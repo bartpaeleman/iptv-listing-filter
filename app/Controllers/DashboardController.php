@@ -70,12 +70,42 @@ final class DashboardController extends BaseController
             ? (string) $input['cache_mode']
             : 'force_download';
 
-        try {
-            $res = (new SchedulerService())->run(true, $mode, $cacheMode);
-            $this->jsonSuccess($res);
-        } catch (\Throwable $e) {
-            $this->jsonError($e->getMessage(), 500);
+        (new \App\Services\SyncProgressService())->reset();
+
+        $response = json_encode([
+            'ok' => true,
+            'success' => true,
+            'data' => [
+                'started' => true,
+                'background' => true,
+                'mode' => $mode,
+                'cache_mode' => $cacheMode,
+            ],
+        ], JSON_UNESCAPED_UNICODE);
+
+        while (ob_get_level() > 0) {
+            ob_end_clean();
         }
+        header('Content-Type: application/json; charset=utf-8');
+        header('Connection: close');
+        header('Content-Length: ' . strlen((string) $response));
+        echo $response;
+        flush();
+
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        }
+
+        try {
+            (new SchedulerService())->run(true, $mode, $cacheMode);
+        } catch (\Throwable $e) {
+            @file_put_contents(
+                dirname(__DIR__, 2) . '/storage/logs/app.log',
+                sprintf("[%s] [SYNC] %s\n", date('Y-m-d H:i:s'), $e->getMessage()),
+                FILE_APPEND
+            );
+        }
+        exit;
     }
 
     public function syncStatus(): void

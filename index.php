@@ -93,6 +93,7 @@ switch ($route) {
         $router->addApiRoute('toggle_epg_source', SettingsController::class, 'toggleEpgSource');
         $router->addApiRoute('delete_epg_source', SettingsController::class, 'deleteEpgSource');
         $router->addApiRoute('test_epg_source', SettingsController::class, 'testEpgSource');
+        $router->addApiRoute('clear_db_tables', SettingsController::class, 'clearDbTables');
         $router->addApiRoute('cache_list', CacheController::class, 'listFiles');
         $router->addApiRoute('cache_import', CacheController::class, 'importFile');
         $router->addApiRoute('cache_rename', CacheController::class, 'renameLabel');

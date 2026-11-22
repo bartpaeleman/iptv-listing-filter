@@ -208,4 +208,39 @@ final class SettingsController extends BaseController
             $this->jsonError($e->getMessage(), 500);
         }
     }
+
+    public function clearDbTables(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $scope = (string) ($input['scope'] ?? '');
+        if (!in_array($scope, ['m3u', 'epg'], true)) {
+            $this->jsonError('Ongeldige scope. Gebruik "m3u" of "epg".', 400);
+        }
+
+        $service = new \App\Services\DatabaseCleanupService();
+        if ($scope === 'm3u') {
+            $counts = $service->clearM3uData();
+            $message = sprintf(
+                'M3U data gewist: %d kanalen en %d groepen verwijderd.',
+                $counts['channels'],
+                $counts['m3u_groups']
+            );
+        } else {
+            $counts = $service->clearEpgData();
+            $message = sprintf(
+                'EPG data gewist: %d programma\'s en %d EPG-zenders verwijderd.',
+                $counts['epg_programmes'],
+                $counts['epg_channels']
+            );
+        }
+
+        $this->jsonSuccess([
+            'scope' => $scope,
+            'deleted' => $counts,
+            'message' => $message,
+        ]);
+    }
 }
