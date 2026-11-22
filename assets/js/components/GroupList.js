@@ -4,7 +4,11 @@ export class GroupList extends BaseComponent {
     render() {
         const { groups = [], selectedGroupId = null, filter = '' } = this.state;
         const q = filter.toLowerCase();
-        const filtered = groups.filter(g => (g.custom_name || g.original_name).toLowerCase().includes(q));
+        const filtered = groups.filter(g =>
+            (g.original_name || g.name || '').toLowerCase().includes(q) ||
+            (g.custom_name || '').toLowerCase().includes(q) ||
+            (g.display_name || '').toLowerCase().includes(q)
+        );
 
         this.container.innerHTML = filtered.map(g => {
             const rawName = g.custom_name || g.original_name;

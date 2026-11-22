@@ -32,8 +32,12 @@ final class ChannelRepository extends BaseRepository
             $params[':gid'] = $groupId;
         }
         if ($search !== '') {
-            $where[] = '(c.tvg_name LIKE :q OR c.custom_name LIKE :q OR c.tvg_id LIKE :q OR c.epg_channel_id LIKE :q)';
-            $params[':q'] = '%' . $search . '%';
+            $like = '%' . $search . '%';
+            $where[] = '(c.tvg_name LIKE :search_tvg OR c.custom_name LIKE :search_custom OR c.tvg_id LIKE :search_tvg_id OR c.epg_channel_id LIKE :search_epg_id)';
+            $params[':search_tvg'] = $like;
+            $params[':search_custom'] = $like;
+            $params[':search_tvg_id'] = $like;
+            $params[':search_epg_id'] = $like;
         }
         if ($activeOnly || $status === 'enabled') {
             $where[] = 'g.is_enabled = 1 AND c.is_enabled = 1';
