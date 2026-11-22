@@ -73,7 +73,7 @@ final class ChannelRepository extends BaseRepository
             $params[':enabled'] = (int) $data['is_enabled'] ? 1 : 0;
         }
         if (array_key_exists('custom_name', $data)) {
-            $cname = trim((string) $data['custom_name']);
+            $cname = mb_substr(trim((string) $data['custom_name']), 0, 250, 'UTF-8');
             $fields[] = 'custom_name = :cname';
             $params[':cname'] = $cname !== '' ? $cname : null;
         }
@@ -83,7 +83,7 @@ final class ChannelRepository extends BaseRepository
             $params[':chno'] = ($chno !== null && $chno !== '') ? (int) $chno : null;
         }
         if (array_key_exists('epg_channel_id', $data)) {
-            $epgId = trim((string) $data['epg_channel_id']);
+            $epgId = mb_substr(trim((string) $data['epg_channel_id']), 0, 250, 'UTF-8');
             $fields[] = 'epg_channel_id = :epg_id';
             $fields[] = 'epg_match_type = :mtype';
             $params[':epg_id'] = $epgId !== '' ? $epgId : null;

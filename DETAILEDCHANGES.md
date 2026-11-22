@@ -34,3 +34,6 @@
   - `SchemaMigrator::migrateIfNeeded()` vergelijkt `hash_file('sha256', 'database/update.sql')` met `last_update_sql_hash` in `settings` en voert `update.sql` idempotent uit bij wijzigingen.
 - **Cross-Device Cache Verharding (`FeedCacheService.php`):**
   - `clearstatcache(true, $path)` vóór `is_file()`/`filesize()` en 0-byte validatie na `rename()`/`copy()`+`unlink()` fallback.
+- **Runtime MEDIUMTEXT Migratie & Pre-Insert Guard (`SchemaMigrator`, `M3uParserService`, `EpgParserService`, `ChannelRepository`):**
+  - `SchemaMigrator::ensureSchemaUpToDate()` bevraagt `INFORMATION_SCHEMA.COLUMNS` vóór elke M3U/EPG-sync en voert direct `ALTER TABLE ... MODIFY COLUMN ... MEDIUMTEXT NULL` uit indien nodig.
+  - `iconv('UTF-8', 'UTF-8//IGNORE', ...)` + 16MB/250-char guards voorkomen `SQLSTATE[22001]` definitief.

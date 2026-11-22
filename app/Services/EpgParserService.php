@@ -29,6 +29,8 @@ final class EpgParserService
      */
     public function sync(?string $overrideUrl = null, string $cacheMode = 'auto'): array
     {
+        \App\Core\SchemaMigrator::ensureSchemaUpToDate($this->pdo);
+
         $cache = new FeedCacheService($this->settings);
         $cacheInfo = $cache->getCacheInfo('epg');
 

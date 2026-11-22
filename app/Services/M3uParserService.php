@@ -34,6 +34,8 @@ final class M3uParserService
      */
     public function sync(?string $overrideUrl = null, string $cacheMode = 'auto'): array
     {
+        \App\Core\SchemaMigrator::ensureSchemaUpToDate($this->pdo);
+
         $cache = new FeedCacheService($this->settings);
         $cacheInfo = $cache->getCacheInfo('m3u');
 
@@ -206,12 +208,12 @@ final class M3uParserService
         ];
     }
 
-    private function sanitizeString(?string $value, int $maxLength = 255): ?string
+    private function sanitizeString(?string $value, int $maxLength = 250): ?string
     {
         if ($value === null) {
             return null;
         }
-        $clean = trim((string) mb_convert_encoding($value, 'UTF-8', 'UTF-8'));
+        $clean = trim((string) @iconv('UTF-8', 'UTF-8//IGNORE', $value));
         if ($clean === '') {
             return null;
         }
@@ -223,8 +225,11 @@ final class M3uParserService
         if ($value === null) {
             return null;
         }
-        $clean = trim((string) mb_convert_encoding($value, 'UTF-8', 'UTF-8'));
-        return $clean !== '' ? $clean : null;
+        $clean = trim((string) @iconv('UTF-8', 'UTF-8//IGNORE', $value));
+        if ($clean === '' || strlen($clean) > 16000000) {
+            return null;
+        }
+        return $clean;
     }
 
     /**
