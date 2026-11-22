@@ -70,57 +70,42 @@ final class DashboardController extends BaseController
             ? (string) $input['cache_mode']
             : 'force_download';
 
-        $script = dirname(__DIR__, 2) . '/bin/sync.php';
-        $phpBin = null;
-        $candidates = [
-            defined('PHP_BINDIR') ? PHP_BINDIR . '/php' : '',
-            '/mnt/ext/opt/apache/bin/php',
-            '/usr/local/bin/php',
-            '/usr/bin/php',
-        ];
-        if (defined('PHP_BINARY') && PHP_BINARY !== '' && basename(PHP_BINARY) === 'php') {
-            array_unshift($candidates, PHP_BINARY);
-        }
-        foreach ($candidates as $candidate) {
-            if ($candidate !== '' && @is_executable($candidate)) {
-                $phpBin = $candidate;
-                break;
-            }
-        }
+        (new \App\Services\SyncProgressService())->reset();
 
-        if ($phpBin !== null && function_exists('exec') && is_file($script)) {
-            $args = ['--force'];
-            if ($mode === 'm3u') {
-                $args[] = '--m3u';
-            } elseif ($mode === 'epg') {
-                $args[] = '--epg';
-            }
-            if ($cacheMode === 'cache_only') {
-                $args[] = '--use-cache';
-            }
-
-            (new \App\Services\SyncProgressService())->reset();
-
-            $cmd = 'nohup ' . escapeshellarg($phpBin) . ' ' . escapeshellarg($script)
-                . ' ' . implode(' ', $args) . ' >/dev/null 2>&1 &';
-            @exec($cmd);
-
-            $this->jsonSuccess([
+        $response = json_encode([
+            'ok' => true,
+            'success' => true,
+            'data' => [
                 'started' => true,
                 'background' => true,
                 'mode' => $mode,
                 'cache_mode' => $cacheMode,
-            ]);
-            return;
+            ],
+        ], JSON_UNESCAPED_UNICODE);
+
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json; charset=utf-8');
+        header('Connection: close');
+        header('Content-Length: ' . strlen((string) $response));
+        echo $response;
+        flush();
+
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
         }
 
         try {
-            $res = (new SchedulerService())->run(true, $mode, $cacheMode);
-            $res['background'] = false;
-            $this->jsonSuccess($res);
+            (new SchedulerService())->run(true, $mode, $cacheMode);
         } catch (\Throwable $e) {
-            $this->jsonError($e->getMessage(), 500);
+            @file_put_contents(
+                dirname(__DIR__, 2) . '/storage/logs/app.log',
+                sprintf("[%s] [SYNC] %s\n", date('Y-m-d H:i:s'), $e->getMessage()),
+                FILE_APPEND
+            );
         }
+        exit;
     }
 
     public function syncStatus(): void
