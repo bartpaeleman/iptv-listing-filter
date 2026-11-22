@@ -361,7 +361,7 @@ export class ChannelsPage extends BaseComponent {
         document.getElementById('loadSourceToggleBtn')?.addEventListener('click', e => {
             this.loadFromDb = !this.loadFromDb;
             const btn = e.currentTarget;
-            btn.textContent = this.loadFromDb ? '🗄️ Database' : '⚡ Cache';
+            btn.textContent = this.loadFromDb ? 'Bron: 🗄️ Database' : 'Bron: ⚡ Cache';
             btn.classList.toggle('btn-warning', this.loadFromDb);
         });
 
