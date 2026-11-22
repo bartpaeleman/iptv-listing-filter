@@ -30,3 +30,5 @@
 - **Sync Log Leegmaken & UI Error Handling (`SyncLogRepository`, `DashboardController`, `App.js`):**
   - `SyncLogRepository::clearAll()` en `DashboardController::clearSyncLogs()` (`?route=api&endpoint=clear_sync_logs`).
   - `App.js::switchTab()` vangt API/JS-fouten af en toont een leesbare foutmelding in plaats van een leeg scherm; `SettingsController::get()` vangt ontbrekende `epg_sources` tabel op.
+- **Latest-Only Delta Migratie (`SchemaMigrator.php`, `database/update.sql`):**
+  - `SchemaMigrator::migrateIfNeeded()` vergelijkt `hash_file('sha256', 'database/update.sql')` met `last_update_sql_hash` in `settings` en voert `update.sql` idempotent uit bij wijzigingen.

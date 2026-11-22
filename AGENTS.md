@@ -19,9 +19,10 @@ Dit document bevat de bindende regels voor alle AI-agents en ontwikkelaars die a
 - **Database:** 100% PDO Prepared Statements (`PDO::ATTR_EMULATE_PREPARES => false`).
 - **Auth, XSS & CSRF:** Alle muterende API-calls (`POST`/`PUT`/`DELETE`) vereisen een geldig CSRF-token. Escape alle user- en externe M3U/EPG-data met `htmlspecialchars(..., ENT_QUOTES, 'UTF-8')`. Uitgaande feeds (`playlist.php`, `epg.php`) vereisen LAN-subnet validatie en/of een geldige `output_token`.
 
-## 4. Database & Migratiebeleid (Rolling 2-Updates)
-- `database/schema.sql` bevat altijd de volledige, actuele tabellenstructuur voor schone installaties (`public/install.php`).
-- `database/update.sql` bevat uitsluitend de databasewijzigingen van de **laatste 2 releases** (Rolling 2-updates beleid), idempotent geschreven (`IF NOT EXISTS`, `IF EXISTS`, kolomchecks) zodat bestaande QNAP-installaties veilig kunnen updaten zonder dataverlies.
+## 4. Database & Migratiebeleid (Latest-Only Delta)
+- `database/schema.sql` bevat altijd de volledige, actuele tabellenstructuur voor schone installaties.
+- `database/update.sql` bevat **uitsluitend** de idempotente SQL-statements (`IF NOT EXISTS`, `IF EXISTS`, `MODIFY COLUMN`) van de **laatste/huidige** databasewijziging. Bij elke volgende databasewijziging wordt `database/update.sql` volledig leeggemaakt en opnieuw gevuld met enkel het nieuwe commando (oudere statements worden verwijderd).
+- Wanneer een taak géén databasewijziging vereist, blijft `database/update.sql` ongewijzigd.
 
 ## 5. UX & Frontend Richtlijnen
 - **Mobile-first & tablet-vriendelijk (iPad/iPhone):** Interactieve knoppen, toggles en links hebben een minimale touch-target van `44x44px`.
