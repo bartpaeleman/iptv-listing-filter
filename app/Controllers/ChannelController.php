@@ -246,6 +246,24 @@ final class ChannelController extends BaseController
         $this->jsonSuccess();
     }
 
+    public function reorderGroupChannels(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $groupId = (int) ($input['group_id'] ?? 0);
+        $sortBy = in_array($input['sort_by'] ?? 'number', ['number', 'number_desc', 'name_asc', 'name_desc'], true)
+            ? (string) $input['sort_by']
+            : 'number';
+
+        if ($groupId > 0) {
+            (new ChannelRepository())->reorderGroupBySort($groupId, $sortBy);
+            (new ViewCacheService())->invalidateGroupChannels($groupId);
+        }
+        $this->jsonSuccess();
+    }
+
     public function countryTags(): void
     {
         $this->requireAuth();

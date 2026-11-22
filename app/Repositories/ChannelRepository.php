@@ -105,6 +105,40 @@ final class ChannelRepository extends BaseRepository
         ];
     }
 
+    public function reorderGroupBySort(int $groupId, string $sortBy): void
+    {
+        if ($groupId <= 0) {
+            return;
+        }
+        $orderSql = match ($sortBy) {
+            'name_asc' => "COALESCE(NULLIF(custom_name, ''), tvg_name) ASC, id ASC",
+            'name_desc' => "COALESCE(NULLIF(custom_name, ''), tvg_name) DESC, id DESC",
+            'number_desc' => '(channel_number IS NULL) ASC, channel_number DESC, id DESC',
+            default => '(channel_number IS NULL) ASC, channel_number ASC, id ASC',
+        };
+
+        $stmt = $this->pdo->prepare(
+            "SELECT id FROM channels WHERE group_id = :gid AND is_enabled = 1 ORDER BY {$orderSql}"
+        );
+        $stmt->execute([':gid' => $groupId]);
+        $ids = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+
+        $this->pdo->beginTransaction();
+        try {
+            $upd = $this->pdo->prepare('UPDATE channels SET channel_number = :num WHERE id = :id');
+            $num = 1;
+            foreach ($ids as $id) {
+                $upd->execute([':num' => $num++, ':id' => (int) $id]);
+            }
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
     /**
      * @param array<string, mixed> $data
      */

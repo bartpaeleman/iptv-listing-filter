@@ -622,7 +622,7 @@ export class ChannelsPage extends BaseComponent {
         }
 
         thead.querySelectorAll('.ch-sort-th').forEach(th => {
-            th.addEventListener('click', () => {
+            th.addEventListener('click', async () => {
                 const key = th.dataset.sort;
                 if (key === 'number') {
                     this.channelSortBy = this.channelSortBy === 'number' ? 'number_desc' : 'number';
@@ -634,8 +634,12 @@ export class ChannelsPage extends BaseComponent {
                     try {
                         localStorage.setItem('iptv_group_channel_sort', JSON.stringify(this.groupChannelSortMap));
                     } catch {}
+                    await this.props.api.post('reorder_group_channels', {
+                        group_id: this.selectedGroupId,
+                        sort_by: this.channelSortBy,
+                    });
                 }
-                this.loadChannels();
+                await this.loadChannels();
             });
         });
     }
