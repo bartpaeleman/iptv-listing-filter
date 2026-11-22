@@ -27,7 +27,7 @@ final class EpgParserService
     /**
      * @return array{epg_channels: int, programmes_imported: int, programmes_pruned: int, sources_ok: int, sources_failed: int}
      */
-    public function sync(?string $overrideUrl = null, string $cacheMode = 'auto'): array
+    public function sync(?string $overrideUrl = null, string $cacheMode = 'auto', ?string $cacheFilename = null): array
     {
         \App\Core\SchemaMigrator::ensureSchemaUpToDate($this->pdo);
 
@@ -35,10 +35,15 @@ final class EpgParserService
         $cacheInfo = $cache->getCacheInfo('epg');
 
         if ($cacheMode === 'cache_only') {
-            if (!$cacheInfo['exists']) {
-                throw new RuntimeException('Geen lokaal EPG cachebestand gevonden. Voer eerst een nieuwe download uit.');
+            if ($cacheFilename !== null && $cacheFilename !== '') {
+                $file = $cache->resolveFilePath($cacheFilename);
+            } elseif ($cacheInfo['exists']) {
+                $file = $cacheInfo['path'];
+            } else {
+                throw new RuntimeException("Geen lokale EPG-cache aanwezig — kies 'EPG downloaden & importeren'.");
             }
-            $stats = $this->parseXmlFile($cacheInfo['path']);
+            $stats = $this->parseXmlFile($file);
+            $cache->updateItemCount($file, $stats['epg_channels']);
             $this->settings->set('last_epg_sync', gmdate('Y-m-d H:i:s'), false);
             return [
                 'epg_channels' => $stats['epg_channels'],
@@ -95,8 +100,9 @@ final class EpgParserService
             try {
                 $tmpFile = dirname(__DIR__, 2) . '/storage/cache/epg_source.xml.tmp';
                 $this->http->downloadToFile((string) $src['url'], $tmpFile, 300, true);
-                $cachedFile = $cache->storeFromTempFile('epg', $tmpFile);
+                $cachedFile = $cache->storeFromTempFile('epg', $tmpFile, (string) ($src['name'] ?? 'epg'));
                 $stats = $this->parseXmlFile($cachedFile);
+                $cache->updateItemCount($cachedFile, $stats['epg_channels']);
                 $totalChannels += $stats['epg_channels'];
                 $totalProgs += $stats['programmes_imported'];
                 $totalPruned += $stats['programmes_pruned'];

@@ -157,10 +157,8 @@ export class DashboardPage extends BaseComponent {
             });
         });
 
-        document.getElementById('clearCacheBtn')?.addEventListener('click', async () => {
-            await this.props.api.post('clear_cache');
-            this.props.toast.show('Lokale cache geleegd!');
-            await this.load();
+        document.getElementById('openCacheManagerBtn')?.addEventListener('click', () => {
+            this.props.switchTab?.('cache');
         });
 
         document.getElementById('btn-clear-sync-logs')?.addEventListener('click', async () => {

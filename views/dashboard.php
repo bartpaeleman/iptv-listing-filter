@@ -12,6 +12,7 @@ ob_start();
         <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
         <button class="tab-btn" data-tab="channels">Groepen & Kanalen</button>
         <button class="tab-btn" data-tab="epg">EPG Koppeling</button>
+        <button class="tab-btn" data-tab="cache">Cachebeheer</button>
         <button class="tab-btn" data-tab="settings">Bronnen & Cron</button>
     </nav>
     <div class="topbar-right">
@@ -24,6 +25,7 @@ ob_start();
     <section id="tab-dashboard" class="tab-panel active"></section>
     <section id="tab-channels" class="tab-panel"></section>
     <section id="tab-epg" class="tab-panel"></section>
+    <section id="tab-cache" class="tab-panel"></section>
     <section id="tab-settings" class="tab-panel"></section>
 </main>
 

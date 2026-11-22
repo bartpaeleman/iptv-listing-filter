@@ -25,7 +25,7 @@ final class SchedulerService
     /**
      * @return array{ran: bool, reason?: string, m3u?: array<string, int>, epg?: array<string, int>}
      */
-    public function run(bool $force = false, string $mode = 'all', string $cacheMode = 'force_download'): array
+    public function run(bool $force = false, string $mode = 'all', string $cacheMode = 'force_download', ?string $cacheFilename = null): array
     {
         $intervalHours = max(1, (int) ($this->settings->get('sync_interval_hours', '72') ?? '72'));
         $preferredHour = (int) ($this->settings->get('sync_preferred_hour', '3') ?? '3');
@@ -50,7 +50,7 @@ final class SchedulerService
             if ($mode === 'all' || $mode === 'epg') {
                 $progress->update('running', 'parse_epg', 10, 'EPG bronnen synchroniseren...', [], 'Start EPG synchronisatie');
                 try {
-                    $epgStats = (new EpgParserService($this->pdo, $this->settings))->sync(null, $cacheMode);
+                    $epgStats = (new EpgParserService($this->pdo, $this->settings))->sync(null, $cacheMode, $mode === 'epg' ? $cacheFilename : null);
                     $result['epg'] = $epgStats;
                     $this->logs->addLog('epg', 'success', 'EPG synchronisatie voltooid.', $epgStats);
                     $this->writeFileLog('epg', 'success', 'EPG synchronisatie voltooid.', $epgStats);
@@ -64,7 +64,7 @@ final class SchedulerService
             }
 
             if ($mode === 'all' || $mode === 'm3u') {
-                $m3uStats = (new M3uParserService($this->pdo, $this->settings))->sync(null, $cacheMode);
+                $m3uStats = (new M3uParserService($this->pdo, $this->settings))->sync(null, $cacheMode, $mode === 'm3u' ? $cacheFilename : null);
                 $result['m3u'] = $m3uStats;
                 $this->logs->addLog('m3u', 'success', 'M3U synchronisatie voltooid.', $m3uStats);
                 $this->writeFileLog('m3u', 'success', 'M3U synchronisatie voltooid.', $m3uStats);

@@ -32,7 +32,7 @@ final class M3uParserService
     /**
      * @return array{groups_added: int, channels_added: int, channels_updated: int, auto_matched: int}
      */
-    public function sync(?string $overrideUrl = null, string $cacheMode = 'auto'): array
+    public function sync(?string $overrideUrl = null, string $cacheMode = 'auto', ?string $cacheFilename = null): array
     {
         \App\Core\SchemaMigrator::ensureSchemaUpToDate($this->pdo);
 
@@ -40,10 +40,13 @@ final class M3uParserService
         $cacheInfo = $cache->getCacheInfo('m3u');
 
         if ($cacheMode === 'cache_only') {
-            if (!$cacheInfo['exists']) {
+            if ($cacheFilename !== null && $cacheFilename !== '') {
+                $sourceFile = $cache->resolveFilePath($cacheFilename);
+            } elseif ($cacheInfo['exists']) {
+                $sourceFile = $cacheInfo['path'];
+            } else {
                 throw new RuntimeException('Geen lokaal M3U cachebestand gevonden. Voer eerst een nieuwe download uit.');
             }
-            $sourceFile = $cacheInfo['path'];
         } elseif ($cacheMode === 'auto' && $cacheInfo['is_fresh'] && $overrideUrl === null) {
             $sourceFile = $cacheInfo['path'];
         } else {
@@ -53,7 +56,8 @@ final class M3uParserService
             }
             $tmpFile = dirname(__DIR__, 2) . '/storage/cache/m3u_source.tmp';
             $this->http->downloadToFile($url, $tmpFile, 180);
-            $sourceFile = $cache->storeFromTempFile('m3u', $tmpFile);
+            $hostLabel = (string) (parse_url($url, PHP_URL_HOST) ?: 'provider');
+            $sourceFile = $cache->storeFromTempFile('m3u', $tmpFile, $hostLabel);
         }
 
         $progress = new SyncProgressService();
@@ -191,6 +195,7 @@ final class M3uParserService
         }
 
         fclose($handle);
+        $cache->updateItemCount($sourceFile, $channelsAdded + $channelsUpdated);
         $this->settings->set('last_m3u_sync', $now, false);
 
         return [

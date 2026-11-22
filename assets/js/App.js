@@ -4,6 +4,7 @@ import { ModalDialog } from './components/ModalDialog.js';
 import { DashboardPage } from './pages/DashboardPage.js';
 import { ChannelsPage } from './pages/ChannelsPage.js';
 import { EpgMappingPage } from './pages/EpgMappingPage.js';
+import { CacheManagerPage } from './pages/CacheManagerPage.js';
 import { SettingsPage } from './pages/SettingsPage.js';
 
 class App {
@@ -12,11 +13,12 @@ class App {
         this.modal = new ModalDialog('#modalRoot');
         this.api = new ApiClient(this.toast);
 
-        const deps = { api: this.api, toast: this.toast, modal: this.modal };
+        const deps = { api: this.api, toast: this.toast, modal: this.modal, switchTab: tab => this.switchTab(tab) };
         this.pages = {
             dashboard: new DashboardPage('#tab-dashboard', deps),
             channels: new ChannelsPage('#tab-channels', deps),
             epg: new EpgMappingPage('#tab-epg', deps),
+            cache: new CacheManagerPage('#tab-cache', deps),
             settings: new SettingsPage('#tab-settings', deps),
         };
     }

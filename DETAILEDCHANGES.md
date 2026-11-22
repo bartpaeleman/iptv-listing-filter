@@ -43,3 +43,6 @@
 - **Land-Tags & Geïsoleerde M3U/EPG Cache (`CountryTagService`, `CountryTagRepository`, `ChannelRepository`, `ChannelsPage.js`):**
   - `CountryTagService` converteert ISO-2 codes naar vlag-emoji's, scant onbekende `[TAG]` prefixen en past vlaggen/landgroepen toe op bestaande kanalen.
   - `ChannelRepository::filter()` ondersteunt `country_tag_id`, `status` (`enabled`/`disabled`) en `has_epg` (`yes`/`no`).
+- **Multi-File Cachebeheer (`FeedCacheService`, `CacheController`, `CacheManagerPage.js`):**
+  - `FeedCacheService` bewaart downloads met unieke datum/bron-bestandsnamen + `.meta.json` (`listCacheFiles()`, `resolveFilePath()`, `renameLabel()`, `deleteBulk()`).
+  - `CacheController` biedt `cache_list`, `cache_import`, `cache_rename` en `cache_delete` endpoints.

@@ -22,65 +22,96 @@ final class FeedCacheService
     }
 
     /**
-     * @return array{
-     *   path: string,
-     *   exists: bool,
-     *   downloaded_at: string|null,
-     *   age_minutes: int|null,
-     *   is_fresh: bool,
-     *   size_formatted: string
-     * }
+     * @return array<int, array<string, mixed>>
+     */
+    public function listCacheFiles(?string $type = null): array
+    {
+        $files = glob($this->cacheDir . '/*.{m3u,xml}', GLOB_BRACE) ?: [];
+        $result = [];
+
+        foreach ($files as $path) {
+            $filename = basename($path);
+            $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+            $fileType = $ext === 'xml' ? 'epg' : 'm3u';
+            if ($type !== null && $fileType !== $type) {
+                continue;
+            }
+
+            $metaPath = $path . '.meta.json';
+            $meta = is_file($metaPath) ? json_decode((string) file_get_contents($metaPath), true) : null;
+            if (!is_array($meta)) {
+                $mtime = filemtime($path) ?: time();
+                $size = filesize($path) ?: 0;
+                $meta = [
+                    'filename' => $filename,
+                    'type' => $fileType,
+                    'label' => $filename,
+                    'source_label' => 'provider',
+                    'created_at' => gmdate('Y-m-d H:i:s', $mtime),
+                    'timestamp' => $mtime,
+                    'size_bytes' => $size,
+                    'size_formatted' => $this->formatBytes($size),
+                    'item_count' => null,
+                ];
+            }
+
+            $result[] = $meta;
+        }
+
+        usort($result, static fn (array $a, array $b): int => ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0)));
+        return $result;
+    }
+
+    /**
+     * @return array{path: string, filename: string|null, exists: bool, downloaded_at: string|null, age_minutes: int|null, is_fresh: bool, size_formatted: string, total_files: int}
      */
     public function getCacheInfo(string $type): array
     {
-        $path = $this->getDataPath($type);
-        $metaPath = $this->getMetaPath($type);
-        clearstatcache(true, $path);
-
-        if (!is_file($path)) {
+        $files = $this->listCacheFiles($type);
+        $totalFiles = count($this->listCacheFiles(null));
+        if ($files === []) {
             return [
-                'path' => $path,
+                'path' => '',
+                'filename' => null,
                 'exists' => false,
                 'downloaded_at' => null,
                 'age_minutes' => null,
                 'is_fresh' => false,
                 'size_formatted' => '0 B',
+                'total_files' => $totalFiles,
             ];
         }
 
-        $mtime = filemtime($path) ?: time();
-        $size = filesize($path) ?: 0;
-        $downloadedAt = gmdate('Y-m-d H:i:s', $mtime);
-
-        if (is_file($metaPath)) {
-            $meta = json_decode((string) file_get_contents($metaPath), true);
-            if (is_array($meta)) {
-                $mtime = (int) ($meta['timestamp'] ?? $mtime);
-                $size = (int) ($meta['size'] ?? $size);
-                $downloadedAt = (string) ($meta['downloaded_at'] ?? $downloadedAt);
-            }
-        }
-
+        $newest = $files[0];
+        $path = $this->resolveFilePath((string) $newest['filename']);
+        $mtime = (int) ($newest['timestamp'] ?? time());
         $ttlMinutes = max(1, (int) ($this->settings->get('cache_ttl_minutes', '360') ?? '360'));
         $ageMinutes = max(0, (int) floor((time() - $mtime) / 60));
 
         return [
             'path' => $path,
+            'filename' => (string) $newest['filename'],
             'exists' => true,
-            'downloaded_at' => $downloadedAt,
+            'downloaded_at' => (string) ($newest['created_at'] ?? gmdate('Y-m-d H:i:s', $mtime)),
             'age_minutes' => $ageMinutes,
             'is_fresh' => $ageMinutes < $ttlMinutes,
-            'size_formatted' => $this->formatBytes($size),
+            'size_formatted' => (string) ($newest['size_formatted'] ?? '0 B'),
+            'total_files' => $totalFiles,
         ];
     }
 
-    public function storeFromTempFile(string $type, string $tempPath): string
+    public function storeFromTempFile(string $type, string $tempPath, string $sourceLabel = 'provider'): string
     {
         if (!is_file($tempPath) || filesize($tempPath) === 0) {
             throw new RuntimeException("Gedownload tijdelijk bestand voor {$type} ontbreekt of is leeg.");
         }
 
-        $destPath = $this->getDataPath($type);
+        $safeSource = preg_replace('/[^a-zA-Z0-9_-]/', '_', strtolower($sourceLabel)) ?: 'provider';
+        $safeSource = trim(substr($safeSource, 0, 24), '_') ?: 'provider';
+        $ext = $type === 'epg' ? 'xml' : 'm3u';
+        $filename = sprintf('%s_%s_%s.%s', $type, date('Y-m-d_His'), $safeSource, $ext);
+        $destPath = $this->cacheDir . '/' . $filename;
+
         if (!@rename($tempPath, $destPath)) {
             if (!@copy($tempPath, $destPath)) {
                 throw new RuntimeException("Kan cachebestand niet opslaan voor {$type}.");
@@ -96,35 +127,96 @@ final class FeedCacheService
 
         $now = time();
         $meta = [
+            'filename' => $filename,
+            'type' => $type,
+            'label' => $filename,
+            'source_label' => $sourceLabel,
+            'created_at' => gmdate('Y-m-d H:i:s', $now),
             'timestamp' => $now,
-            'downloaded_at' => gmdate('Y-m-d H:i:s', $now),
-            'size' => $size,
+            'size_bytes' => $size,
+            'size_formatted' => $this->formatBytes($size),
+            'item_count' => null,
         ];
-        @file_put_contents($this->getMetaPath($type), json_encode($meta));
+        @file_put_contents($destPath . '.meta.json', json_encode($meta, JSON_UNESCAPED_UNICODE));
 
         return $destPath;
     }
 
-    public function clearCache(?string $type = null): void
+    public function resolveFilePath(string $filename): string
     {
-        $types = $type !== null ? [$type] : ['m3u', 'epg'];
-        foreach ($types as $t) {
-            @unlink($this->getDataPath($t));
-            @unlink($this->getMetaPath($t));
+        if ($filename === '' || basename($filename) !== $filename) {
+            throw new RuntimeException('Ongeldige cache-bestandsnaam.');
+        }
+        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        if (!in_array($ext, ['m3u', 'xml'], true)) {
+            throw new RuntimeException('Ongeldige cache-extensie.');
+        }
+        $path = $this->cacheDir . '/' . $filename;
+        if (!is_file($path)) {
+            throw new RuntimeException("Cachebestand '{$filename}' niet gevonden.");
+        }
+        return $path;
+    }
+
+    public function updateItemCount(string $filePath, int $count): void
+    {
+        $metaPath = $filePath . '.meta.json';
+        if (!is_file($metaPath)) {
+            return;
+        }
+        $meta = json_decode((string) file_get_contents($metaPath), true);
+        if (is_array($meta)) {
+            $meta['item_count'] = $count;
+            @file_put_contents($metaPath, json_encode($meta, JSON_UNESCAPED_UNICODE));
         }
     }
 
-    private function getDataPath(string $type): string
+    public function renameLabel(string $filename, string $newLabel): bool
     {
-        return $this->cacheDir . ($type === 'epg' ? '/latest_epg.xml' : '/latest_playlist.m3u');
+        $path = $this->resolveFilePath($filename);
+        $metaPath = $path . '.meta.json';
+        $meta = is_file($metaPath) ? json_decode((string) file_get_contents($metaPath), true) : [];
+        if (!is_array($meta)) {
+            $meta = [];
+        }
+        $meta['filename'] = $filename;
+        $meta['label'] = trim($newLabel) !== '' ? trim($newLabel) : $filename;
+        return file_put_contents($metaPath, json_encode($meta, JSON_UNESCAPED_UNICODE)) !== false;
     }
 
-    private function getMetaPath(string $type): string
+    public function deleteFile(string $filename): bool
     {
-        return $this->getDataPath($type) . '.meta.json';
+        $path = $this->resolveFilePath($filename);
+        @unlink($path . '.meta.json');
+        return @unlink($path);
     }
 
-    private function formatBytes(int $bytes): string
+    /**
+     * @param array<int, string> $filenames
+     */
+    public function deleteBulk(array $filenames): int
+    {
+        $deleted = 0;
+        foreach ($filenames as $fn) {
+            try {
+                if ($this->deleteFile((string) $fn)) {
+                    $deleted++;
+                }
+            } catch (\Throwable) {
+                // Skip invalid filenames
+            }
+        }
+        return $deleted;
+    }
+
+    public function clearCache(?string $type = null): void
+    {
+        foreach ($this->listCacheFiles($type) as $file) {
+            $this->deleteFile((string) $file['filename']);
+        }
+    }
+
+    public function formatBytes(int $bytes): string
     {
         if ($bytes >= 1048576) {
             return number_format($bytes / 1048576, 1, ',', '.') . ' MB';
