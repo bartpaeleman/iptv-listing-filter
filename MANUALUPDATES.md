@@ -8,3 +8,6 @@ Dit document beschrijft handmatige acties die beheerders op de QNAP NAS moeten u
 3. **LAN Clients (TiviMate/Kodi/VLC):** Gebruik de nieuwe URLs:
    - Playlist: `http://<nas-ip>/iptv/index.php?route=playlist&token=<OUTPUT_TOKEN>`
 4. **Database Migratie:** Voer `database/update.sql` uit op bestaande installaties om `epg_sources` toe te voegen en `channels.tvg_logo` / `epg_channels.icon_url` naar `TEXT` te migreren.
+
+## Update naar Groepssortering & Dynamische Kanaalhernummering
+- `SchemaMigrator::ensureSchemaUpToDate()` voert de migratie (`m3u_groups.import_order` en `settings.group_sort_mode`) automatisch uit bij het openen van het dashboard. Indien de database-gebruiker geen `ALTER TABLE`-rechten heeft, voer dan handmatig `database/update.sql` uit als DB-admin.

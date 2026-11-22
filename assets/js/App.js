@@ -38,6 +38,10 @@ class App {
             btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
         });
 
+        document.getElementById('adminToolsBtn')?.addEventListener('click', () => {
+            this.switchTab('admin');
+        });
+
         document.getElementById('themeToggle')?.addEventListener('click', () => {
             const html = document.documentElement;
             html.dataset.theme = html.dataset.theme === 'light' ? 'dark' : 'light';

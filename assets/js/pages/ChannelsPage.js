@@ -8,6 +8,8 @@ export class ChannelsPage extends BaseComponent {
         super(container, props);
         this.selectedGroupId = null;
         this.channelSearch = '';
+        this.groupSortMode = 'import';
+        this.channelSortBy = 'number';
         this.groupList = null;
         this.channelTable = null;
     }
@@ -17,13 +19,17 @@ export class ChannelsPage extends BaseComponent {
             this.renderShell();
             this.container.dataset.mounted = '1';
         }
-        const [groups, tags] = await Promise.all([
+        const [groupsRes, tags] = await Promise.all([
             this.props.api.get('groups'),
             this.props.api.get('country_tags'),
         ]);
+        this.groups = Array.isArray(groupsRes) ? groupsRes : (groupsRes?.items || []);
+        this.groupSortMode = groupsRes?.group_sort_mode || this.groupSortMode || 'import';
         this.countryTags = tags || [];
         this.populateCountryFilter();
-        this.groupList.setState({ groups, selectedGroupId: this.selectedGroupId, countryTags: this.countryTags });
+        this.updateGroupSortButton();
+        this.groupList.setState({ groups: this.groups, selectedGroupId: this.selectedGroupId, countryTags: this.countryTags });
+        this.updateGroupHeader();
         await this.loadChannels();
     }
 
@@ -42,6 +48,7 @@ export class ChannelsPage extends BaseComponent {
             country_tag_id: document.getElementById('channelCountryFilter')?.value || '',
             status: document.getElementById('channelStatusFilter')?.value || 'all',
             has_epg: document.getElementById('channelEpgFilter')?.value || 'all',
+            sort_by: this.channelSortBy,
             limit: 150,
         };
         if (this.selectedGroupId) params.group_id = this.selectedGroupId;
@@ -56,6 +63,7 @@ export class ChannelsPage extends BaseComponent {
                     <div class="card-header">
                         <h2>Groepen</h2>
                         <div class="btn-group">
+                            <button type="button" class="btn btn-sm" id="groupSortBtn" title="Klik om groepssortering te wisselen (Import / A-Z / Z-A)"><span id="groupSortBadge">⇅ Import</span></button>
                             <button class="btn btn-sm" id="enableAllGroupsBtn">Alles Aan</button>
                             <button class="btn btn-sm" id="disableAllGroupsBtn">Alles Uit</button>
                         </div>
@@ -77,8 +85,8 @@ export class ChannelsPage extends BaseComponent {
                             <button type="button" class="btn btn-sm hidden" id="adoptGroupNameBtn" title="Huidige weergavenaam (incl. vlag/emoji) opslaan als custom naam">❐</button>
                             <button type="button" class="btn btn-sm hidden" id="editGroupNameBtn" title="Groepsnaam aanpassen">✏️</button>
                             <button class="btn btn-sm" id="manageCountryTagsBtn">🏷️ Landen & Tags Beheren</button>
-                            <button class="btn btn-sm" id="bulkEnableChannelsBtn">Selectie Aan</button>
-                            <button class="btn btn-sm" id="bulkDisableChannelsBtn">Selectie Uit</button>
+                            <button class="btn btn-sm" id="bulkEnableChannelsBtn">Alles Aan</button>
+                            <button class="btn btn-sm" id="bulkDisableChannelsBtn">Alles Uit</button>
                         </div>
                     </div>
                     <div class="toolbar" style="flex-wrap:wrap;">
@@ -99,14 +107,9 @@ export class ChannelsPage extends BaseComponent {
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th title="Selecteer/deselecteer alle zichtbare kanalen voor bulkacties" style="white-space:nowrap;">
-                                        <label style="display:inline-flex;align-items:center;gap:0.25rem;cursor:pointer;">
-                                            <input type="checkbox" id="selectAllChannels" title="Selecteer/deselecteer alle zichtbare kanalen voor bulkacties">
-                                        </label>
-                                    </th>
                                     <th>Aan</th>
-                                    <th>#</th>
-                                    <th>Naam (Origineel / Custom)</th>
+                                    <th id="sortChannelsByNum" style="cursor:pointer;user-select:none;" title="Sorteer op kanaalnummer">#</th>
+                                    <th id="sortChannelsByName" style="cursor:pointer;user-select:none;" title="Klik om te sorteren: A-Z / Z-A / Import">Naam (Origineel / Custom) <span id="channelNameSortBadge" class="muted" style="font-size:0.8rem;font-weight:normal;"></span></th>
                                     <th>Groep</th>
                                 </tr>
                             </thead>
@@ -163,18 +166,13 @@ export class ChannelsPage extends BaseComponent {
             this.load();
         });
 
-        document.getElementById('selectAllChannels')?.addEventListener('change', ev => {
-            document.querySelectorAll('#channelsTableRoot tr').forEach(tr => {
-                const cb = tr.querySelector('.ch-select');
-                if (cb) cb.checked = ev.target.checked;
-                tr.classList.toggle('row-selected', ev.target.checked);
-            });
-        });
-
         const bulkChannels = async enable => {
-            const ids = this.channelTable.getSelectedIds();
-            if (ids.length === 0) return this.props.toast.show('Selecteer eerst kanalen.');
-            await this.props.api.post('bulk_channels', { ids, is_enabled: enable ? 1 : 0 });
+            await this.props.api.post('bulk_channels', {
+                is_enabled: enable ? 1 : 0,
+                group_id: this.selectedGroupId,
+                search: this.channelSearch,
+            });
+            this.props.toast.show(enable ? 'Alle kanalen ingeschakeld' : 'Alle kanalen uitgeschakeld');
             this.loadChannels();
         };
         document.getElementById('bulkEnableChannelsBtn')?.addEventListener('click', () => bulkChannels(true));
@@ -236,6 +234,46 @@ export class ChannelsPage extends BaseComponent {
             const display = grp?.display_name || titleEl?.textContent || '';
             saveHeaderGroupName(display.trim());
         });
+
+        document.getElementById('groupSortBtn')?.addEventListener('click', async () => {
+            const order = ['import', 'asc', 'desc'];
+            const nextMode = order[(order.indexOf(this.groupSortMode) + 1) % order.length];
+            const res = await this.props.api.post('set_group_sort', { mode: nextMode });
+            this.groups = Array.isArray(res) ? res : (res?.items || []);
+            this.groupSortMode = res?.group_sort_mode || nextMode;
+            this.updateGroupSortButton();
+            this.groupList.setState({ groups: this.groups, selectedGroupId: this.selectedGroupId });
+        });
+
+        document.getElementById('sortChannelsByNum')?.addEventListener('click', () => {
+            this.channelSortBy = 'number';
+            const badge = document.getElementById('channelNameSortBadge');
+            if (badge) badge.textContent = '';
+            this.loadChannels();
+        });
+
+        document.getElementById('sortChannelsByName')?.addEventListener('click', () => {
+            const order = ['name_asc', 'name_desc', 'import'];
+            const idx = order.indexOf(this.channelSortBy);
+            this.channelSortBy = order[(idx + 1) % order.length];
+            const badge = document.getElementById('channelNameSortBadge');
+            if (badge) {
+                const labels = { name_asc: '↑', name_desc: '↓', import: '⇅' };
+                badge.textContent = labels[this.channelSortBy] || '';
+            }
+            this.loadChannels();
+        });
+    }
+
+    updateGroupSortButton() {
+        const badge = document.getElementById('groupSortBadge');
+        if (!badge) return;
+        const labels = {
+            import: '⇅ Import',
+            asc: '↑ A-Z',
+            desc: '↓ Z-A',
+        };
+        badge.textContent = labels[this.groupSortMode] || '⇅ Import';
     }
 
     updateGroupHeader(fallbackName = '') {

@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased] - feature/sorting-and-numbering
+### Toegevoegd
+- **Stap 2 — Custom Groep- & Kanaalnamen + Bulk-UI (`ChannelsPage.js`, `ChannelTable.js`, `ChannelController.php`):**
+  - Inline groepsnaam bewerken (`✏️`) en 1-klik weergavenaam overnemen (`❐`) direct in de kanaalheader boven de kanaaltabel (leeg laten = reset naar originele sync-naam).
+  - Dynamische selectieteller op bulk-knoppen (`Selectie Aan (N)` / `Selectie Uit (N)`).
+- **Stap 3 — Groepssortering & Dynamische Kanaalhernummering (`GroupRepository`, `ChannelRepository`, `ChannelController`, `ChannelsPage.js`):**
+  - Groepssortering op `Import` (`import_order ASC`), `A-Z` of `Z-A` via klikbare `Groepen`-header (`set_group_sort`), persistent opgeslagen in `settings.group_sort_mode`.
+  - Klikbare `#` en `Naam` kolomheaders in de kanaaltabel voor sortering op kanaalnummer of alfabetische naam.
+  - Dynamische hernummering (`ChannelRepository::reorderChannelInGroup()` binnen PDO-transactie): wijzigen van een kanaalnummer hernummert alle kanalen in die groep direct aaneensluitend (`1..N`) zonder dubbele nummers.
+### Gewijzigd
+- **Kanaalnaam-weergave (`ChannelTable.js`, `ChannelController.php`):** Vlag-/emoji-prefix wordt als aparte `<span>` naast het `<input class="ch-name">` veld getoond, zodat opslaan geen dubbele emoji's in `custom_name` schrijft.
+- **Dashboard LAN Client Endpoint (`DashboardPage.js`, `DashboardController.php`, `PlaylistExporterService.php`):** Kaarttitel bijgewerkt naar `LAN Client Endpoint M3U Link` (`vb: (IPTVX / Kodi / VLC)`), aparte `XMLTV EPG URL` verborgen bij `source_mode = xtream`, en `url-tvg="..."` toegevoegd aan de `#EXTM3U`-header.
+- **Documentatie:** `ARCHITECTURE.md` toegevoegd en gekoppeld vanuit `README.md`.
+
 ## [Unreleased] - feature/groepen-en-kanalen
 ### Toegevoegd
 - **Stap 1 — Centrale Emoji- & Tag-database + Beheerscherm (`emoji_rules`, `EmojiTagService`, `EmojiRuleController`, `EmojiRulesPage.js`):**

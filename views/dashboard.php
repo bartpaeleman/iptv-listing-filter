@@ -15,6 +15,7 @@ ob_start();
         <button class="tab-btn" data-tab="settings">Bronnen & Cron</button>
     </nav>
     <div class="topbar-right">
+        <button id="adminToolsBtn" class="btn btn-ghost" title="Admin & Database Tools">⚙️</button>
         <button id="themeToggle" class="btn btn-ghost" title="Thema wisselen">🌓</button>
         <button id="logoutBtn" class="btn btn-ghost">Uitloggen</button>
     </div>
@@ -26,6 +27,7 @@ ob_start();
     <section id="tab-epg" class="tab-panel"></section>
     <section id="tab-cache" class="tab-panel"></section>
     <section id="tab-emoji-rules" class="tab-panel"></section>
+    <section id="tab-admin" class="tab-panel"></section>
     <section id="tab-settings" class="tab-panel"></section>
 </main>
 

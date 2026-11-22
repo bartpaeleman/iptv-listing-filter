@@ -116,7 +116,20 @@ final class SchemaMigrator
             }
         }
 
-        $pdo->exec("INSERT INTO settings (setting_key, setting_value, is_encrypted) VALUES ('schema_integrity_v4', '1', 0) ON DUPLICATE KEY UPDATE setting_value = '1'");
+        $grpImportStmt = $pdo->query(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'm3u_groups' AND COLUMN_NAME = 'import_order'"
+        );
+        if ((int) $grpImportStmt->fetchColumn() === 0) {
+            try {
+                $pdo->exec('ALTER TABLE `m3u_groups` ADD COLUMN `import_order` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `sort_order`');
+            } catch (\Throwable) {
+                // Ignore if already exists or insufficient privileges
+            }
+        }
+
+        $pdo->exec("INSERT IGNORE INTO settings (setting_key, setting_value, is_encrypted) VALUES ('group_sort_mode', 'import', 0)");
+        $pdo->exec("INSERT INTO settings (setting_key, setting_value, is_encrypted) VALUES ('schema_integrity_v5', '1', 0) ON DUPLICATE KEY UPDATE setting_value = '1'");
     }
 
     /**

@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS `m3u_groups` (
     `custom_name` VARCHAR(255) NULL,
     `is_enabled` TINYINT(1) NOT NULL DEFAULT 1,
     `sort_order` INT NOT NULL DEFAULT 0,
+    `import_order` INT UNSIGNED NOT NULL DEFAULT 0,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_m3u_groups_original_name` (`original_name`),
     KEY `idx_m3u_groups_enabled_sort` (`is_enabled`, `sort_order`)
@@ -150,6 +151,7 @@ INSERT IGNORE INTO `settings` (`setting_key`, `setting_value`, `is_encrypted`) V
     ('last_m3u_sync', '', 0),
     ('last_epg_sync', '', 0),
     ('output_token', '', 0),
-    ('enforce_lan_ip', '1', 0);
+    ('enforce_lan_ip', '1', 0),
+    ('group_sort_mode', 'import', 0);
 
 SET FOREIGN_KEY_CHECKS = 1;
