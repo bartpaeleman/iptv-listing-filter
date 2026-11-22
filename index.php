@@ -69,6 +69,7 @@ switch ($route) {
         $router->addApiRoute('run_update_sql', DashboardController::class, 'runUpdateSql');
         $router->addApiRoute('logout', DashboardController::class, 'logout');
         $router->addApiRoute('groups', ChannelController::class, 'groups');
+        $router->addApiRoute('groups_search', ChannelController::class, 'searchGroups');
         $router->addApiRoute('set_group_sort', ChannelController::class, 'setGroupSort');
         $router->addApiRoute('update_group', ChannelController::class, 'updateGroup');
         $router->addApiRoute('bulk_groups', ChannelController::class, 'bulkGroups');

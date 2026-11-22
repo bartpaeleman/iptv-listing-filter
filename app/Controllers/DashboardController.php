@@ -20,27 +20,41 @@ final class DashboardController extends BaseController
         $settings = new SettingsRepository($pdo);
         $logs = new SyncLogRepository($pdo);
 
-        $activeChannels = (int) $pdo->query(
-            'SELECT COUNT(*) FROM channels c INNER JOIN m3u_groups g ON g.id = c.group_id WHERE g.is_enabled = 1 AND c.is_enabled = 1'
-        )->fetchColumn();
-        $totalChannels = (int) $pdo->query('SELECT COUNT(*) FROM channels')->fetchColumn();
-        $activeGroups = (int) $pdo->query('SELECT COUNT(*) FROM m3u_groups WHERE is_enabled = 1')->fetchColumn();
-        $totalGroups = (int) $pdo->query('SELECT COUNT(*) FROM m3u_groups')->fetchColumn();
-        $linkedEpg = (int) $pdo->query(
-            "SELECT COUNT(*) FROM channels c INNER JOIN m3u_groups g ON g.id = c.group_id
-             WHERE g.is_enabled = 1 AND c.is_enabled = 1 AND c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> ''"
-        )->fetchColumn();
-        $epgChannelsCount = (int) $pdo->query('SELECT COUNT(*) FROM epg_channels')->fetchColumn();
+        $viewCache = new \App\Services\ViewCacheService();
+        $stats = $viewCache->getDashboardStats();
+        if ($stats === null) {
+            $activeChannels = (int) $pdo->query(
+                'SELECT COUNT(*) FROM channels c INNER JOIN m3u_groups g ON g.id = c.group_id WHERE g.is_enabled = 1 AND c.is_enabled = 1'
+            )->fetchColumn();
+            $totalChannels = (int) $pdo->query('SELECT COUNT(*) FROM channels')->fetchColumn();
+            $activeGroups = (int) $pdo->query('SELECT COUNT(*) FROM m3u_groups WHERE is_enabled = 1')->fetchColumn();
+            $totalGroups = (int) $pdo->query('SELECT COUNT(*) FROM m3u_groups')->fetchColumn();
+            $linkedEpg = (int) $pdo->query(
+                "SELECT COUNT(*) FROM channels c INNER JOIN m3u_groups g ON g.id = c.group_id
+                 WHERE g.is_enabled = 1 AND c.is_enabled = 1 AND c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> ''"
+            )->fetchColumn();
+            $epgChannelsCount = (int) $pdo->query('SELECT COUNT(*) FROM epg_channels')->fetchColumn();
+
+            $stats = [
+                'active_channels' => $activeChannels,
+                'total_channels' => $totalChannels,
+                'active_groups' => $activeGroups,
+                'total_groups' => $totalGroups,
+                'linked_epg' => $linkedEpg,
+                'epg_channels_count' => $epgChannelsCount,
+            ];
+            $viewCache->setDashboardStats($stats);
+        }
 
         $cache = new \App\Services\FeedCacheService($settings);
 
         $this->jsonSuccess([
-            'active_channels' => $activeChannels,
-            'total_channels' => $totalChannels,
-            'active_groups' => $activeGroups,
-            'total_groups' => $totalGroups,
-            'linked_epg' => $linkedEpg,
-            'epg_channels_count' => $epgChannelsCount,
+            'active_channels' => (int) ($stats['active_channels'] ?? 0),
+            'total_channels' => (int) ($stats['total_channels'] ?? 0),
+            'active_groups' => (int) ($stats['active_groups'] ?? 0),
+            'total_groups' => (int) ($stats['total_groups'] ?? 0),
+            'linked_epg' => (int) ($stats['linked_epg'] ?? 0),
+            'epg_channels_count' => (int) ($stats['epg_channels_count'] ?? 0),
             'last_m3u_sync' => $settings->get('last_m3u_sync', ''),
             'last_epg_sync' => $settings->get('last_epg_sync', ''),
             'sync_interval_hours' => (int) $settings->get('sync_interval_hours', '72'),

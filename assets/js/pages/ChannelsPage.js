@@ -46,7 +46,7 @@ export class ChannelsPage extends BaseComponent {
         }
         const contentTypes = Array.from(this.selectedContentTypes).join(',');
         const [groupsRes, tags] = await Promise.all([
-            this.props.api.get('groups', { content_types: contentTypes }),
+            this.props.api.get('groups', { content_types: contentTypes, scope: 'active' }),
             this.props.api.get('country_tags'),
         ]);
         this.hasLoadedData = true;
@@ -57,7 +57,63 @@ export class ChannelsPage extends BaseComponent {
         this.updateGroupSortButton();
         this.groupList.setState({ groups: this.groups, selectedGroupId: this.selectedGroupId, countryTags: this.countryTags });
         this.updateGroupHeader();
-        await this.loadChannels();
+        if (this.selectedGroupId) {
+            await this.loadChannels();
+        } else {
+            this.renderSelectGroupPrompt();
+        }
+    }
+
+    async searchAndRenderAddGroups() {
+        const resultsEl = document.getElementById('groupAddResults');
+        if (!resultsEl) return;
+        const q = (document.getElementById('groupAddSearchInput')?.value || '').trim();
+        const status = document.getElementById('groupAddStatusFilter')?.value || 'disabled';
+        const contentTypes = Array.from(this.selectedContentTypes).join(',');
+
+        resultsEl.innerHTML = `<div class="muted" style="padding:0.5rem;">Zoeken...</div>`;
+        const items = await this.props.api.get('groups_search', {
+            q,
+            status,
+            content_types: contentTypes,
+            limit: 50,
+        });
+
+        if (!Array.isArray(items) || items.length === 0) {
+            resultsEl.innerHTML = `<div class="muted" style="padding:0.5rem;">Geen groepen gevonden.</div>`;
+            return;
+        }
+
+        resultsEl.innerHTML = items.map(g => {
+            const name = this.escapeHtml(g.display_name || g.custom_name || g.original_name || '');
+            const enabled = Number(g.is_enabled) === 1;
+            return `
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;padding:0.35rem 0.25rem;border-bottom:1px solid rgba(255,255,255,0.06);">
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">${name}</span>
+                    <button type="button" class="btn btn-sm ${enabled ? '' : 'btn-primary'} group-add-toggle-btn" data-id="${g.id}" data-enable="${enabled ? '0' : '1'}" style="min-height:36px;flex-shrink:0;">
+                        ${enabled ? 'Actief ✓' : '+ Activeer'}
+                    </button>
+                </div>
+            `;
+        }).join('');
+
+        resultsEl.querySelectorAll('.group-add-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = Number(btn.dataset.id);
+                const enable = Number(btn.dataset.enable);
+                await this.props.api.post('update_group', { id, is_enabled: enable });
+                this.props.toast?.show(enable ? 'Groep geactiveerd en toegevoegd' : 'Groep gedeactiveerd');
+                await this.loadFilteredData();
+                await this.searchAndRenderAddGroups();
+            });
+        });
+    }
+
+    renderSelectGroupPrompt() {
+        const channelsRoot = document.getElementById('channelsTableRoot');
+        if (channelsRoot) {
+            channelsRoot.innerHTML = `<tr><td colspan="4" class="muted" style="padding:2rem;text-align:center;">Selecteer een actieve groep links om de kanalen te laden, of klik op <strong>+ Groep toevoegen</strong> om extra groepen op te zoeken.</td></tr>`;
+        }
     }
 
     populateCountryFilter() {
@@ -71,6 +127,10 @@ export class ChannelsPage extends BaseComponent {
 
     async loadChannels() {
         if (!this.hasLoadedData || this.selectedContentTypes.size === 0) {
+            return;
+        }
+        if (!this.selectedGroupId && !this.channelSearch.trim()) {
+            this.renderSelectGroupPrompt();
             return;
         }
         const params = {
@@ -105,12 +165,24 @@ export class ChannelsPage extends BaseComponent {
                     <div class="card-header">
                         <h2>Groepen</h2>
                         <div class="btn-group">
+                            <button type="button" class="btn btn-sm btn-primary" id="openGroupSearchBtn" style="min-height:44px;">+ Groep toevoegen</button>
                             <button type="button" class="btn btn-sm" id="groupSortBtn" title="Klik om groepssortering te wisselen (Import / A-Z / Z-A)"><span id="groupSortBadge">⇅ Import</span></button>
                             <button class="btn btn-sm" id="enableAllGroupsBtn">Alles Aan</button>
                             <button class="btn btn-sm" id="disableAllGroupsBtn">Alles Uit</button>
                         </div>
                     </div>
-                    <input type="search" id="groupSearchInput" placeholder="Filter groepen...">
+                    <div id="groupAddPanel" class="hidden" style="padding:0.75rem;margin-bottom:0.75rem;border:1px solid var(--border-color, #334155);border-radius:8px;background:rgba(15,23,42,0.4);">
+                        <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;flex-wrap:wrap;">
+                            <input type="search" id="groupAddSearchInput" placeholder="Zoek groep (bv. BE, NL, Sport)..." style="flex:1;min-width:140px;font-size:16px;min-height:44px;">
+                            <select id="groupAddStatusFilter" style="font-size:16px;min-height:44px;">
+                                <option value="disabled">Alleen inactief</option>
+                                <option value="all">Alle</option>
+                            </select>
+                            <button type="button" class="btn btn-sm" id="closeGroupSearchBtn" style="min-height:44px;">✕</button>
+                        </div>
+                        <div id="groupAddResults" style="max-height:240px;overflow-y:auto;"></div>
+                    </div>
+                    <input type="search" id="groupSearchInput" placeholder="Filter actieve groepen..." style="font-size:16px;">
                     <div id="groupsListRoot" class="groups-list"></div>
                 </aside>
                 <div class="card channels-pane">
@@ -192,6 +264,28 @@ export class ChannelsPage extends BaseComponent {
         document.getElementById('groupSearchInput')?.addEventListener('input', debounce(e => {
             this.groupList.setState({ filter: e.target.value });
         }, 200));
+
+        document.getElementById('openGroupSearchBtn')?.addEventListener('click', () => {
+            const panel = document.getElementById('groupAddPanel');
+            if (!panel) return;
+            panel.classList.toggle('hidden');
+            if (!panel.classList.contains('hidden')) {
+                document.getElementById('groupAddSearchInput')?.focus();
+                this.searchAndRenderAddGroups();
+            }
+        });
+
+        document.getElementById('closeGroupSearchBtn')?.addEventListener('click', () => {
+            document.getElementById('groupAddPanel')?.classList.add('hidden');
+        });
+
+        document.getElementById('groupAddSearchInput')?.addEventListener('input', debounce(() => {
+            this.searchAndRenderAddGroups();
+        }, 300));
+
+        document.getElementById('groupAddStatusFilter')?.addEventListener('change', () => {
+            this.searchAndRenderAddGroups();
+        });
 
         document.getElementById('channelSearchInput')?.addEventListener('input', debounce(e => {
             this.channelSearch = e.target.value;

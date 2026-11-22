@@ -8,17 +8,60 @@ use App\Core\BaseController;
 use App\Repositories\ChannelRepository;
 use App\Repositories\GroupRepository;
 use App\Services\EmojiTagService;
+use App\Services\ViewCacheService;
 
 final class ChannelController extends BaseController
 {
     public function groups(): void
     {
         $this->requireAuth();
+        $contentTypes = $this->parseContentTypes((string) ($_GET['content_types'] ?? ''));
+        $scope = (string) ($_GET['scope'] ?? 'active');
+        $viewCache = new ViewCacheService();
+
+        if ($scope === 'active') {
+            $cached = $viewCache->getActiveGroups('import', $contentTypes);
+            if ($cached !== null) {
+                $this->jsonSuccess($cached);
+                return;
+            }
+        }
+
         $emojiService = new EmojiTagService();
         $emojiService->seedDefaultsIfEmpty();
 
+        $repo = new GroupRepository();
+        $groups = $scope === 'all'
+            ? $repo->allWithCounts('import', $contentTypes)
+            : $repo->activeWithCounts('import', $contentTypes);
+
+        foreach ($groups as &$g) {
+            $rawName = (string) (($g['custom_name'] ?? '') !== '' ? $g['custom_name'] : ($g['original_name'] ?? ''));
+            $g['display_name'] = $emojiService->parseName($rawName, true)['display_name'];
+        }
+        unset($g);
+
+        if ($scope === 'active') {
+            $viewCache->setActiveGroups('import', $contentTypes, $groups);
+        }
+
+        $this->jsonSuccess($groups);
+    }
+
+    public function searchGroups(): void
+    {
+        $this->requireAuth();
+        $query = trim((string) ($_GET['q'] ?? ''));
         $contentTypes = $this->parseContentTypes((string) ($_GET['content_types'] ?? ''));
-        $groups = (new GroupRepository())->allWithCounts('import', $contentTypes);
+        $status = in_array($_GET['status'] ?? 'disabled', ['disabled', 'enabled', 'all'], true)
+            ? (string) $_GET['status']
+            : 'disabled';
+        $limit = min(100, max(10, (int) ($_GET['limit'] ?? 50)));
+
+        $groups = (new GroupRepository())->searchGroups($query, $contentTypes, $status, $limit);
+        $emojiService = new EmojiTagService();
+        $emojiService->seedDefaultsIfEmpty();
+
         foreach ($groups as &$g) {
             $rawName = (string) (($g['custom_name'] ?? '') !== '' ? $g['custom_name'] : ($g['original_name'] ?? ''));
             $g['display_name'] = $emojiService->parseName($rawName, true)['display_name'];
@@ -40,6 +83,10 @@ final class ChannelController extends BaseController
         $sortOrder = isset($input['sort_order']) ? (int) $input['sort_order'] : null;
 
         (new GroupRepository())->updateGroup($id, $isEnabled, $customName, $sortOrder);
+        $viewCache = new ViewCacheService();
+        $viewCache->invalidateGroupsCache();
+        $viewCache->invalidateGroupChannels($id);
+        $viewCache->invalidateDashboardStats();
         $this->jsonSuccess();
     }
 
@@ -52,6 +99,16 @@ final class ChannelController extends BaseController
         $enable = (bool) ((int) ($input['is_enabled'] ?? 1));
         $ids = is_array($input['ids'] ?? null) ? array_map('intval', $input['ids']) : [];
         (new GroupRepository())->bulkSetEnabled($enable, $ids);
+        $viewCache = new ViewCacheService();
+        $viewCache->invalidateGroupsCache();
+        $viewCache->invalidateDashboardStats();
+        if ($ids !== []) {
+            foreach ($ids as $gid) {
+                $viewCache->invalidateGroupChannels((int) $gid);
+            }
+        } else {
+            $viewCache->invalidateAll();
+        }
         $this->jsonSuccess();
     }
 
@@ -68,6 +125,17 @@ final class ChannelController extends BaseController
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
         $sortBy = in_array($_GET['sort_by'] ?? 'number', ['number', 'name_asc', 'name_desc', 'import'], true) ? (string) $_GET['sort_by'] : 'number';
         $contentTypes = $this->parseContentTypes((string) ($_GET['content_types'] ?? ''));
+
+        $isDefaultGroupView = ($groupId !== null && $groupId > 0 && $search === '' && $epgStatus === '' && !$activeOnly && $countryTagId === '' && $status === 'all' && $sortBy === 'number' && $offset === 0 && $limit >= 150);
+        $viewCache = new ViewCacheService();
+        if ($isDefaultGroupView) {
+            $cached = $viewCache->getGroupChannels($groupId);
+            if ($cached !== null) {
+                $this->jsonSuccess($cached);
+                return;
+            }
+        }
+
         $channelRepo = new ChannelRepository();
         if ($groupId !== null && $groupId > 0) {
             $channelRepo->normalizeActiveGroupNumbers($groupId);
@@ -89,6 +157,10 @@ final class ChannelController extends BaseController
                 }
             }
             unset($ch);
+        }
+
+        if ($isDefaultGroupView) {
+            $viewCache->setGroupChannels($groupId, $res);
         }
 
         $this->jsonSuccess($res);
@@ -117,17 +189,24 @@ final class ChannelController extends BaseController
                 }
             }
             unset($ch);
+            $viewCache = new ViewCacheService();
+            $viewCache->invalidateAll();
             $this->jsonSuccess(['items' => $reordered]);
             return;
         }
 
         $repo->updateChannel($id, $input);
-        if (array_key_exists('is_enabled', $input)) {
-            $chRow = $repo->findById($id);
-            if ($chRow !== null && !empty($chRow['group_id'])) {
-                $repo->normalizeActiveGroupNumbers((int) $chRow['group_id']);
+        $chRow = $repo->findById($id);
+        $viewCache = new ViewCacheService();
+        if ($chRow !== null && !empty($chRow['group_id'])) {
+            $gid = (int) $chRow['group_id'];
+            if (array_key_exists('is_enabled', $input)) {
+                $repo->normalizeActiveGroupNumbers($gid);
             }
+            $viewCache->invalidateGroupChannels($gid);
         }
+        $viewCache->invalidateGroupsCache();
+        $viewCache->invalidateDashboardStats();
         $this->jsonSuccess();
     }
 
@@ -144,9 +223,15 @@ final class ChannelController extends BaseController
 
         $repo = new ChannelRepository();
         $repo->bulkSetEnabled($enable, $ids, $groupId, $search);
+        $viewCache = new ViewCacheService();
         if ($groupId !== null && $groupId > 0) {
             $repo->normalizeActiveGroupNumbers($groupId);
+            $viewCache->invalidateGroupChannels($groupId);
+        } else {
+            $viewCache->invalidateAll();
         }
+        $viewCache->invalidateGroupsCache();
+        $viewCache->invalidateDashboardStats();
         $this->jsonSuccess();
     }
 
