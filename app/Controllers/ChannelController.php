@@ -78,6 +78,20 @@ final class ChannelController extends BaseController
         $this->jsonSuccess($groups);
     }
 
+    public function setGroupSort(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $mode = in_array($input['mode'] ?? 'import', ['import', 'asc', 'desc'], true)
+            ? (string) $input['mode']
+            : 'import';
+
+        (new \App\Repositories\SettingsRepository())->set('group_sort_mode', $mode);
+        $this->jsonSuccess(['group_sort_mode' => $mode]);
+    }
+
     public function updateGroup(): void
     {
         $this->requireAuth();
