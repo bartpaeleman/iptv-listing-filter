@@ -24,6 +24,7 @@
 - `FeedCacheService::getCacheInfo()` en `listCacheFiles()` gefixt zodat ontbrekende/legacy `.meta.json` `filename` keys nooit een exception gooien op het dashboard.
 - `SQLSTATE[42S02]` (`epg_sources` / `country_tags` ontbreekt) opgelost door `SchemaMigrator::ensureSchemaUpToDate()` alle `CREATE TABLE IF NOT EXISTS` en `INSERT IGNORE` statements uit `database/schema.sql` automatisch te laten uitvoeren.
 - Safari `"Load failed"` opgelost via snelle `schema_integrity_v2` check in `SchemaMigrator` (geen zware DDL bij elke API-call), SQL-comment stripping en een fatal-error JSON shutdown handler in `index.php`.
+- Globale `error` / `unhandledrejection` toast-melding toegevoegd in `App.js` en 250-kanalen batch-transacties + `512M`/`set_time_limit(0)` limieten in `M3uParserService` & `EpgParserService` voor grote (98+ MB) bestanden.
 
 ## [1.0.0] - 2026-11-22
 ### Toegevoegd

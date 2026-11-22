@@ -24,6 +24,14 @@ class App {
     }
 
     init() {
+        window.addEventListener('error', ev => {
+            this.toast?.show(`JS Fout: ${ev.message}`);
+        });
+        window.addEventListener('unhandledrejection', ev => {
+            const msg = ev.reason?.message || String(ev.reason || 'Onbekende fout');
+            this.toast?.show(`Fout: ${msg}`);
+        });
+
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
         });

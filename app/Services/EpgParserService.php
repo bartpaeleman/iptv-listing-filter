@@ -29,6 +29,8 @@ final class EpgParserService
      */
     public function sync(?string $overrideUrl = null, string $cacheMode = 'auto', ?string $cacheFilename = null): array
     {
+        @set_time_limit(0);
+        @ini_set('memory_limit', '512M');
         \App\Core\SchemaMigrator::ensureSchemaUpToDate($this->pdo);
 
         $cache = new FeedCacheService($this->settings);
