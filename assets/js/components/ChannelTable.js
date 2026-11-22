@@ -19,8 +19,7 @@ export class ChannelTable extends BaseComponent {
                 <td><input type="number" class="ch-num" value="${c.channel_number ?? ''}" style="width:76px;"></td>
                 <td>
                     <div style="display:flex;align-items:center;gap:0.4rem;">
-                        ${chParsed.icon ? `<span title="Originele tag: ${this.escapeHtml(chParsed.rawTag)}" style="font-size:1.1rem;cursor:help;">${chParsed.icon}</span>` : ''}
-                        <input type="text" class="ch-name" value="${this.escapeHtml(rawName)}">
+                        <input type="text" class="ch-name" value="${this.escapeHtml(c.display_name || rawName)}">
                     </div>
                 </td>
                 <td class="muted" title="${this.escapeHtml(c.group_name)}">${this.escapeHtml(grpDisplay)}</td>
