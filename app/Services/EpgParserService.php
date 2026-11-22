@@ -81,6 +81,15 @@ final class EpgParserService
             }
             if ($sources === []) {
                 $legacyUrl = (string) $this->settings->get('epg_source_url', '');
+                if ($legacyUrl === '' && $this->settings->get('source_mode', 'xtream') === 'xtream') {
+                    $host = (string) $this->settings->get('xtream_host', '');
+                    $user = (string) $this->settings->get('xtream_username', '');
+                    $pass = (string) $this->settings->get('xtream_password', '');
+                    if ($host !== '' && $user !== '' && $pass !== '') {
+                        $legacyUrl = XtreamUrlBuilder::buildXmltvUrl($host, $user, $pass);
+                        $sourceRepo->addOrUpdate('Xtream Provider EPG', $legacyUrl, 10);
+                    }
+                }
                 if ($legacyUrl !== '') {
                     $sources[] = ['id' => 0, 'name' => 'Standaard EPG', 'url' => $legacyUrl];
                 }
@@ -88,7 +97,7 @@ final class EpgParserService
         }
 
         if ($sources === []) {
-            return ['epg_channels' => 0, 'programmes_imported' => 0, 'programmes_pruned' => 0, 'sources_ok' => 0, 'sources_failed' => 0];
+            throw new RuntimeException('Geen actieve EPG-URL geconfigureerd.');
         }
 
         $totalChannels = 0;

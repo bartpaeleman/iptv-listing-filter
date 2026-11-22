@@ -37,13 +37,20 @@ export class CacheManagerPage extends BaseComponent {
             </div>
 
             <div class="card">
+                <div class="btn-group" style="margin-bottom:1rem;">
+                    <button type="button" id="cacheSyncAllBtn" class="btn btn-primary" style="min-height:48px;font-size:1rem;">⚡ Alles uit Cache importeren</button>
+                    <button type="button" id="cacheSyncM3uBtn" class="btn" style="min-height:48px;font-size:1rem;" ${d.m3u_count === 0 ? 'disabled' : ''}>📺 M3U uit Cache</button>
+                    <button type="button" id="cacheSyncEpgBtn" class="btn" style="min-height:48px;font-size:1rem;" ${d.epg_count === 0 ? 'disabled' : ''}>📅 EPG uit Cache</button>
+                    <button type="button" id="bulkDeleteCacheBtn" class="btn" style="min-height:48px;font-size:1rem;">🗑️ Geselecteerde wissen</button>
+                </div>
+                <div id="cacheProgressPanel" class="sync-banner hidden" aria-live="polite" style="margin-bottom:1rem;"></div>
+
                 <div class="card-header">
                     <div class="btn-group">
                         <button type="button" class="btn btn-sm ${this.filterType === 'all' ? 'btn-primary' : ''}" data-cfilter="all">Alle bestanden</button>
                         <button type="button" class="btn btn-sm ${this.filterType === 'm3u' ? 'btn-primary' : ''}" data-cfilter="m3u">M3U Playlists</button>
                         <button type="button" class="btn btn-sm ${this.filterType === 'epg' ? 'btn-primary' : ''}" data-cfilter="epg">EPG Guides</button>
                     </div>
-                    <button type="button" id="bulkDeleteCacheBtn" class="btn btn-sm">🗑️ Geselecteerde wissen</button>
                 </div>
 
                 <div class="table-wrap">
@@ -131,6 +138,39 @@ export class CacheManagerPage extends BaseComponent {
                 this.props.toast.show('Cachebestand verwijderd');
                 this.load();
             });
+        });
+
+        const runCacheSync = async (mode, filename = null) => {
+            const panel = document.getElementById('cacheProgressPanel');
+            if (panel) {
+                panel.textContent = '⏳ Cache-import bezig...';
+                panel.classList.remove('hidden');
+            }
+            try {
+                if (filename) {
+                    await this.props.api.post('cache_import', { filename });
+                } else {
+                    await this.props.api.post('sync', { mode, cache_mode: 'cache_only' });
+                }
+                this.props.toast.show('Cache-import voltooid!');
+                this.load();
+            } catch (e) {
+                if (panel) panel.textContent = `✗ Fout: ${e.message}`;
+            }
+        };
+
+        document.getElementById('cacheSyncAllBtn')?.addEventListener('click', () => runCacheSync('all'));
+        document.getElementById('cacheSyncM3uBtn')?.addEventListener('click', () => {
+            const checkedM3u = Array.from(this.container.querySelectorAll('tbody tr'))
+                .filter(tr => tr.querySelector('.cache-select')?.checked && tr.dataset.fn?.endsWith('.m3u'))
+                .map(tr => tr.dataset.fn)[0] || null;
+            runCacheSync('m3u', checkedM3u);
+        });
+        document.getElementById('cacheSyncEpgBtn')?.addEventListener('click', () => {
+            const checkedEpg = Array.from(this.container.querySelectorAll('tbody tr'))
+                .filter(tr => tr.querySelector('.cache-select')?.checked && tr.dataset.fn?.endsWith('.xml'))
+                .map(tr => tr.dataset.fn)[0] || null;
+            runCacheSync('epg', checkedEpg);
         });
 
         document.getElementById('bulkDeleteCacheBtn')?.addEventListener('click', async () => {
