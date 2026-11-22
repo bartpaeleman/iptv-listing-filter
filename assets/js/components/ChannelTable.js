@@ -2,30 +2,34 @@ import { BaseComponent } from '../core/BaseComponent.js';
 
 export class ChannelTable extends BaseComponent {
     render() {
-        const { channels = [] } = this.state;
+        const { channels = [], isAllChannelsView = false } = this.state;
         this.container.innerHTML = channels.map(c => {
             const rawName = c.custom_name || c.tvg_name;
             const cleanName = c.clean_name || rawName;
             const emojiPrefix = c.emoji_prefix || '';
             const grpDisplay = c.group_display_name || c.group_name;
+            const isEnabled = Boolean(Number(c.is_enabled));
 
             return `
             <tr data-cid="${c.id}">
-                <td><input type="checkbox" class="ch-select" title="Selecteer kanaal voor bulkactie"></td>
+                ${isAllChannelsView ? '' : '<td><input type="checkbox" class="ch-select" title="Selecteer kanaal voor bulkactie"></td>'}
                 <td>
                     <label class="toggle-switch" title="Kanaal opnemen in actieve M3U-playlist">
-                        <input type="checkbox" class="ch-enable" ${c.is_enabled ? 'checked' : ''}>
+                        <input type="checkbox" class="ch-enable" ${isEnabled ? 'checked' : ''}>
                         <span class="toggle-slider"></span>
                     </label>
                 </td>
-                <td><input type="number" class="ch-num" value="${c.channel_number ?? ''}" style="width:76px;font-size:16px;min-height:44px;"></td>
+                <td>${isEnabled
+                    ? `<input type="number" class="ch-num" value="${c.channel_number ?? ''}" style="width:76px;font-size:16px;min-height:44px;">`
+                    : `<input type="text" class="ch-num" value="-" disabled style="width:76px;font-size:16px;min-height:44px;text-align:center;opacity:0.5;" title="Kanaal is uitgeschakeld">`
+                }</td>
                 <td>
                     <div style="display:flex;align-items:center;gap:0.4rem;">
                         ${emojiPrefix ? `<span class="ch-emoji-prefix" title="${this.escapeHtml(c.tvg_name || '')}">${this.escapeHtml(emojiPrefix)}</span>` : ''}
                         <input type="text" class="ch-name" value="${this.escapeHtml(cleanName)}" title="Origineel: ${this.escapeHtml(c.tvg_name || '')}">
                     </div>
                 </td>
-                <td class="muted" title="${this.escapeHtml(c.group_name)}">${this.escapeHtml(grpDisplay)}</td>
+                ${isAllChannelsView ? '' : `<td class="muted" title="${this.escapeHtml(c.group_name)}">${this.escapeHtml(grpDisplay)}</td>`}
             </tr>
         `;
         }).join('');

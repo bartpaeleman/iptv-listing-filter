@@ -211,4 +211,47 @@ final class ChannelRepository extends BaseRepository
             throw $e;
         }
     }
+
+    public function normalizeActiveGroupNumbers(int $groupId): bool
+    {
+        if ($groupId <= 0) {
+            return false;
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare(
+                'SELECT id, channel_number
+                 FROM channels
+                 WHERE group_id = :gid AND is_enabled = 1
+                 ORDER BY (channel_number IS NULL OR channel_number <= 0) ASC, channel_number ASC, id ASC'
+            );
+            $stmt->execute([':gid' => $groupId]);
+            $rows = $stmt->fetchAll();
+
+            $updStmt = $this->pdo->prepare('UPDATE channels SET channel_number = :num WHERE id = :id');
+            $changed = false;
+            $expected = 1;
+
+            foreach ($rows as $row) {
+                $currentNum = $row['channel_number'] !== null ? (int) $row['channel_number'] : 0;
+                if ($currentNum !== $expected) {
+                    $updStmt->execute([
+                        ':num' => $expected,
+                        ':id' => (int) $row['id'],
+                    ]);
+                    $changed = true;
+                }
+                $expected++;
+            }
+
+            $this->pdo->commit();
+            return $changed;
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
 }

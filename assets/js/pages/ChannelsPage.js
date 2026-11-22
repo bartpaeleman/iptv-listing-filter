@@ -84,7 +84,12 @@ export class ChannelsPage extends BaseComponent {
         };
         if (this.selectedGroupId) params.group_id = this.selectedGroupId;
         const data = await this.props.api.get('channels', params);
-        this.channelTable.setState({ channels: data.items, countryTags: this.countryTags || [] });
+        this.updateChannelsTableHeader();
+        this.channelTable.setState({
+            channels: data.items,
+            countryTags: this.countryTags || [],
+            isAllChannelsView: !this.selectedGroupId,
+        });
     }
 
     renderShell() {
@@ -142,7 +147,7 @@ export class ChannelsPage extends BaseComponent {
                     </div>
                     <div class="table-wrap">
                         <table class="data-table">
-                            <thead>
+                            <thead id="channelsTableHead">
                                 <tr>
                                     <th>Aan</th>
                                     <th id="sortChannelsByNum" style="cursor:pointer;user-select:none;" title="Sorteer op kanaalnummer">#</th>

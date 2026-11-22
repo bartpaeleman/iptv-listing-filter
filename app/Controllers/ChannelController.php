@@ -68,8 +68,12 @@ final class ChannelController extends BaseController
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
         $sortBy = in_array($_GET['sort_by'] ?? 'number', ['number', 'name_asc', 'name_desc', 'import'], true) ? (string) $_GET['sort_by'] : 'number';
         $contentTypes = $this->parseContentTypes((string) ($_GET['content_types'] ?? ''));
+        $channelRepo = new ChannelRepository();
+        if ($groupId !== null && $groupId > 0) {
+            $channelRepo->normalizeActiveGroupNumbers($groupId);
+        }
 
-        $res = (new ChannelRepository())->filter($groupId, $search, $epgStatus, $activeOnly, $limit, $offset, $countryTagId, $status, $sortBy, $contentTypes);
+        $res = $channelRepo->filter($groupId, $search, $epgStatus, $activeOnly, $limit, $offset, $countryTagId, $status, $sortBy, $contentTypes);
         $emojiService = new EmojiTagService();
         $emojiService->seedDefaultsIfEmpty();
 
@@ -118,6 +122,12 @@ final class ChannelController extends BaseController
         }
 
         $repo->updateChannel($id, $input);
+        if (array_key_exists('is_enabled', $input)) {
+            $chRow = $repo->findById($id);
+            if ($chRow !== null && !empty($chRow['group_id'])) {
+                $repo->normalizeActiveGroupNumbers((int) $chRow['group_id']);
+            }
+        }
         $this->jsonSuccess();
     }
 
@@ -132,7 +142,11 @@ final class ChannelController extends BaseController
         $groupId = isset($input['group_id']) && $input['group_id'] !== '' && $input['group_id'] !== null ? (int) $input['group_id'] : null;
         $search = trim((string) ($input['search'] ?? ''));
 
-        (new ChannelRepository())->bulkSetEnabled($enable, $ids, $groupId, $search);
+        $repo = new ChannelRepository();
+        $repo->bulkSetEnabled($enable, $ids, $groupId, $search);
+        if ($groupId !== null && $groupId > 0) {
+            $repo->normalizeActiveGroupNumbers($groupId);
+        }
         $this->jsonSuccess();
     }
 
