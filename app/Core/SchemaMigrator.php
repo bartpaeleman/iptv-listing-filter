@@ -21,43 +21,64 @@ final class SchemaMigrator
 
     public static function ensureSchemaUpToDate(PDO $pdo): void
     {
+        $schemaFile = dirname(__DIR__, 2) . '/database/schema.sql';
+        if (is_file($schemaFile) && is_readable($schemaFile)) {
+            $sql = (string) file_get_contents($schemaFile);
+            foreach (self::splitSqlStatements($sql) as $stmtSql) {
+                if (preg_match('/^(CREATE TABLE IF NOT EXISTS|INSERT IGNORE INTO)/i', $stmtSql)) {
+                    try {
+                        $pdo->exec($stmtSql);
+                    } catch (\Throwable) {
+                        // Ignore non-fatal seed/table warnings
+                    }
+                }
+            }
+        }
+
         $stmt = $pdo->prepare(
             "SELECT TABLE_NAME, COLUMN_NAME, LOWER(DATA_TYPE) AS data_type
              FROM INFORMATION_SCHEMA.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE()
-               AND ((TABLE_NAME = 'channels' AND COLUMN_NAME = 'tvg_logo')
+               AND ((TABLE_NAME = 'channels' AND COLUMN_NAME IN ('tvg_logo', 'country_tag_id'))
                  OR (TABLE_NAME = 'epg_channels' AND COLUMN_NAME = 'icon_url'))"
         );
         $stmt->execute();
 
-        $needsMigration = false;
+        $needsMediumText = false;
+        $hasCountryTagId = false;
         foreach ($stmt->fetchAll() as $row) {
-            if (!in_array($row['data_type'], ['mediumtext', 'longtext'], true)) {
-                $needsMigration = true;
-                break;
+            if ($row['COLUMN_NAME'] === 'country_tag_id') {
+                $hasCountryTagId = true;
+            } elseif (!in_array($row['data_type'], ['mediumtext', 'longtext'], true)) {
+                $needsMediumText = true;
             }
         }
 
-        if (!$needsMigration) {
-            return;
+        if (!$hasCountryTagId) {
+            try {
+                $pdo->exec('ALTER TABLE `channels` ADD COLUMN `country_tag_id` INT UNSIGNED NULL AFTER `epg_match_type`, ADD KEY `idx_channels_country_tag` (`country_tag_id`)');
+            } catch (\Throwable) {
+                // Ignore if already exists
+            }
         }
 
-        $statements = [
-            'ALTER TABLE `channels` MODIFY COLUMN `tvg_logo` MEDIUMTEXT NULL',
-            'ALTER TABLE `channels` MODIFY COLUMN `stream_url` TEXT NOT NULL',
-            'ALTER TABLE `channels` MODIFY COLUMN `tvg_id` VARCHAR(255) NULL, MODIFY COLUMN `tvg_name` VARCHAR(255) NOT NULL DEFAULT \'\', MODIFY COLUMN `custom_name` VARCHAR(255) NULL, MODIFY COLUMN `epg_channel_id` VARCHAR(255) NULL',
-            'ALTER TABLE `epg_channels` MODIFY COLUMN `icon_url` MEDIUMTEXT NULL, MODIFY COLUMN `display_name` VARCHAR(255) NOT NULL DEFAULT \'\'',
-        ];
-
-        foreach ($statements as $sql) {
-            try {
-                $pdo->exec($sql);
-            } catch (\Throwable $e) {
-                throw new RuntimeException(
-                    "Database migratie mislukt ({$e->getMessage()}). Voer handmatig uit als DB-admin: {$sql}",
-                    0,
-                    $e
-                );
+        if ($needsMediumText) {
+            $statements = [
+                'ALTER TABLE `channels` MODIFY COLUMN `tvg_logo` MEDIUMTEXT NULL',
+                'ALTER TABLE `channels` MODIFY COLUMN `stream_url` TEXT NOT NULL',
+                'ALTER TABLE `channels` MODIFY COLUMN `tvg_id` VARCHAR(255) NULL, MODIFY COLUMN `tvg_name` VARCHAR(255) NOT NULL DEFAULT \'\', MODIFY COLUMN `custom_name` VARCHAR(255) NULL, MODIFY COLUMN `epg_channel_id` VARCHAR(255) NULL',
+                'ALTER TABLE `epg_channels` MODIFY COLUMN `icon_url` MEDIUMTEXT NULL, MODIFY COLUMN `display_name` VARCHAR(255) NOT NULL DEFAULT \'\'',
+            ];
+            foreach ($statements as $sql) {
+                try {
+                    $pdo->exec($sql);
+                } catch (\Throwable $e) {
+                    throw new RuntimeException(
+                        "Database migratie mislukt ({$e->getMessage()}). Voer handmatig uit als DB-admin: {$sql}",
+                        0,
+                        $e
+                    );
+                }
             }
         }
 
@@ -73,6 +94,42 @@ final class SchemaMigrator
                 // Ignore if already exists or insufficient privileges
             }
         }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function splitSqlStatements(string $sql): array
+    {
+        $statements = [];
+        $current = '';
+        $inSingle = false;
+        $inDouble = false;
+        $len = strlen($sql);
+
+        for ($i = 0; $i < $len; $i++) {
+            $ch = $sql[$i];
+            if ($ch === "'" && !$inDouble && ($i === 0 || $sql[$i - 1] !== '\\')) {
+                $inSingle = !$inSingle;
+            } elseif ($ch === '"' && !$inSingle && ($i === 0 || $sql[$i - 1] !== '\\')) {
+                $inDouble = !$inDouble;
+            } elseif ($ch === ';' && !$inSingle && !$inDouble) {
+                $trimmed = trim($current);
+                if ($trimmed !== '') {
+                    $statements[] = $trimmed;
+                }
+                $current = '';
+                continue;
+            }
+            $current .= $ch;
+        }
+
+        $trimmed = trim($current);
+        if ($trimmed !== '') {
+            $statements[] = $trimmed;
+        }
+
+        return $statements;
     }
 
     public function migrateIfNeeded(): bool

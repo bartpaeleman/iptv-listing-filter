@@ -56,3 +56,5 @@
   - Vangt alle `\Throwable` fouten op tijdens `?route=api`, logt naar `storage/logs/app.log` en retourneert altijd geldige JSON met bestandsnaam en regelnummer.
 - **Cache Status Guard (`FeedCacheService.php`):**
   - `listCacheFiles()` forceert `$meta['filename'] = $filename` en `getCacheInfo()` vangt ongeldige/ontbrekende bestandsnamen af zonder exception.
+- **Zelfherstellende SchemaMigrator (`SchemaMigrator.php`, `index.php`):**
+  - `ensureSchemaUpToDate()` splitst `database/schema.sql` en voert alle `CREATE TABLE IF NOT EXISTS` en `INSERT IGNORE` statements idempotent uit bij elke API-request en sync, en voegt ontbrekende `country_tag_id` / `MEDIUMTEXT` kolommen toe.

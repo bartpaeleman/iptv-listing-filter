@@ -91,6 +91,7 @@ switch ($route) {
         $router->addApiRoute('cache_rename', CacheController::class, 'renameLabel');
         $router->addApiRoute('cache_delete', CacheController::class, 'deleteFiles');
         try {
+            \App\Core\SchemaMigrator::ensureSchemaUpToDate(\App\Core\Database::getInstance());
             $router->dispatchApi($endpoint);
         } catch (\Throwable $e) {
             $logLine = sprintf("[%s] [API ERROR] %s in %s:%d\n%s\n", date('Y-m-d H:i:s'), $e->getMessage(), $e->getFile(), $e->getLine(), $e->getTraceAsString());

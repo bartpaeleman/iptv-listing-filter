@@ -22,6 +22,7 @@
 - Automatische `filemtime` cache-busting toegevoegd op CSS/JS assets in `views/layout.php`, `views/dashboard.php` en `views/install.php` voor iPad Safari, plus endpoint/URL-diagnostiek in `ApiClient.js`.
 - Globale `Throwable` JSON exception-handler toegevoegd aan `index.php` (`?route=api`) met stacktrace-logging naar `storage/logs/app.log`.
 - `FeedCacheService::getCacheInfo()` en `listCacheFiles()` gefixt zodat ontbrekende/legacy `.meta.json` `filename` keys nooit een exception gooien op het dashboard.
+- `SQLSTATE[42S02]` (`epg_sources` / `country_tags` ontbreekt) opgelost door `SchemaMigrator::ensureSchemaUpToDate()` alle `CREATE TABLE IF NOT EXISTS` en `INSERT IGNORE` statements uit `database/schema.sql` automatisch te laten uitvoeren.
 
 ## [1.0.0] - 2026-11-22
 ### Toegevoegd
