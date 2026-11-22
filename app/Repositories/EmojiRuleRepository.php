@@ -115,12 +115,6 @@ final class EmojiRuleRepository extends BaseRepository
         ]);
     }
 
-    public function deleteById(int $id): void
-    {
-        $stmt = $this->pdo->prepare('DELETE FROM emoji_rules WHERE id = :id');
-        $stmt->execute([':id' => $id]);
-    }
-
     /**
      * @param array<int, array{match_type: string, pattern: string, emoji: string, label: string}> $rules
      */
