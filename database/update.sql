@@ -3,5 +3,20 @@
 
 SET NAMES utf8mb4;
 
--- Placeholder for upcoming schema deltas (v1.0.0 is baseline in schema.sql)
-SELECT 1;
+CREATE TABLE IF NOT EXISTS `epg_sources` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(100) NOT NULL,
+    `url` TEXT NOT NULL,
+    `priority` INT NOT NULL DEFAULT 10,
+    `is_enabled` TINYINT(1) NOT NULL DEFAULT 1,
+    `last_sync_at` DATETIME NULL,
+    `last_status` VARCHAR(255) NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_epg_sources_enabled_prio` (`is_enabled`, `priority`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO `settings` (`setting_key`, `setting_value`, `is_encrypted`) VALUES
+    ('source_mode', 'xtream', 0),
+    ('xtream_host', '', 0),
+    ('xtream_username', '', 1),
+    ('xtream_password', '', 1);

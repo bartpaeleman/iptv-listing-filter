@@ -20,3 +20,7 @@
 - **Bidirectionele Wizard Navigatie (`InstallController`, `InstallerService`, `views/install.php`):**
   - Voltooide stappen in de stepper zijn klikbaar en stappen 2–4 bevatten een "← Vorige stap" knop.
   - Bestaande `.env` en `settings`-waarden worden vooringevuld; geheime velden worden gemarkeerd met `data-has-existing="1"` en behouden hun waarde als ze leeg blijven. `install_completed = 1` vergrendelt de wizard na stap 4.
+- **Xtream Codes & Multi-Source EPG (`XtreamUrlBuilder`, `EpgSourceRepository`, `HttpClient`, `EpgParserService`):**
+  - `XtreamUrlBuilder` genereert `m3u_plus` en `xmltv.php` URL's en detecteert Xtream-credentials uit geplakte `get.php` links.
+  - `HttpClient` biedt expliciete DNS/HTTP-foutmeldingen en streaming `.gz` decompressie (`gzopen`/`gzread`).
+  - `EpgParserService` itereert over actieve `epg_sources` op prioriteit met per-bron statuslogging.

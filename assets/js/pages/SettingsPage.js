@@ -88,5 +88,45 @@ export class SettingsPage extends BaseComponent {
             if (!input) return;
             ClipboardHelper.copyText(input.value, ev.currentTarget, null, this.props.toast);
         });
+
+        document.getElementById('addEpgSourceForm')?.addEventListener('submit', async ev => {
+            ev.preventDefault();
+            await this.props.api.post('save_epg_source', {
+                name: document.getElementById('newEpgName').value,
+                url: document.getElementById('newEpgUrl').value,
+                priority: Number(document.getElementById('newEpgPrio').value),
+            });
+            this.props.toast.show('EPG bron toegevoegd!');
+            this.load();
+        });
+
+        this.container.querySelectorAll('.epg-src-toggle').forEach(cb => {
+            cb.addEventListener('change', async () => {
+                await this.props.api.post('toggle_epg_source', { id: Number(cb.dataset.id), is_enabled: cb.checked });
+                this.props.toast.show('EPG bron bijgewerkt');
+            });
+        });
+
+        this.container.querySelectorAll('.test-epg-src-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                btn.disabled = true;
+                btn.textContent = '⏳...';
+                try {
+                    const stats = await this.props.api.post('test_epg_source', { id: Number(btn.dataset.id) });
+                    this.props.toast.show(`OK: ${stats.epg_channels} zenders`);
+                    this.load();
+                } catch {
+                    this.load();
+                }
+            });
+        });
+
+        this.container.querySelectorAll('.del-epg-src-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                await this.props.api.post('delete_epg_source', { id: Number(btn.dataset.id) });
+                this.props.toast.show('EPG bron verwijderd');
+                this.load();
+            });
+        });
     }
 }

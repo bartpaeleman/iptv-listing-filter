@@ -16,7 +16,17 @@ final class SettingsController extends BaseController
         $m3u = (string) $settings->get('m3u_source_url', '');
         $epg = (string) $settings->get('epg_source_url', '');
 
+        $epgSources = (new \App\Repositories\EpgSourceRepository())->allDecrypted(false);
+        $maskedSources = array_map(static function (array $s): array {
+            $u = (string) ($s['url'] ?? '');
+            $s['url_masked'] = $u !== '' ? substr($u, 0, 36) . (strlen($u) > 36 ? '••••' : '') : '';
+            unset($s['url']);
+            return $s;
+        }, $epgSources);
+
         $this->jsonSuccess([
+            'source_mode' => $settings->get('source_mode', 'xtream'),
+            'xtream_host' => $settings->get('xtream_host', ''),
             'm3u_source_url_masked' => $m3u !== '' ? substr($m3u, 0, 28) . '••••••' : '',
             'epg_source_url_masked' => $epg !== '' ? substr($epg, 0, 36) . (strlen($epg) > 36 ? '••••' : '') : '',
             'sync_interval_hours' => (int) $settings->get('sync_interval_hours', '72'),
@@ -24,6 +34,7 @@ final class SettingsController extends BaseController
             'enforce_lan_ip' => $settings->get('enforce_lan_ip', '1') === '1',
             'output_token' => $settings->get('output_token', ''),
             'app_root' => dirname(__DIR__, 2),
+            'epg_sources' => $maskedSources,
         ]);
     }
 
@@ -63,5 +74,70 @@ final class SettingsController extends BaseController
         $newToken = bin2hex(random_bytes(16));
         (new SettingsRepository())->set('output_token', $newToken, false);
         $this->jsonSuccess(['output_token' => $newToken]);
+    }
+
+    public function saveEpgSource(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $name = trim((string) ($input['name'] ?? 'EPG Bron'));
+        $url = trim((string) ($input['url'] ?? ''));
+        $prio = (int) ($input['priority'] ?? 10);
+        if ($url === '') {
+            $this->jsonError('URL is verplicht.', 400);
+        }
+        $id = (new \App\Repositories\EpgSourceRepository())->addOrUpdate($name, $url, $prio);
+        $this->jsonSuccess(['id' => $id]);
+    }
+
+    public function toggleEpgSource(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        (new \App\Repositories\EpgSourceRepository())->setEnabled((int) ($input['id'] ?? 0), (bool) ($input['is_enabled'] ?? true));
+        $this->jsonSuccess();
+    }
+
+    public function deleteEpgSource(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        (new \App\Repositories\EpgSourceRepository())->deleteById((int) ($input['id'] ?? 0));
+        $this->jsonSuccess();
+    }
+
+    public function testEpgSource(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $id = (int) ($input['id'] ?? 0);
+        $repo = new \App\Repositories\EpgSourceRepository();
+        $row = null;
+        foreach ($repo->allDecrypted(false) as $s) {
+            if ((int) $s['id'] === $id) {
+                $row = $s;
+                break;
+            }
+        }
+        if (!$row || empty($row['url'])) {
+            $this->jsonError('EPG bron niet gevonden.', 404);
+        }
+
+        try {
+            $stats = (new \App\Services\EpgParserService())->sync((string) $row['url']);
+            $repo->updateStatus($id, "OK ({$stats['epg_channels']} zenders)");
+            $this->jsonSuccess($stats);
+        } catch (\Throwable $e) {
+            $repo->updateStatus($id, 'Fout: ' . $e->getMessage());
+            $this->jsonError($e->getMessage(), 500);
+        }
     }
 }

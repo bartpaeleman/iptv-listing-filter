@@ -33,6 +33,40 @@ export class InstallerPage extends BaseComponent {
             if (!input) return;
             ClipboardHelper.copyText(input.value, ev.currentTarget);
         });
+
+        const modeSelect = document.getElementById('sourceModeSelect');
+        const xtreamBlock = document.getElementById('xtreamFieldsBlock');
+        const customBlock = document.getElementById('customUrlFieldsBlock');
+        modeSelect?.addEventListener('change', () => {
+            const isCustom = modeSelect.value === 'custom_urls';
+            xtreamBlock?.classList.toggle('hidden', isCustom);
+            customBlock?.classList.toggle('hidden', !isCustom);
+        });
+
+        const m3uInput = document.getElementById('customM3uInput');
+        const detectBanner = document.getElementById('xtreamAutoDetectBanner');
+        let detectedXmltv = '';
+        m3uInput?.addEventListener('input', () => {
+            try {
+                const u = new URL(m3uInput.value.trim());
+                const user = u.searchParams.get('username');
+                const pass = u.searchParams.get('password');
+                if (user && pass) {
+                    detectedXmltv = `${u.origin}/xmltv.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`;
+                    detectBanner?.classList.remove('hidden');
+                    return;
+                }
+            } catch { /* ignore invalid URL */ }
+            detectBanner?.classList.add('hidden');
+        });
+
+        document.getElementById('applyDetectedXmltvBtn')?.addEventListener('click', () => {
+            const epgInput = document.getElementById('customEpgInput');
+            if (epgInput && detectedXmltv) {
+                epgInput.value = detectedXmltv;
+                detectBanner?.classList.add('hidden');
+            }
+        });
     }
 
     async recheck(btn) {

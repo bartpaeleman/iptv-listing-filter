@@ -273,26 +273,68 @@ final class InstallerService
     }
 
     /**
-     * @param array{m3u_url: string, epg_url: string, interval_days: int, preferred_hour: int, run_sync: bool} $data
+     * @param array<string, mixed> $data
+     * @return array{warning?: string}
      */
-    public function saveInitialSources(array $data): void
+    public function saveInitialSources(array $data): array
     {
         EnvLoader::load(dirname(__DIR__, 2) . '/.env');
         $pdo = Database::getInstance();
         $settings = new \App\Repositories\SettingsRepository($pdo);
+        $epgSources = new \App\Repositories\EpgSourceRepository($pdo);
 
-        if ($data['m3u_url'] !== '') {
-            $settings->set('m3u_source_url', $data['m3u_url'], true);
+        $mode = ($data['source_mode'] ?? 'xtream') === 'custom_urls' ? 'custom_urls' : 'xtream';
+        $settings->set('source_mode', $mode, false);
+
+        if ($mode === 'xtream') {
+            $host = trim((string) ($data['xtream_host'] ?? ''));
+            $user = trim((string) ($data['xtream_username'] ?? ''));
+            $pass = (string) ($data['xtream_password'] ?? '');
+
+            if ($host !== '') {
+                $settings->set('xtream_host', $host, false);
+            }
+            if ($user !== '') {
+                $settings->set('xtream_username', $user, true);
+            }
+            if ($pass !== '') {
+                $settings->set('xtream_password', $pass, true);
+            }
+
+            $effHost = $host !== '' ? $host : (string) $settings->get('xtream_host', '');
+            $effUser = $user !== '' ? $user : (string) $settings->get('xtream_username', '');
+            $effPass = $pass !== '' ? $pass : (string) $settings->get('xtream_password', '');
+
+            if ($effHost !== '' && $effUser !== '' && $effPass !== '') {
+                $settings->set('m3u_source_url', XtreamUrlBuilder::buildM3uPlusUrl($effHost, $effUser, $effPass), true);
+                $xmltvUrl = XtreamUrlBuilder::buildXmltvUrl($effHost, $effUser, $effPass);
+                $settings->set('epg_source_url', $xmltvUrl, true);
+                $epgSources->addOrUpdate('Xtream Provider EPG', $xmltvUrl, 10);
+            }
+        } else {
+            $m3uUrl = trim((string) ($data['m3u_url'] ?? ''));
+            $epgUrl = trim((string) ($data['epg_url'] ?? ''));
+            if ($m3uUrl !== '') {
+                $settings->set('m3u_source_url', $m3uUrl, true);
+            }
+            if ($epgUrl !== '') {
+                $settings->set('epg_source_url', $epgUrl, true);
+                $epgSources->addOrUpdate('Primaire EPG', $epgUrl, 10);
+            }
         }
-        if ($data['epg_url'] !== '') {
-            $settings->set('epg_source_url', $data['epg_url'], true);
-        }
-        $settings->set('sync_interval_hours', (string) (max(1, $data['interval_days']) * 24), false);
-        $settings->set('sync_preferred_hour', (string) max(0, min(23, $data['preferred_hour'])), false);
+
+        $settings->set('sync_interval_hours', (string) (max(1, (int) ($data['interval_days'] ?? 3)) * 24), false);
+        $settings->set('sync_preferred_hour', (string) max(0, min(23, (int) ($data['preferred_hour'] ?? 3))), false);
         $settings->set('install_completed', '1', false);
 
-        if ($data['run_sync'] && (string) $settings->get('m3u_source_url', '') !== '') {
-            (new SchedulerService($pdo, $settings))->run(true, 'all');
+        if (!empty($data['run_sync']) && (string) $settings->get('m3u_source_url', '') !== '') {
+            try {
+                (new SchedulerService($pdo, $settings))->run(true, 'all');
+            } catch (\Throwable $e) {
+                return ['warning' => 'Instellingen opgeslagen, maar initiële sync gaf een waarschuwing: ' . $e->getMessage()];
+            }
         }
+
+        return [];
     }
 }

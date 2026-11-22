@@ -127,31 +127,53 @@ ob_start();
         <?php elseif ($step === 4): ?>
             <form method="post" action="index.php?route=install&step=4" class="stack-form">
                 <input type="hidden" name="step" value="4">
-                <label>M3U Playlist URL (wordt versleuteld opgeslagen)
-                    <input type="url" name="m3u_url" placeholder="http://provider.example/get.php?username=..." data-has-existing="<?= !empty($hasExistingM3u) ? '1' : '0' ?>" <?= empty($hasExistingM3u) ? 'required' : '' ?>>
-                    <?php if (!empty($hasExistingM3u)): ?>
-                        <span class="muted" style="font-size:0.8rem;">Reeds opgeslagen — laat leeg om te behouden of vul in om te overschrijven.</span>
-                    <?php endif; ?>
+                <label>Bron-modus
+                    <select name="source_mode" id="sourceModeSelect">
+                        <option value="xtream">Xtream Codes Login (Aanbevolen — auto M3U + EPG)</option>
+                        <option value="custom_urls">Handmatige M3U & EPG URL's</option>
+                    </select>
                 </label>
-                <label>EPG XMLTV URL
-                    <input type="url" name="epg_url" value="<?= !empty($hasExistingEpg) ? '' : 'http://epgguide.ddns.net/epg/tvguide.xml' ?>" placeholder="http://epgguide.ddns.net/epg/tvguide.xml" data-has-existing="<?= !empty($hasExistingEpg) ? '1' : '0' ?>" <?= empty($hasExistingEpg) ? 'required' : '' ?>>
-                    <?php if (!empty($hasExistingEpg)): ?>
-                        <span class="muted" style="font-size:0.8rem;">Reeds opgeslagen — laat leeg om te behouden of vul in om te overschrijven.</span>
-                    <?php endif; ?>
-                </label>
+
+                <div id="xtreamFieldsBlock" class="card" style="margin-bottom:0;">
+                    <label>Server URL (bv. http://provider.tld:8080)
+                        <input type="url" name="xtream_host" id="xtreamHostInput" placeholder="http://provider.tld:8080">
+                    </label>
+                    <div class="grid-2" style="margin-top:0.75rem;">
+                        <label>Gebruikersnaam <input type="text" name="xtream_username" id="xtreamUserInput"></label>
+                        <label>Wachtwoord <input type="password" name="xtream_password" id="xtreamPassInput"></label>
+                    </div>
+                </div>
+
+                <div id="customUrlFieldsBlock" class="card hidden" style="margin-bottom:0;">
+                    <label>M3U Playlist URL (wordt versleuteld opgeslagen)
+                        <input type="url" name="m3u_url" id="customM3uInput" placeholder="http://provider.example/get.php?username=..." data-has-existing="<?= !empty($hasExistingM3u) ? '1' : '0' ?>">
+                        <?php if (!empty($hasExistingM3u)): ?>
+                            <span class="muted" style="font-size:0.8rem;">Reeds opgeslagen — laat leeg om te behouden of vul in om te overschrijven.</span>
+                        <?php endif; ?>
+                    </label>
+                    <div id="xtreamAutoDetectBanner" class="sync-banner hidden" style="margin-bottom:0.75rem;">
+                        <span>✨ Xtream M3U gedetecteerd!</span>
+                        <button type="button" class="btn btn-sm" id="applyDetectedXmltvBtn">Vul xmltv.php EPG-URL in</button>
+                    </div>
+                    <label style="margin-top:0.75rem;">EPG XMLTV / .xml.gz URL (optioneel)
+                        <input type="url" name="epg_url" id="customEpgInput" placeholder="https://.../guide.xml.gz" data-has-existing="<?= !empty($hasExistingEpg) ? '1' : '0' ?>">
+                    </label>
+                </div>
+
                 <div class="grid-2">
                     <label>Sync Interval (dagen) <input type="number" name="interval_days" value="<?= (int) ($savedIntervalDays ?? 3) ?>" min="1" max="30"></label>
                     <label>Voorkeursuur (0-23) <input type="number" name="preferred_hour" value="<?= (int) ($savedPreferredHour ?? 3) ?>" min="0" max="23"></label>
                 </div>
                 <label class="checkbox-row">
                     <input type="checkbox" name="run_sync" value="1" checked>
-                    <span>Direct initiële M3U & EPG synchronisatie uitvoeren</span>
+                    <span>Direct initiële M3U & EPG synchronisatie uitvoeren (non-blocking)</span>
                 </label>
                 <div class="wizard-footer">
                     <a href="index.php?route=install&step=3" class="btn">← Vorige stap</a>
                     <button type="submit" class="btn btn-primary">Installatie Voltooien ✓</button>
                 </div>
             </form>
+            <script type="module" src="assets/js/pages/InstallerPage.js"></script>
         <?php endif; ?>
     <?php endif; ?>
 </div>

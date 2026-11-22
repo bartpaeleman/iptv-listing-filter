@@ -74,6 +74,10 @@ switch ($route) {
         $router->addApiRoute('get_settings', SettingsController::class, 'get');
         $router->addApiRoute('save_settings', SettingsController::class, 'save');
         $router->addApiRoute('regenerate_token', SettingsController::class, 'regenerateToken');
+        $router->addApiRoute('save_epg_source', SettingsController::class, 'saveEpgSource');
+        $router->addApiRoute('toggle_epg_source', SettingsController::class, 'toggleEpgSource');
+        $router->addApiRoute('delete_epg_source', SettingsController::class, 'deleteEpgSource');
+        $router->addApiRoute('test_epg_source', SettingsController::class, 'testEpgSource');
         $router->dispatchApi($endpoint);
         break;
 

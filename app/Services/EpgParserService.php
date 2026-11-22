@@ -25,22 +25,81 @@ final class EpgParserService
     }
 
     /**
-     * @return array{epg_channels: int, programmes_imported: int, programmes_pruned: int}
+     * @return array{epg_channels: int, programmes_imported: int, programmes_pruned: int, sources_ok: int, sources_failed: int}
      */
     public function sync(?string $overrideUrl = null): array
     {
-        $url = $overrideUrl ?? (string) $this->settings->get('epg_source_url', '');
-        if ($url === '') {
-            throw new RuntimeException('Geen EPG bron-URL geconfigureerd.');
+        $sourceRepo = new \App\Repositories\EpgSourceRepository($this->pdo);
+        $sources = [];
+
+        if ($overrideUrl !== null && $overrideUrl !== '') {
+            $sources[] = ['id' => 0, 'name' => 'Handmatig', 'url' => $overrideUrl];
+        } else {
+            foreach ($sourceRepo->allDecrypted(true) as $src) {
+                if (!empty($src['url'])) {
+                    $sources[] = $src;
+                }
+            }
+            if ($sources === []) {
+                $legacyUrl = (string) $this->settings->get('epg_source_url', '');
+                if ($legacyUrl !== '') {
+                    $sources[] = ['id' => 0, 'name' => 'Standaard EPG', 'url' => $legacyUrl];
+                }
+            }
         }
 
-        $isGz = str_ends_with(strtolower(parse_url($url, PHP_URL_PATH) ?? ''), '.gz');
-        $tmpFile = dirname(__DIR__, 2) . '/storage/cache/' . ($isGz ? 'epg_source.xml.gz' : 'epg_source.xml');
-        $this->http->downloadToFile($url, $tmpFile, 300);
+        if ($sources === []) {
+            return ['epg_channels' => 0, 'programmes_imported' => 0, 'programmes_pruned' => 0, 'sources_ok' => 0, 'sources_failed' => 0];
+        }
 
-        $readerUri = $isGz ? 'compress.zlib://' . $tmpFile : $tmpFile;
+        $totalChannels = 0;
+        $totalProgs = 0;
+        $totalPruned = 0;
+        $sourcesOk = 0;
+        $sourcesFailed = 0;
+
+        foreach ($sources as $src) {
+            $srcId = (int) ($src['id'] ?? 0);
+            try {
+                $stats = $this->syncSingleUrl((string) $src['url']);
+                $totalChannels += $stats['epg_channels'];
+                $totalProgs += $stats['programmes_imported'];
+                $totalPruned += $stats['programmes_pruned'];
+                $sourcesOk++;
+                if ($srcId > 0) {
+                    $sourceRepo->updateStatus($srcId, "OK ({$stats['epg_channels']} zenders, {$stats['programmes_imported']} prog.)");
+                }
+            } catch (\Throwable $e) {
+                $sourcesFailed++;
+                if ($srcId > 0) {
+                    $sourceRepo->updateStatus($srcId, 'Fout: ' . $e->getMessage());
+                }
+            }
+        }
+
+        if ($sourcesOk > 0) {
+            $this->settings->set('last_epg_sync', gmdate('Y-m-d H:i:s'), false);
+        }
+
+        return [
+            'epg_channels' => $totalChannels,
+            'programmes_imported' => $totalProgs,
+            'programmes_pruned' => $totalPruned,
+            'sources_ok' => $sourcesOk,
+            'sources_failed' => $sourcesFailed,
+        ];
+    }
+
+    /**
+     * @return array{epg_channels: int, programmes_imported: int, programmes_pruned: int}
+     */
+    private function syncSingleUrl(string $url): array
+    {
+        $tmpFile = dirname(__DIR__, 2) . '/storage/cache/epg_source.xml';
+        $this->http->downloadToFile($url, $tmpFile, 300, true);
+
         $reader = new XMLReader();
-        if (!$reader->open($readerUri, null, LIBXML_NONET | LIBXML_COMPACT)) {
+        if (!$reader->open($tmpFile, null, LIBXML_NONET | LIBXML_COMPACT)) {
             @unlink($tmpFile);
             throw new RuntimeException('Kan EPG XML niet openen met XMLReader.');
         }

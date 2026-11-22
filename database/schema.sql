@@ -88,9 +88,25 @@ CREATE TABLE IF NOT EXISTS `sync_logs` (
     KEY `idx_sync_logs_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `epg_sources` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(100) NOT NULL,
+    `url` TEXT NOT NULL,
+    `priority` INT NOT NULL DEFAULT 10,
+    `is_enabled` TINYINT(1) NOT NULL DEFAULT 1,
+    `last_sync_at` DATETIME NULL,
+    `last_status` VARCHAR(255) NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_epg_sources_enabled_prio` (`is_enabled`, `priority`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 INSERT IGNORE INTO `settings` (`setting_key`, `setting_value`, `is_encrypted`) VALUES
+    ('source_mode', 'xtream', 0),
+    ('xtream_host', '', 0),
+    ('xtream_username', '', 1),
+    ('xtream_password', '', 1),
     ('m3u_source_url', '', 1),
-    ('epg_source_url', 'http://epgguide.ddns.net/epg/tvguide.xml', 1),
+    ('epg_source_url', '', 1),
     ('sync_interval_hours', '72', 0),
     ('sync_preferred_hour', '3', 0),
     ('last_m3u_sync', '', 0),
