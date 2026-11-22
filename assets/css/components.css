@@ -275,11 +275,11 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; }
 }
 
 .content-type-toggle.is-active {
-    background: var(--primary, #2563eb);
-    color: #ffffff;
-    border-color: var(--primary, #2563eb);
+    background: #16a34a !important;
+    color: #ffffff !important;
+    border-color: #15803d !important;
     font-weight: 600;
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+    box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.35);
 }
 
 /* EPG Koppeling tabel uitlijning & kolombreedtes */

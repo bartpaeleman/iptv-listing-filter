@@ -360,4 +360,46 @@ export class ChannelsPage extends BaseComponent {
     async openCountryModal() {
         this.props.switchTab('emoji-rules');
     }
+
+    updateContentTypeFilterUi() {
+        const labels = { live: 'Live TV', movie: 'Films', series: 'Series' };
+        this.container.querySelectorAll('.content-type-toggle').forEach(btn => {
+            const type = btn.dataset.type;
+            const active = Boolean(type && this.selectedContentTypes.has(type));
+            btn.classList.toggle('is-active', active);
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+            const baseLabel = btn.dataset.label || btn.textContent.replace(/^✓\s*/, '');
+            btn.textContent = (active ? '✓ ' : '') + baseLabel;
+        });
+        const statusEl = document.getElementById('contentTypeStatusText');
+        if (statusEl) {
+            const activeNames = Array.from(this.selectedContentTypes).map(t => labels[t] || t);
+            statusEl.textContent = activeNames.length > 0
+                ? `Actief: ${activeNames.join(', ')}`
+                : 'Actief: Geen (selecteer minstens 1)';
+        }
+    }
+
+    updateChannelsTableHeader() {
+        const thead = document.getElementById('channelsTableHead');
+        if (!thead) return;
+        if (!this.selectedGroupId) {
+            thead.innerHTML = `
+                <tr>
+                    <th style="width:72px;">Aan/Uit</th>
+                    <th style="width:90px;">#</th>
+                    <th>Naam van het kanaal</th>
+                </tr>`;
+        } else {
+            thead.innerHTML = `
+                <tr>
+                    <th style="width:40px;"><input type="checkbox" id="selectAllChannelsCheckbox" title="Selecteer alle zichtbare kanalen"></th>
+                    <th style="width:72px;">Aan/Uit</th>
+                    <th style="width:90px;">#</th>
+                    <th>Naam van het kanaal</th>
+                    <th>Groep</th>
+                </tr>`;
+        }
+    }
 }
