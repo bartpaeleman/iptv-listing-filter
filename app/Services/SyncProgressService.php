@@ -31,13 +31,26 @@ final class SyncProgressService
             }
         }
 
+        $startedAt = isset($state['started_at']) && is_numeric($state['started_at'])
+            ? (float) $state['started_at']
+            : microtime(true);
+        $clampedPercent = max(0, min(100, $percent));
+        $etaSeconds = null;
+        if ($status === 'running' && $clampedPercent > 0 && $clampedPercent < 100) {
+            $elapsed = max(0.1, microtime(true) - $startedAt);
+            $totalEstimated = $elapsed / ($clampedPercent / 100);
+            $etaSeconds = max(0, (int) round($totalEstimated - $elapsed));
+        }
+
         $payload = [
             'status' => $status,
             'step' => $step,
-            'percent' => max(0, min(100, $percent)),
+            'percent' => $clampedPercent,
             'message' => $message,
             'stats' => $stats,
             'live_lines' => $lines,
+            'started_at' => $startedAt,
+            'eta_seconds' => $etaSeconds,
             'updated_at' => gmdate('Y-m-d H:i:s'),
         ];
 
@@ -51,11 +64,18 @@ final class SyncProgressService
 
     public function reset(): void
     {
-        $this->update('running', 'download', 0, 'Synchronisatie gestart...', ['inserted' => 0, 'updated' => 0, 'total' => 0], 'Synchronisatie gestart');
-        // Clear previous live_lines on fresh start
-        $state = $this->getState();
-        $state['live_lines'] = ['[' . date('H:i:s') . '] Synchronisatie gestart'];
-        file_put_contents($this->filePath, json_encode($state, JSON_UNESCAPED_UNICODE));
+        $payload = [
+            'status' => 'running',
+            'step' => 'download',
+            'percent' => 0,
+            'message' => 'Synchronisatie gestart...',
+            'stats' => ['inserted' => 0, 'updated' => 0, 'total' => 0],
+            'live_lines' => ['[' . date('H:i:s') . '] Synchronisatie gestart'],
+            'started_at' => microtime(true),
+            'eta_seconds' => null,
+            'updated_at' => gmdate('Y-m-d H:i:s'),
+        ];
+        file_put_contents($this->filePath, json_encode($payload, JSON_UNESCAPED_UNICODE));
     }
 
     /**

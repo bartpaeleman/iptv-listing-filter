@@ -48,12 +48,8 @@ export class DashboardPage extends BaseComponent {
                     <h2>Synchronisatie & Lokale Cache</h2>
                     <div class="btn-group">
                         <button class="btn btn-primary" data-sync="all" data-cache-mode="force_download">🔄 Alles Downloaden & Sync</button>
-                        <button class="btn" data-sync="all" data-cache-mode="cache_only" ${!(d.cache_status?.m3u?.exists || d.cache_status?.epg?.exists) ? 'disabled' : ''}>⚡ Alles uit Cache</button>
-                        <button class="btn" data-sync="m3u" data-cache-mode="force_download">M3U Download</button>
-                        <button class="btn" data-sync="m3u" data-cache-mode="cache_only" ${!d.cache_status?.m3u?.exists ? 'disabled' : ''}>M3U Cache</button>
-                        <button class="btn" data-sync="epg" data-cache-mode="force_download">EPG Download</button>
-                        <button class="btn" data-sync="epg" data-cache-mode="cache_only" ${!d.cache_status?.epg?.exists ? 'disabled' : ''}>EPG Cache</button>
-                        <button class="btn" id="clearCacheBtn">🗑️ Cache legen</button>
+                        <button class="btn" data-sync="all" data-cache-mode="cache_only" ${!(d.cache_status?.m3u?.exists || d.cache_status?.epg?.exists) ? 'disabled' : ''}>⚡ Laad Cache</button>
+                        <button class="btn" id="openCacheManagerBtn">💾 Beheer Cache</button>
                     </div>
                 </div>
                 <p class="muted" style="font-size:0.85rem;margin:0 0 0.5rem 0;">
@@ -61,6 +57,19 @@ export class DashboardPage extends BaseComponent {
                     &nbsp;|&nbsp;
                     Lokale EPG cache: ${d.cache_status?.epg?.exists ? `${this.escapeHtml(d.cache_status.epg.size_formatted)} — ${d.cache_status.epg.age_minutes} min geleden` : 'Geen'}
                 </p>
+                <div id="sync-progress-panel" class="sync-progress-panel hidden" style="margin:0.75rem 0;padding:0.75rem;border-radius:8px;background:var(--surface-2, rgba(255,255,255,0.04));border:1px solid var(--border, rgba(255,255,255,0.1));">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;margin-bottom:0.4rem;font-size:0.9rem;">
+                        <span id="syncProgressMsg">Synchronisatie voorbereiden...</span>
+                        <span style="display:flex;gap:0.75rem;align-items:center;white-space:nowrap;">
+                            <span id="syncProgressEta" class="muted" style="font-size:0.82rem;">ETA: berekenen...</span>
+                            <strong id="syncProgressPercent">0%</strong>
+                        </span>
+                    </div>
+                    <div style="width:100%;height:10px;border-radius:999px;background:var(--border, rgba(255,255,255,0.12));overflow:hidden;">
+                        <div id="syncProgressFill" style="width:0%;height:100%;background:var(--primary, #3b82f6);transition:width 0.3s ease;"></div>
+                    </div>
+                    <pre id="syncLiveConsole" class="muted" style="margin:0.5rem 0 0 0;font-size:0.78rem;max-height:90px;overflow:auto;white-space:pre-wrap;"></pre>
+                </div>
                 <div id="syncStatusBanner" class="sync-banner hidden"></div>
             </div>
 
@@ -121,19 +130,34 @@ export class DashboardPage extends BaseComponent {
             btn.addEventListener('click', async () => {
                 const panel = document.getElementById('sync-progress-panel');
                 const msgEl = document.getElementById('syncProgressMsg');
+                const pctEl = document.getElementById('syncProgressPercent');
+                const etaEl = document.getElementById('syncProgressEta');
                 const fillEl = document.getElementById('syncProgressFill');
                 const consoleEl = document.getElementById('syncLiveConsole');
                 const banner = document.getElementById('syncStatusBanner');
                 panel?.classList.remove('hidden');
                 banner?.classList.add('hidden');
                 if (fillEl) fillEl.style.width = '5%';
+                if (pctEl) pctEl.textContent = '5%';
+                if (etaEl) etaEl.textContent = 'ETA: berekenen...';
+
+                const formatEta = (secs) => {
+                    if (secs === null || secs === undefined) return 'ETA: berekenen...';
+                    if (secs < 60) return `ETA: ~${secs}s`;
+                    const mins = Math.floor(secs / 60);
+                    const rem = secs % 60;
+                    return `ETA: ~${mins}m ${rem}s`;
+                };
 
                 const poller = setInterval(async () => {
                     try {
                         const st = await this.props.api.get('sync_status');
                         const p = st.progress || {};
+                        const pct = Number(p.percent || 0);
                         if (msgEl) msgEl.textContent = p.message || 'Bezig...';
-                        if (fillEl) fillEl.style.width = `${p.percent || 0}%`;
+                        if (pctEl) pctEl.textContent = `${pct}%`;
+                        if (etaEl) etaEl.textContent = pct >= 100 ? 'Voltooid' : formatEta(p.eta_seconds);
+                        if (fillEl) fillEl.style.width = `${pct}%`;
                         if (consoleEl) consoleEl.textContent = (p.live_lines || []).join('\n');
                         if (st.logs) this.renderSyncLogs(st.logs);
                     } catch { /* ignore transient poll errors */ }

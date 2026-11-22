@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased] - feature/cachecontrol
+### Gewijzigd
+- **Dashboard Synchronisatie & Lokale Cache (`DashboardPage.js`, `views/dashboard.php`, `SyncProgressService.php`):**
+  - De 6 losse sync/cache-knoppen vervangen door **⚡ Laad Cache** (herimporteert alle lokale M3U/EPG cachebestanden) en **💾 Beheer Cache** (navigeert direct naar Cachebeheer).
+  - Dubbele **Cachebeheer**-knop uit de bovenste navigatiebalk verwijderd.
+  - Dynamisch voortgangspaneel (`#sync-progress-panel`) toegevoegd met percentage, statusbalk, actuele actie en berekende ETA (`eta_seconds`).
+- **Bronnen & Cron: Xtream Codes & Bronselectie (`SettingsPage.js`, `SettingsController.php`, `XtreamUrlBuilder.php`, `SchedulerService.php`):**
+  - Radio-selector toegevoegd voor bronmodus: **Xtream Codes API** (`xtream` met `Server URL`, `Gebruikersnaam`, `Wachtwoord` en optionele output-parameters) of **Aparte M3U & EPG links** (`separate_urls`).
+  - `SchedulerService::run()` valideert vooraf of de actieve bronmodus volledig is geconfigureerd (of dat lokale cachebestanden aanwezig zijn bij `cache_only`) en genereert automatisch beide Xtream-URL's (`/get.php` + `/xmltv.php`).
+
 ## [1.1.0] - 2026-11-22
 ### Toegevoegd
 - Uitgebreide prerequisite-diagnostiek in de Web Installer (`InstallerService::checkPrerequisites()`) met kopieerbare QNAP/Linux herstelcommando's en asynchrone "Opnieuw controleren" knop (`?route=install&step=recheck`).

@@ -42,6 +42,8 @@ final class SchedulerService
             }
         }
 
+        $this->validateSourceConfiguration($cacheMode);
+
         $progress = new SyncProgressService();
         $progress->reset();
         $result = ['ran' => true];
@@ -79,6 +81,43 @@ final class SchedulerService
         }
 
         return $result;
+    }
+
+    private function validateSourceConfiguration(string $cacheMode): void
+    {
+        if ($cacheMode === 'cache_only') {
+            $cache = new FeedCacheService($this->settings);
+            $m3uInfo = $cache->getCacheInfo('m3u');
+            $epgInfo = $cache->getCacheInfo('epg');
+            if (empty($m3uInfo['exists']) && empty($epgInfo['exists'])) {
+                throw new \RuntimeException('Geen lokale cachebestanden gevonden om te laden.');
+            }
+            return;
+        }
+
+        $sourceMode = (string) $this->settings->get('source_mode', 'xtream');
+        if ($sourceMode === 'xtream') {
+            $host = trim((string) $this->settings->get('xtream_host', ''));
+            $user = trim((string) $this->settings->get('xtream_username', ''));
+            $pass = (string) $this->settings->get('xtream_password', '');
+            $outputParams = trim((string) $this->settings->get('xtream_output_params', 'type=m3u_plus&output=ts'));
+
+            if ($host !== '' && $user !== '' && $pass !== '') {
+                $this->settings->set('m3u_source_url', XtreamUrlBuilder::buildM3uPlusUrl($host, $user, $pass, $outputParams), true);
+                $this->settings->set('epg_source_url', XtreamUrlBuilder::buildXmltvUrl($host, $user, $pass), true);
+                return;
+            }
+
+            $m3uUrl = trim((string) $this->settings->get('m3u_source_url', ''));
+            if ($m3uUrl === '') {
+                throw new \RuntimeException("Xtream Codes API is geselecteerd, maar Server URL, Gebruikersnaam of Wachtwoord ontbreekt. Configureer dit eerst bij 'Bronnen & Cron'.");
+            }
+        } else {
+            $m3uUrl = trim((string) $this->settings->get('m3u_source_url', ''));
+            if ($m3uUrl === '') {
+                throw new \RuntimeException("Aparte M3U & EPG links is geselecteerd, maar de M3U Bron URL ontbreekt. Configureer dit eerst bij 'Bronnen & Cron'.");
+            }
+        }
     }
 
     /**

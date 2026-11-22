@@ -15,16 +15,49 @@ export class SettingsPage extends BaseComponent {
 
         const cronCmd = `0 * * * * /mnt/ext/opt/apache/bin/php ${s.app_root}/bin/sync.php >/dev/null 2>&1`;
 
+        const sourceMode = s.source_mode === 'separate_urls' ? 'separate_urls' : 'xtream';
+
         this.container.innerHTML = `
             <div class="card">
                 <h2>Bronnen & Automatisering</h2>
                 <form id="settingsForm" class="stack-form">
-                    <label>M3U Bron URL (laat leeg om huidige te behouden)
-                        <input type="url" id="settingM3uUrl" placeholder="${this.escapeHtml(s.m3u_source_url_masked || 'https://...')}">
-                    </label>
-                    <label>EPG Bron URL (laat leeg om huidige te behouden)
-                        <input type="url" id="settingEpgUrl" placeholder="${this.escapeHtml(s.epg_source_url_masked || 'http://epgguide.ddns.net/epg/tvguide.xml')}">
-                    </label>
+                    <div class="source-mode-selector" style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:0.5rem;">
+                        <label class="checkbox-row" style="min-height:44px;cursor:pointer;">
+                            <input type="radio" name="source_mode" value="xtream" ${sourceMode === 'xtream' ? 'checked' : ''}>
+                            <span><strong>Xtream Codes API</strong> (M3U + EPG automatisch)</span>
+                        </label>
+                        <label class="checkbox-row" style="min-height:44px;cursor:pointer;">
+                            <input type="radio" name="source_mode" value="separate_urls" ${sourceMode === 'separate_urls' ? 'checked' : ''}>
+                            <span><strong>Aparte M3U & EPG links</strong></span>
+                        </label>
+                    </div>
+
+                    <div id="xtreamFields" class="${sourceMode === 'xtream' ? '' : 'hidden'}" style="display:flex;flex-direction:column;gap:0.75rem;">
+                        <label>Server URL
+                            <input type="url" id="settingXtreamHost" value="${this.escapeHtml(s.xtream_host || '')}" placeholder="https://example.com:8080">
+                        </label>
+                        <div class="grid-2">
+                            <label>Gebruikersnaam
+                                <input type="text" id="settingXtreamUser" placeholder="${this.escapeHtml(s.xtream_username_masked || 'Gebruikersnaam (laat leeg om te behouden)')}">
+                            </label>
+                            <label>Wachtwoord
+                                <input type="password" id="settingXtreamPass" placeholder="${s.xtream_password_set ? '•••••••• (laat leeg om te behouden)' : 'Wachtwoord'}">
+                            </label>
+                        </div>
+                        <label>Output-parameters (optioneel)
+                            <input type="text" id="settingXtreamOutputParams" value="${this.escapeHtml(s.xtream_output_params || 'type=m3u_plus&output=ts')}" placeholder="type=m3u_plus&output=ts">
+                        </label>
+                    </div>
+
+                    <div id="separateUrlFields" class="${sourceMode === 'separate_urls' ? '' : 'hidden'}" style="display:flex;flex-direction:column;gap:0.75rem;">
+                        <label>M3U Bron URL (laat leeg om huidige te behouden)
+                            <input type="url" id="settingM3uUrl" placeholder="${this.escapeHtml(s.m3u_source_url_masked || 'https://...')}">
+                        </label>
+                        <label>EPG Bron URL (laat leeg om huidige te behouden)
+                            <input type="url" id="settingEpgUrl" placeholder="${this.escapeHtml(s.epg_source_url_masked || 'http://epgguide.ddns.net/epg/tvguide.xml')}">
+                        </label>
+                    </div>
+
                     <div class="grid-2">
                         <label>Sync Interval (uren)
                             <input type="number" id="settingIntervalHours" value="${s.sync_interval_hours}" min="1" max="720" required>
@@ -64,11 +97,25 @@ export class SettingsPage extends BaseComponent {
     }
 
     bindEvents() {
+        this.container.querySelectorAll('input[name="source_mode"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                const mode = this.container.querySelector('input[name="source_mode"]:checked')?.value || 'xtream';
+                document.getElementById('xtreamFields')?.classList.toggle('hidden', mode !== 'xtream');
+                document.getElementById('separateUrlFields')?.classList.toggle('hidden', mode !== 'separate_urls');
+            });
+        });
+
         document.getElementById('settingsForm')?.addEventListener('submit', async ev => {
             ev.preventDefault();
+            const sourceMode = this.container.querySelector('input[name="source_mode"]:checked')?.value || 'xtream';
             await this.props.api.post('save_settings', {
-                m3u_source_url: document.getElementById('settingM3uUrl').value,
-                epg_source_url: document.getElementById('settingEpgUrl').value,
+                source_mode: sourceMode,
+                xtream_host: document.getElementById('settingXtreamHost')?.value || '',
+                xtream_username: document.getElementById('settingXtreamUser')?.value || '',
+                xtream_password: document.getElementById('settingXtreamPass')?.value || '',
+                xtream_output_params: document.getElementById('settingXtreamOutputParams')?.value || 'type=m3u_plus&output=ts',
+                m3u_source_url: document.getElementById('settingM3uUrl')?.value || '',
+                epg_source_url: document.getElementById('settingEpgUrl')?.value || '',
                 sync_interval_hours: Number(document.getElementById('settingIntervalHours').value),
                 sync_preferred_hour: Number(document.getElementById('settingPreferredHour').value),
                 enforce_lan_ip: document.getElementById('settingEnforceLan').checked,
