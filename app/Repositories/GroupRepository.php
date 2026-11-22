@@ -13,16 +13,22 @@ final class GroupRepository extends BaseRepository
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function allWithCounts(): array
+    public function allWithCounts(string $sortMode = 'import'): array
     {
+        $orderBy = match ($sortMode) {
+            'asc' => "ORDER BY COALESCE(NULLIF(g.custom_name, ''), g.original_name) ASC, g.id ASC",
+            'desc' => "ORDER BY COALESCE(NULLIF(g.custom_name, ''), g.original_name) DESC, g.id DESC",
+            default => 'ORDER BY g.import_order ASC, g.id ASC',
+        };
+
         return $this->pdo->query(
-            'SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order,
+            "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order,
                     COUNT(c.id) AS channel_count,
                     SUM(CASE WHEN c.is_enabled = 1 THEN 1 ELSE 0 END) AS active_channel_count
              FROM m3u_groups g
              LEFT JOIN channels c ON c.group_id = g.id
              GROUP BY g.id
-             ORDER BY g.sort_order ASC, g.id ASC'
+             {$orderBy}"
         )->fetchAll();
     }
 

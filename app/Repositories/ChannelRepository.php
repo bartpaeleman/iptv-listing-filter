@@ -21,7 +21,8 @@ final class ChannelRepository extends BaseRepository
         int $limit,
         int $offset,
         string $countryTagId = '',
-        string $status = 'all'
+        string $status = 'all',
+        string $sortBy = 'number'
     ): array {
         $where = ['1=1'];
         $params = [];
@@ -124,5 +125,53 @@ final class ChannelRepository extends BaseRepository
         $ph = implode(',', array_fill(0, count($cleanIds), '?'));
         $stmt = $this->pdo->prepare("UPDATE channels SET is_enabled = ? WHERE id IN ({$ph})");
         $stmt->execute(array_merge([$enabled ? 1 : 0], $cleanIds));
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function reorderChannelInGroup(int $channelId, int $newPosition): array
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $grpStmt = $this->pdo->prepare('SELECT group_id FROM channels WHERE id = :id LIMIT 1');
+            $grpStmt->execute([':id' => $channelId]);
+            $groupId = $grpStmt->fetchColumn();
+            if ($groupId === false) {
+                $this->pdo->commit();
+                return [];
+            }
+            $groupId = (int) $groupId;
+
+            $listStmt = $this->pdo->prepare(
+                'SELECT id FROM channels
+                 WHERE group_id = :gid
+                 ORDER BY (channel_number IS NULL) ASC, channel_number ASC, sort_order ASC, id ASC'
+            );
+            $listStmt->execute([':gid' => $groupId]);
+            $ids = array_map('intval', $listStmt->fetchAll(\PDO::FETCH_COLUMN));
+
+            $filtered = array_values(array_filter($ids, static fn(int $id): bool => $id !== $channelId));
+            $total = count($filtered) + 1;
+            $pos = max(1, min($total, $newPosition));
+            array_splice($filtered, $pos - 1, 0, [$channelId]);
+
+            $updStmt = $this->pdo->prepare('UPDATE channels SET channel_number = :num WHERE id = :id');
+            foreach ($filtered as $idx => $id) {
+                $updStmt->execute([
+                    ':num' => $idx + 1,
+                    ':id' => $id,
+                ]);
+            }
+
+            $this->pdo->commit();
+
+            return $this->filter($groupId, '', '', false, 200, 0, '', 'all', 'number')['items'];
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 }

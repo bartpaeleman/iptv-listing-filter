@@ -8,6 +8,8 @@ export class ChannelsPage extends BaseComponent {
         super(container, props);
         this.selectedGroupId = null;
         this.channelSearch = '';
+        this.groupSortMode = 'import';
+        this.channelSortBy = 'number';
         this.groupList = null;
         this.channelTable = null;
     }
@@ -17,13 +19,17 @@ export class ChannelsPage extends BaseComponent {
             this.renderShell();
             this.container.dataset.mounted = '1';
         }
-        const [groups, tags] = await Promise.all([
+        const [groupsRes, tags] = await Promise.all([
             this.props.api.get('groups'),
             this.props.api.get('country_tags'),
         ]);
+        this.groups = Array.isArray(groupsRes) ? groupsRes : (groupsRes?.items || []);
+        this.groupSortMode = groupsRes?.group_sort_mode || this.groupSortMode || 'import';
         this.countryTags = tags || [];
         this.populateCountryFilter();
-        this.groupList.setState({ groups, selectedGroupId: this.selectedGroupId, countryTags: this.countryTags });
+        this.updateGroupSortButton();
+        this.groupList.setState({ groups: this.groups, selectedGroupId: this.selectedGroupId, countryTags: this.countryTags });
+        this.updateGroupHeader();
         await this.loadChannels();
     }
 
@@ -42,6 +48,7 @@ export class ChannelsPage extends BaseComponent {
             country_tag_id: document.getElementById('channelCountryFilter')?.value || '',
             status: document.getElementById('channelStatusFilter')?.value || 'all',
             has_epg: document.getElementById('channelEpgFilter')?.value || 'all',
+            sort_by: this.channelSortBy,
             limit: 150,
         };
         if (this.selectedGroupId) params.group_id = this.selectedGroupId;
@@ -105,8 +112,8 @@ export class ChannelsPage extends BaseComponent {
                                         </label>
                                     </th>
                                     <th>Aan</th>
-                                    <th>#</th>
-                                    <th>Naam (Origineel / Custom)</th>
+                                    <th id="sortChannelsByNum" style="cursor:pointer;user-select:none;" title="Sorteer op kanaalnummer">#</th>
+                                    <th id="sortChannelsByName" style="cursor:pointer;user-select:none;" title="Sorteer alfabetisch op kanaalnaam">Naam (Origineel / Custom)</th>
                                     <th>Groep</th>
                                 </tr>
                             </thead>
@@ -236,6 +243,37 @@ export class ChannelsPage extends BaseComponent {
             const display = grp?.display_name || titleEl?.textContent || '';
             saveHeaderGroupName(display.trim());
         });
+
+        document.getElementById('groupSortBtn')?.addEventListener('click', async () => {
+            const order = ['import', 'asc', 'desc'];
+            const nextMode = order[(order.indexOf(this.groupSortMode) + 1) % order.length];
+            const res = await this.props.api.post('set_group_sort', { mode: nextMode });
+            this.groups = Array.isArray(res) ? res : (res?.items || []);
+            this.groupSortMode = res?.group_sort_mode || nextMode;
+            this.updateGroupSortButton();
+            this.groupList.setState({ groups: this.groups, selectedGroupId: this.selectedGroupId });
+        });
+
+        document.getElementById('sortChannelsByNum')?.addEventListener('click', () => {
+            this.channelSortBy = 'number';
+            this.loadChannels();
+        });
+
+        document.getElementById('sortChannelsByName')?.addEventListener('click', () => {
+            this.channelSortBy = 'name';
+            this.loadChannels();
+        });
+    }
+
+    updateGroupSortButton() {
+        const badge = document.getElementById('groupSortBadge');
+        if (!badge) return;
+        const labels = {
+            import: '⇅ Import',
+            asc: '↑ A-Z',
+            desc: '↓ Z-A',
+        };
+        badge.textContent = labels[this.groupSortMode] || '⇅ Import';
     }
 
     updateGroupHeader(fallbackName = '') {

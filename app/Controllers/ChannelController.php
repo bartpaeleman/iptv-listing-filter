@@ -65,8 +65,9 @@ final class ChannelController extends BaseController
         $status = (string) ($_GET['status'] ?? 'all');
         $limit = min(200, max(10, (int) ($_GET['limit'] ?? 100)));
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
+        $sortBy = in_array($_GET['sort_by'] ?? 'number', ['number', 'name'], true) ? (string) $_GET['sort_by'] : 'number';
 
-        $res = (new ChannelRepository())->filter($groupId, $search, $epgStatus, $activeOnly, $limit, $offset, $countryTagId, $status);
+        $res = (new ChannelRepository())->filter($groupId, $search, $epgStatus, $activeOnly, $limit, $offset, $countryTagId, $status, $sortBy);
         $emojiService = new EmojiTagService();
         $emojiService->seedDefaultsIfEmpty();
 
@@ -94,7 +95,27 @@ final class ChannelController extends BaseController
         $this->verifyCsrf($input);
 
         $id = (int) ($input['id'] ?? 0);
-        (new ChannelRepository())->updateChannel($id, $input);
+        $repo = new ChannelRepository();
+
+        if (array_key_exists('channel_number', $input) && $input['channel_number'] !== '' && $input['channel_number'] !== null) {
+            $reordered = $repo->reorderChannelInGroup($id, (int) $input['channel_number']);
+            $emojiService = new EmojiTagService();
+            foreach ($reordered as &$ch) {
+                $rawCh = (string) (($ch['custom_name'] ?? '') !== '' ? $ch['custom_name'] : ($ch['tvg_name'] ?? ''));
+                $parsed = $emojiService->parseName($rawCh, false);
+                $ch['display_name'] = $parsed['display_name'];
+                $ch['clean_name'] = $parsed['clean_name'];
+                $ch['emoji_prefix'] = $parsed['country_emoji'] ?? '';
+                if (isset($ch['group_name']) && (string) $ch['group_name'] !== '') {
+                    $ch['group_display_name'] = $emojiService->parseName((string) $ch['group_name'], true)['display_name'];
+                }
+            }
+            unset($ch);
+            $this->jsonSuccess(['items' => $reordered]);
+            return;
+        }
+
+        $repo->updateChannel($id, $input);
         $this->jsonSuccess();
     }
 

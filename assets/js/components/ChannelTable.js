@@ -18,7 +18,7 @@ export class ChannelTable extends BaseComponent {
                         <span class="toggle-slider"></span>
                     </label>
                 </td>
-                <td><input type="number" class="ch-num" value="${c.channel_number ?? ''}" style="width:76px;"></td>
+                <td><input type="number" class="ch-num" value="${c.channel_number ?? ''}" style="width:76px;font-size:16px;min-height:44px;"></td>
                 <td>
                     <div style="display:flex;align-items:center;gap:0.4rem;">
                         ${emojiPrefix ? `<span class="ch-emoji-prefix" title="${this.escapeHtml(c.tvg_name || '')}">${this.escapeHtml(emojiPrefix)}</span>` : ''}

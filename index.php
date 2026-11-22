@@ -68,6 +68,7 @@ switch ($route) {
         $router->addApiRoute('clear_sync_logs', DashboardController::class, 'clearSyncLogs');
         $router->addApiRoute('logout', DashboardController::class, 'logout');
         $router->addApiRoute('groups', ChannelController::class, 'groups');
+        $router->addApiRoute('set_group_sort', ChannelController::class, 'setGroupSort');
         $router->addApiRoute('update_group', ChannelController::class, 'updateGroup');
         $router->addApiRoute('bulk_groups', ChannelController::class, 'bulkGroups');
         $router->addApiRoute('channels', ChannelController::class, 'channels');
