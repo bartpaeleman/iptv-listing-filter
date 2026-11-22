@@ -168,6 +168,6 @@ export class ChannelsPage extends BaseComponent {
     }
 
     async openCountryModal() {
-        this.props.switchTab('emoji_rules');
+        this.props.switchTab('emoji-rules');
     }
 }

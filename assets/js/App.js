@@ -20,7 +20,7 @@ class App {
             channels: new ChannelsPage('#tab-channels', deps),
             epg: new EpgMappingPage('#tab-epg', deps),
             cache: new CacheManagerPage('#tab-cache', deps),
-            emoji_rules: new EmojiRulesPage('#tab-emoji-rules', deps),
+            'emoji-rules': new EmojiRulesPage('#tab-emoji-rules', deps),
             settings: new SettingsPage('#tab-settings', deps),
         };
     }
