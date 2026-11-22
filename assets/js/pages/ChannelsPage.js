@@ -65,21 +65,21 @@ export class ChannelsPage extends BaseComponent {
                 </aside>
                 <div class="card channels-pane">
                     <div class="card-header">
-                        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                        <div id="groupHeaderTitleWrap" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
                             <h2 id="selectedGroupTitle">Alle Kanalen</h2>
-                            <button type="button" class="btn btn-sm hidden" id="renameSelectedGroupBtn" title="Geselecteerde groep hernoemen">✏️ Hernoemen</button>
+                            <div id="inlineGroupEditWrap" class="hidden" style="display:inline-flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+                                <input type="text" id="inlineGroupNameInput" placeholder="Custom groepsnaam (leeg = origineel)" style="font-size:16px;min-height:44px;min-width:180px;">
+                                <button type="button" class="btn btn-sm btn-primary" id="inlineGroupSaveBtn" title="Opslaan (Enter)" style="min-height:44px;min-width:44px;">✔️</button>
+                                <button type="button" class="btn btn-sm" id="inlineGroupCancelBtn" title="Annuleren (Escape)" style="min-height:44px;min-width:44px;">✖️</button>
+                            </div>
                         </div>
                         <div class="btn-group">
+                            <button type="button" class="btn btn-sm hidden" id="adoptGroupNameBtn" title="Huidige weergavenaam (incl. vlag/emoji) opslaan als custom naam">❐</button>
+                            <button type="button" class="btn btn-sm hidden" id="editGroupNameBtn" title="Groepsnaam aanpassen">✏️</button>
                             <button class="btn btn-sm" id="manageCountryTagsBtn">🏷️ Landen & Tags Beheren</button>
                             <button class="btn btn-sm" id="bulkEnableChannelsBtn">Selectie Aan</button>
                             <button class="btn btn-sm" id="bulkDisableChannelsBtn">Selectie Uit</button>
                         </div>
-                    </div>
-                    <div id="groupRenameBar" class="toolbar hidden" style="gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.5rem;">
-                        <input type="text" id="groupRenameInput" placeholder="Custom groepsnaam (leeg = origineel)" style="flex:1;min-width:180px;">
-                        <button type="button" class="btn btn-sm btn-primary" id="groupRenameSaveBtn">Opslaan</button>
-                        <button type="button" class="btn btn-sm" id="groupRenameAdoptDisplayBtn" title="Neem huidige weergavenaam inclusief emoji over">Weergavenaam overnemen</button>
-                        <button type="button" class="btn btn-sm" id="groupRenameCancelBtn">Annuleer</button>
                     </div>
                     <div class="toolbar" style="flex-wrap:wrap;">
                         <input type="search" id="channelSearchInput" placeholder="Zoek kanaalnaam..." style="flex:2;min-width:180px;">
@@ -186,37 +186,59 @@ export class ChannelsPage extends BaseComponent {
         document.getElementById('bulkDisableChannelsBtn')?.addEventListener('click', () => bulkChannels(false));
         document.getElementById('manageCountryTagsBtn')?.addEventListener('click', () => this.openCountryModal());
 
-        const renameBar = document.getElementById('groupRenameBar');
-        const renameInput = document.getElementById('groupRenameInput');
-        document.getElementById('renameSelectedGroupBtn')?.addEventListener('click', () => {
-            if (!this.selectedGroupId) return;
-            const grp = (this.groups || []).find(g => Number(g.id) === Number(this.selectedGroupId));
-            if (renameInput) {
-                renameInput.value = grp?.custom_name || grp?.original_name || '';
-            }
-            renameBar?.classList.toggle('hidden');
-            renameInput?.focus();
-        });
-        document.getElementById('groupRenameCancelBtn')?.addEventListener('click', () => {
-            renameBar?.classList.add('hidden');
-        });
+        const titleEl = document.getElementById('selectedGroupTitle');
+        const editWrap = document.getElementById('inlineGroupEditWrap');
+        const inlineInput = document.getElementById('inlineGroupNameInput');
+
+        const cancelInlineEdit = () => {
+            editWrap?.classList.add('hidden');
+            titleEl?.classList.remove('hidden');
+        };
+
         const saveHeaderGroupName = async newName => {
             if (!this.selectedGroupId) return;
             await this.props.api.post('update_group', { id: this.selectedGroupId, custom_name: newName });
             this.props.toast.show(newName ? 'Groepsnaam bijgewerkt' : 'Groepsnaam hersteld naar origineel');
-            renameBar?.classList.add('hidden');
+            cancelInlineEdit();
             await this.load();
             const updated = (this.groups || []).find(g => Number(g.id) === Number(this.selectedGroupId));
-            if (updated) {
-                document.getElementById('selectedGroupTitle').textContent = updated.display_name || updated.custom_name || updated.original_name;
+            if (updated && titleEl) {
+                titleEl.textContent = updated.display_name || updated.custom_name || updated.original_name;
             }
         };
-        document.getElementById('groupRenameSaveBtn')?.addEventListener('click', () => {
-            saveHeaderGroupName((renameInput?.value || '').trim());
-        });
-        document.getElementById('groupRenameAdoptDisplayBtn')?.addEventListener('click', () => {
+
+        document.getElementById('editGroupNameBtn')?.addEventListener('click', () => {
+            if (!this.selectedGroupId) return;
             const grp = (this.groups || []).find(g => Number(g.id) === Number(this.selectedGroupId));
-            const display = grp?.display_name || document.getElementById('selectedGroupTitle')?.textContent || '';
+            if (inlineInput) {
+                inlineInput.value = grp?.custom_name || grp?.original_name || grp?.name || '';
+            }
+            titleEl?.classList.add('hidden');
+            editWrap?.classList.remove('hidden');
+            inlineInput?.focus();
+            inlineInput?.select();
+        });
+
+        document.getElementById('inlineGroupSaveBtn')?.addEventListener('click', () => {
+            saveHeaderGroupName((inlineInput?.value || '').trim());
+        });
+
+        document.getElementById('inlineGroupCancelBtn')?.addEventListener('click', cancelInlineEdit);
+
+        inlineInput?.addEventListener('keydown', ev => {
+            if (ev.key === 'Enter') {
+                ev.preventDefault();
+                saveHeaderGroupName((inlineInput.value || '').trim());
+            } else if (ev.key === 'Escape') {
+                ev.preventDefault();
+                cancelInlineEdit();
+            }
+        });
+
+        document.getElementById('adoptGroupNameBtn')?.addEventListener('click', () => {
+            if (!this.selectedGroupId) return;
+            const grp = (this.groups || []).find(g => Number(g.id) === Number(this.selectedGroupId));
+            const display = grp?.display_name || titleEl?.textContent || '';
             saveHeaderGroupName(display.trim());
         });
     }
