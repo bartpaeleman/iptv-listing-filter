@@ -52,6 +52,14 @@ final class EmojiTagService
         $this->fallbackEmoji = self::DEFAULT_FALLBACK_EMOJI;
     }
 
+    public static function invalidateRulesCache(): void
+    {
+        $cacheFile = dirname(__DIR__, 2) . '/storage/cache/emoji_rules.json';
+        if (is_file($cacheFile)) {
+            @unlink($cacheFile);
+        }
+    }
+
     public function formatGroupName(string $rawName): string
     {
         return $this->parseName($rawName, true)['display_name'];
