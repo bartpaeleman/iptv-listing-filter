@@ -35,7 +35,7 @@ export class EpgMappingPage extends BaseComponent {
                     </select>
                 </div>
                 <div class="table-wrap">
-                    <table class="data-table">
+                    <table class="data-table epg-mapping-table">
                         <thead><tr><th>Kanaal</th><th>Status</th><th>Gekoppelde EPG Zender</th><th>Actie</th></tr></thead>
                         <tbody id="epgMapperRoot"></tbody>
                     </table>

@@ -17,7 +17,8 @@ final class ChannelController extends BaseController
         $emojiService = new EmojiTagService();
         $emojiService->seedDefaultsIfEmpty();
 
-        $groups = (new GroupRepository())->allWithCounts();
+        $contentTypes = $this->parseContentTypes((string) ($_GET['content_types'] ?? ''));
+        $groups = (new GroupRepository())->allWithCounts('import', $contentTypes);
         foreach ($groups as &$g) {
             $rawName = (string) (($g['custom_name'] ?? '') !== '' ? $g['custom_name'] : ($g['original_name'] ?? ''));
             $g['display_name'] = $emojiService->parseName($rawName, true)['display_name'];
@@ -66,8 +67,13 @@ final class ChannelController extends BaseController
         $limit = min(200, max(10, (int) ($_GET['limit'] ?? 100)));
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
         $sortBy = in_array($_GET['sort_by'] ?? 'number', ['number', 'name_asc', 'name_desc', 'import'], true) ? (string) $_GET['sort_by'] : 'number';
+        $contentTypes = $this->parseContentTypes((string) ($_GET['content_types'] ?? ''));
+        $channelRepo = new ChannelRepository();
+        if ($groupId !== null && $groupId > 0) {
+            $channelRepo->normalizeActiveGroupNumbers($groupId);
+        }
 
-        $res = (new ChannelRepository())->filter($groupId, $search, $epgStatus, $activeOnly, $limit, $offset, $countryTagId, $status, $sortBy);
+        $res = $channelRepo->filter($groupId, $search, $epgStatus, $activeOnly, $limit, $offset, $countryTagId, $status, $sortBy, $contentTypes);
         $emojiService = new EmojiTagService();
         $emojiService->seedDefaultsIfEmpty();
 
@@ -116,6 +122,12 @@ final class ChannelController extends BaseController
         }
 
         $repo->updateChannel($id, $input);
+        if (array_key_exists('is_enabled', $input)) {
+            $chRow = $repo->findById($id);
+            if ($chRow !== null && !empty($chRow['group_id'])) {
+                $repo->normalizeActiveGroupNumbers((int) $chRow['group_id']);
+            }
+        }
         $this->jsonSuccess();
     }
 
@@ -130,7 +142,11 @@ final class ChannelController extends BaseController
         $groupId = isset($input['group_id']) && $input['group_id'] !== '' && $input['group_id'] !== null ? (int) $input['group_id'] : null;
         $search = trim((string) ($input['search'] ?? ''));
 
-        (new ChannelRepository())->bulkSetEnabled($enable, $ids, $groupId, $search);
+        $repo = new ChannelRepository();
+        $repo->bulkSetEnabled($enable, $ids, $groupId, $search);
+        if ($groupId !== null && $groupId > 0) {
+            $repo->normalizeActiveGroupNumbers($groupId);
+        }
         $this->jsonSuccess();
     }
 
@@ -182,5 +198,21 @@ final class ChannelController extends BaseController
         $groupByCountry = (bool) ($input['group_by_country'] ?? false);
         $res = (new \App\Services\CountryTagService())->applyTagsToExistingChannels($groupByCountry);
         $this->jsonSuccess($res);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function parseContentTypes(string $raw): array
+    {
+        if (trim($raw) === '') {
+            return [];
+        }
+        $allowed = ['live', 'movie', 'series'];
+        $parts = array_map('trim', explode(',', $raw));
+        return array_values(array_unique(array_filter(
+            $parts,
+            static fn (string $v): bool => in_array($v, $allowed, true)
+        )));
     }
 }

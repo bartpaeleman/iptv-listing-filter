@@ -26,7 +26,7 @@ final class SchemaMigrator
                 "SELECT COUNT(*) FROM information_schema.tables
                  WHERE table_schema = DATABASE() AND table_name IN ('epg_sources', 'country_tags', 'emoji_rules')"
             )->fetchColumn();
-            $flag = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'schema_integrity_v4' LIMIT 1")->fetchColumn();
+            $flag = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'schema_integrity_v6' LIMIT 1")->fetchColumn();
             if ($tblCount === 3 && (string) $flag === '1') {
                 return;
             }
@@ -128,8 +128,32 @@ final class SchemaMigrator
             }
         }
 
+        $grpContentTypeStmt = $pdo->query(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'm3u_groups' AND COLUMN_NAME = 'content_type'"
+        );
+        if ((int) $grpContentTypeStmt->fetchColumn() === 0) {
+            try {
+                $pdo->exec("ALTER TABLE `m3u_groups` ADD COLUMN `content_type` ENUM('live','movie','series') NOT NULL DEFAULT 'live' AFTER `import_order`, ADD INDEX `idx_groups_content_type` (`content_type`)");
+            } catch (\Throwable) {
+                // Ignore if already exists or insufficient privileges
+            }
+        }
+
+        $chContentTypeStmt = $pdo->query(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'channels' AND COLUMN_NAME = 'content_type'"
+        );
+        if ((int) $chContentTypeStmt->fetchColumn() === 0) {
+            try {
+                $pdo->exec("ALTER TABLE `channels` ADD COLUMN `content_type` ENUM('live','movie','series') NOT NULL DEFAULT 'live' AFTER `group_id`, ADD INDEX `idx_channels_content_type` (`content_type`)");
+            } catch (\Throwable) {
+                // Ignore if already exists or insufficient privileges
+            }
+        }
+
         $pdo->exec("INSERT IGNORE INTO settings (setting_key, setting_value, is_encrypted) VALUES ('group_sort_mode', 'import', 0)");
-        $pdo->exec("INSERT INTO settings (setting_key, setting_value, is_encrypted) VALUES ('schema_integrity_v5', '1', 0) ON DUPLICATE KEY UPDATE setting_value = '1'");
+        $pdo->exec("INSERT INTO settings (setting_key, setting_value, is_encrypted) VALUES ('schema_integrity_v6', '1', 0) ON DUPLICATE KEY UPDATE setting_value = '1'");
     }
 
     /**

@@ -11,14 +11,14 @@ ob_start();
     <?php if ($loginError !== ''): ?>
         <div class="alert alert-error"><?= htmlspecialchars($loginError, ENT_QUOTES, 'UTF-8') ?></div>
     <?php endif; ?>
-    <form method="post" class="stack-form">
+    <form method="post" action="?route=login" id="loginForm" name="loginForm" class="stack-form" autocomplete="on">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" name="login_submit" value="1">
-        <label>Gebruikersnaam
-            <input type="text" name="username" autocomplete="username" required autofocus>
+        <label for="loginUsername">Gebruikersnaam
+            <input type="text" id="loginUsername" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
         </label>
-        <label>Wachtwoord
-            <input type="password" name="password" autocomplete="current-password" required>
+        <label for="loginPassword">Wachtwoord
+            <input type="password" id="loginPassword" name="password" autocomplete="current-password" required>
         </label>
         <button type="submit" class="btn btn-primary">Inloggen</button>
     </form>

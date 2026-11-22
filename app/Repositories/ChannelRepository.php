@@ -11,6 +11,7 @@ final class ChannelRepository extends BaseRepository
     protected string $table = 'channels';
 
     /**
+     * @param array<int, string> $contentTypes
      * @return array{items: array<int, array<string, mixed>>, total: int}
      */
     public function filter(
@@ -22,7 +23,8 @@ final class ChannelRepository extends BaseRepository
         int $offset,
         string $countryTagId = '',
         string $status = 'all',
-        string $sortBy = 'number'
+        string $sortBy = 'number',
+        array $contentTypes = []
     ): array {
         $where = ['1=1'];
         $params = [];
@@ -32,12 +34,12 @@ final class ChannelRepository extends BaseRepository
             $params[':gid'] = $groupId;
         }
         if ($search !== '') {
+            $where[] = '(c.tvg_name LIKE :q1 OR c.custom_name LIKE :q2 OR c.tvg_id LIKE :q3 OR c.epg_channel_id LIKE :q4)';
             $like = '%' . $search . '%';
-            $where[] = '(c.tvg_name LIKE :search_tvg OR c.custom_name LIKE :search_custom OR c.tvg_id LIKE :search_tvg_id OR c.epg_channel_id LIKE :search_epg_id)';
-            $params[':search_tvg'] = $like;
-            $params[':search_custom'] = $like;
-            $params[':search_tvg_id'] = $like;
-            $params[':search_epg_id'] = $like;
+            $params[':q1'] = $like;
+            $params[':q2'] = $like;
+            $params[':q3'] = $like;
+            $params[':q4'] = $like;
         }
         if ($activeOnly || $status === 'enabled') {
             $where[] = 'g.is_enabled = 1 AND c.is_enabled = 1';
@@ -54,6 +56,15 @@ final class ChannelRepository extends BaseRepository
         } elseif ($countryTagId !== '' && ctype_digit($countryTagId)) {
             $where[] = 'c.country_tag_id = :ctid';
             $params[':ctid'] = (int) $countryTagId;
+        }
+        if ($contentTypes !== []) {
+            $ctPlaceholders = [];
+            foreach (array_values($contentTypes) as $idx => $ct) {
+                $key = ":ct_{$idx}";
+                $ctPlaceholders[] = $key;
+                $params[$key] = $ct;
+            }
+            $where[] = 'c.content_type IN (' . implode(', ', $ctPlaceholders) . ')';
         }
 
         $whereSql = implode(' AND ', $where);
@@ -193,6 +204,49 @@ final class ChannelRepository extends BaseRepository
             $this->pdo->commit();
 
             return $this->filter($groupId, '', '', false, 200, 0, '', 'all', 'number')['items'];
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    public function normalizeActiveGroupNumbers(int $groupId): bool
+    {
+        if ($groupId <= 0) {
+            return false;
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare(
+                'SELECT id, channel_number
+                 FROM channels
+                 WHERE group_id = :gid AND is_enabled = 1
+                 ORDER BY (channel_number IS NULL OR channel_number <= 0) ASC, channel_number ASC, id ASC'
+            );
+            $stmt->execute([':gid' => $groupId]);
+            $rows = $stmt->fetchAll();
+
+            $updStmt = $this->pdo->prepare('UPDATE channels SET channel_number = :num WHERE id = :id');
+            $changed = false;
+            $expected = 1;
+
+            foreach ($rows as $row) {
+                $currentNum = $row['channel_number'] !== null ? (int) $row['channel_number'] : 0;
+                if ($currentNum !== $expected) {
+                    $updStmt->execute([
+                        ':num' => $expected,
+                        ':id' => (int) $row['id'],
+                    ]);
+                    $changed = true;
+                }
+                $expected++;
+            }
+
+            $this->pdo->commit();
+            return $changed;
         } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();

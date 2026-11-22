@@ -83,23 +83,24 @@ final class M3uParserService
         $now = gmdate('Y-m-d H:i:s');
         $touchIds = [];
 
-        $insertGroupStmt = $this->pdo->prepare('INSERT INTO m3u_groups (original_name, is_enabled, sort_order) VALUES (:name, 1, :sort)');
+        $insertGroupStmt = $this->pdo->prepare('INSERT INTO m3u_groups (original_name, content_type, is_enabled, sort_order) VALUES (:name, :ct, 1, :sort)');
         $selectChannelStmt = $this->pdo->prepare(
             'SELECT id, tvg_id, tvg_name, tvg_logo, group_id, stream_url, epg_channel_id, epg_match_type FROM channels WHERE stream_hash = :hash LIMIT 1'
         );
         $insertChannelStmt = $this->pdo->prepare(
-            'INSERT INTO channels (stream_hash, tvg_id, tvg_name, tvg_logo, group_id, stream_url, epg_channel_id, epg_match_type, is_enabled, sort_order, last_seen_at)
-             VALUES (:hash, :tvg_id, :tvg_name, :tvg_logo, :group_id, :stream_url, :epg_id, :match_type, 1, :sort, :seen)
+            'INSERT INTO channels (stream_hash, tvg_id, tvg_name, tvg_logo, group_id, content_type, stream_url, epg_channel_id, epg_match_type, is_enabled, sort_order, last_seen_at)
+             VALUES (:hash, :tvg_id, :tvg_name, :tvg_logo, :group_id, :ct, :stream_url, :epg_id, :match_type, 1, :sort, :seen)
              ON DUPLICATE KEY UPDATE
                 tvg_id = VALUES(tvg_id),
                 tvg_name = VALUES(tvg_name),
                 tvg_logo = VALUES(tvg_logo),
                 group_id = VALUES(group_id),
+                content_type = VALUES(content_type),
                 stream_url = VALUES(stream_url),
                 last_seen_at = VALUES(last_seen_at)'
         );
         $updateChannelStmt = $this->pdo->prepare(
-            'UPDATE channels SET tvg_id = :tvg_id, tvg_name = :tvg_name, tvg_logo = :tvg_logo, group_id = :group_id, stream_url = :stream_url,
+            'UPDATE channels SET tvg_id = :tvg_id, tvg_name = :tvg_name, tvg_logo = :tvg_logo, group_id = :group_id, content_type = :ct, stream_url = :stream_url,
              epg_channel_id = :epg_id, epg_match_type = :match_type, last_seen_at = :seen WHERE id = :id'
         );
 
@@ -123,9 +124,10 @@ final class M3uParserService
 
                 $streamUrl = $line;
                 $groupName = $pendingMeta['group_title'] !== '' ? $pendingMeta['group_title'] : 'Overig';
+                $contentType = $this->detectContentType($streamUrl, $groupName);
 
                 if (!isset($groupCache[$groupName])) {
-                    $insertGroupStmt->execute([':name' => $groupName, ':sort' => count($groupCache) + 1]);
+                    $insertGroupStmt->execute([':name' => $groupName, ':ct' => $contentType, ':sort' => count($groupCache) + 1]);
                     $groupCache[$groupName] = (int) $this->pdo->lastInsertId();
                     $groupsAdded++;
                 }
@@ -153,6 +155,7 @@ final class M3uParserService
                         ':tvg_name' => $pendingMeta['tvg_name'],
                         ':tvg_logo' => $pendingMeta['tvg_logo'],
                         ':group_id' => $groupId,
+                        ':ct' => $contentType,
                         ':stream_url' => $streamUrl,
                         ':epg_id' => $epgChannelId,
                         ':match_type' => $matchType,
@@ -173,6 +176,7 @@ final class M3uParserService
                         ':tvg_name' => $pendingMeta['tvg_name'],
                         ':tvg_logo' => $pendingMeta['tvg_logo'],
                         ':group_id' => $groupId,
+                        ':ct' => $contentType,
                         ':stream_url' => $streamUrl,
                         ':epg_id' => $matched,
                         ':match_type' => $matchType,
@@ -184,7 +188,7 @@ final class M3uParserService
 
                 $pendingMeta = null;
                 $processed = $channelsAdded + $channelsUpdated;
-                if ($processed > 0 && $processed % 250 === 0) {
+                if ($processed > 0 && $processed % 500 === 0) {
                     $this->pdo->commit();
                     $this->pdo->beginTransaction();
                     $pos = ftell($handle) ?: 0;
@@ -292,5 +296,17 @@ final class M3uParserService
             $map[(string) $row['original_name']] = (int) $row['id'];
         }
         return $map;
+    }
+
+    private function detectContentType(string $url, string $groupTitle): string
+    {
+        $lowerUrl = strtolower($url);
+        if (str_contains($lowerUrl, '/movie/')) {
+            return 'movie';
+        }
+        if (str_contains($lowerUrl, '/series/')) {
+            return 'series';
+        }
+        return 'live';
     }
 }

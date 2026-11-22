@@ -267,3 +267,37 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; }
 .toggle-switch input:checked + .toggle-slider::before {
     transform: translateX(20px);
 }
+
+/* Content-type filter toggles */
+.content-type-toggle {
+    min-height: 44px;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.content-type-toggle.is-active {
+    background: #16a34a !important;
+    color: #ffffff !important;
+    border-color: #15803d !important;
+    font-weight: 600;
+    box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.35);
+}
+
+/* EPG Koppeling tabel uitlijning & kolombreedtes */
+.epg-mapping-table th {
+    text-align: left;
+    white-space: nowrap;
+}
+
+.epg-mapping-table th:first-child,
+.epg-mapping-table td:first-child {
+    width: 1%;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.epg-mapping-table .badge,
+.epg-mapping-table .btn {
+    white-space: nowrap;
+}

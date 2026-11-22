@@ -67,10 +67,18 @@ final class SchedulerService
 
             if ($mode === 'all' || $mode === 'm3u') {
                 $this->pdo = \App\Core\Database::reconnectIfNeeded();
-                $m3uStats = (new M3uParserService($this->pdo, $this->settings))->sync(null, $cacheMode, $mode === 'm3u' ? $cacheFilename : null);
-                $result['m3u'] = $m3uStats;
-                $this->logs->addLog('m3u', 'success', 'M3U synchronisatie voltooid.', $m3uStats);
-                $this->writeFileLog('m3u', 'success', 'M3U synchronisatie voltooid.', $m3uStats);
+                $sourceMode = (string) $this->settings->get('source_mode', 'xtream');
+                if ($sourceMode === 'xtream' && $cacheMode !== 'cache_only') {
+                    $m3uStats = (new XtreamApiService($this->pdo, $this->settings))->sync();
+                    $result['m3u'] = $m3uStats;
+                    $this->logs->addLog('m3u', 'success', 'Xtream API synchronisatie voltooid.', $m3uStats);
+                    $this->writeFileLog('m3u', 'success', 'Xtream API synchronisatie voltooid.', $m3uStats);
+                } else {
+                    $m3uStats = (new M3uParserService($this->pdo, $this->settings))->sync(null, $cacheMode, $mode === 'm3u' ? $cacheFilename : null);
+                    $result['m3u'] = $m3uStats;
+                    $this->logs->addLog('m3u', 'success', 'M3U synchronisatie voltooid.', $m3uStats);
+                    $this->writeFileLog('m3u', 'success', 'M3U synchronisatie voltooid.', $m3uStats);
+                }
             }
 
             $progress->update('completed', 'done', 100, 'Synchronisatie voltooid!', [], 'Synchronisatie voltooid');
