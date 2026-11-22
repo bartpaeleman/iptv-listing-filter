@@ -16,8 +16,8 @@ final class GroupRepository extends BaseRepository
     public function allWithCounts(string $sortMode = 'import'): array
     {
         $orderBy = match ($sortMode) {
-            'asc' => "ORDER BY COALESCE(NULLIF(g.custom_name, ''), g.original_name) ASC, g.id ASC",
-            'desc' => "ORDER BY COALESCE(NULLIF(g.custom_name, ''), g.original_name) DESC, g.id DESC",
+            'asc' => 'ORDER BY g.original_name ASC, g.id ASC',
+            'desc' => 'ORDER BY g.original_name DESC, g.id DESC',
             default => 'ORDER BY g.import_order ASC, g.id ASC',
         };
 
