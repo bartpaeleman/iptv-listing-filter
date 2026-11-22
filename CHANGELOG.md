@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased] - feature/cachecontrol
+### Gewijzigd
+- **Dashboard Synchronisatie & Lokale Cache (`DashboardPage.js`, `views/dashboard.php`, `SyncProgressService.php`):**
+  - De 6 losse sync/cache-knoppen vervangen door **⚡ Laad Cache** (herimporteert alle lokale M3U/EPG cachebestanden) en **💾 Beheer Cache** (navigeert direct naar Cachebeheer).
+  - Dubbele **Cachebeheer**-knop uit de bovenste navigatiebalk verwijderd.
+  - Dynamisch voortgangspaneel (`#sync-progress-panel`) toegevoegd met percentage, statusbalk, actuele actie en berekende ETA (`eta_seconds`).
+- **Bronnen & Cron: Xtream Codes & Bronselectie (`SettingsPage.js`, `SettingsController.php`, `XtreamUrlBuilder.php`, `SchedulerService.php`):**
+  - Radio-selector toegevoegd voor bronmodus: **Xtream Codes API** (`xtream` met `Server URL`, `Gebruikersnaam`, `Wachtwoord`, optionele output-parameters en keuze tussen standaard `/xmltv.php` of een eigen aangepaste EPG-URL) of **Aparte M3U & EPG links** (`separate_urls`).
+  - `SchedulerService::run()` valideert vooraf of de actieve bronmodus volledig is geconfigureerd (of dat lokale cachebestanden aanwezig zijn bij `cache_only`) en genereert automatisch beide Xtream-URL's.
+- **Groepen & Kanalen UI & Centrale Vlaggen-Registry (`FlagRegistry.php`, `FlagRegistry.js`, `ChannelTable.js`, `GroupList.js`, `ChannelsPage.js`):**
+  - Centrale ISO 3166-1 alpha-2 + IPTV-aliassen registry (`FlagRegistry`) aangemaakt voor zowel backend als frontend.
+  - Land-/prefix-tags (`|BE|`, `NL|`, `|VIP|`, enz.) worden in de groepen- en kanaallijst visueel omgezet naar vlag-emoji's of `🏷️` zonder de databasedata te wijzigen.
+  - Kolom `Aan` vervangen door een visuele toggle-switch, en bulk-selectie voorzien van rij-highlight en duidelijke tooltip/label (`☑️`).
+  - Voortgangsbalk, actuele actie en ETA-berekening geëxtraheerd naar `SyncProgressPanel.js` en geïntegreerd op zowel het Dashboard als **Beheer Cache** (`CacheManagerPage`).
+  - **Beheer Cache** controleert bij het openen direct `sync_status`, hervat lopende achtergrond-syncs naadloos en blokkeert conflicterende actieknoppen tot de sync/import is afgerond.
+  - `DashboardController::sync()` gebruikt `ignore_user_abort(true)` en `set_time_limit(0)` zodat synchronisaties doorlopen bij paginawissel; `DashboardPage::load()` herstelt automatisch de voortgangs-UI bij terugkeer.
+  - `M3uParserService::sync()` voert echte delta-vergelijking uit (`INSERT` nieuwe, `UPDATE` enkel gewijzigde, `DELETE` verwijderde kanalen).
+
 ## [1.1.0] - 2026-11-22
 ### Toegevoegd
 - Uitgebreide prerequisite-diagnostiek in de Web Installer (`InstallerService::checkPrerequisites()`) met kopieerbare QNAP/Linux herstelcommando's en asynchrone "Opnieuw controleren" knop (`?route=install&step=recheck`).

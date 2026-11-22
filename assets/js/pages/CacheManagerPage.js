@@ -1,4 +1,5 @@
 import { BaseComponent } from '../core/BaseComponent.js';
+import { SyncProgressPanel } from '../components/SyncProgressPanel.js';
 
 export class CacheManagerPage extends BaseComponent {
     constructor(container, props) {
@@ -9,6 +10,10 @@ export class CacheManagerPage extends BaseComponent {
     async load() {
         const data = await this.props.api.get('cache_list');
         this.setState({ data });
+        await this.progressPanel?.checkActive({
+            onStateChange: (running) => this.setActionsDisabled(running),
+            onComplete: () => this.load(),
+        });
     }
 
     render() {
@@ -43,6 +48,7 @@ export class CacheManagerPage extends BaseComponent {
                     <button type="button" id="cacheSyncEpgBtn" class="btn" style="min-height:48px;font-size:1rem;" ${d.epg_count === 0 ? 'disabled' : ''}>📅 EPG uit Cache</button>
                     <button type="button" id="bulkDeleteCacheBtn" class="btn" style="min-height:48px;font-size:1rem;">🗑️ Geselecteerde wissen</button>
                 </div>
+                <div id="cacheProgressMount"></div>
                 <div id="cacheProgressPanel" class="sync-banner hidden" aria-live="polite" style="margin-bottom:1rem;"></div>
 
                 <div class="card-header">
@@ -93,7 +99,22 @@ export class CacheManagerPage extends BaseComponent {
         this.bindEvents();
     }
 
+    setActionsDisabled(disabled) {
+        ['cacheSyncAllBtn', 'cacheSyncM3uBtn', 'cacheSyncEpgBtn', 'bulkDeleteCacheBtn'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = disabled;
+        });
+        this.container.querySelectorAll('.import-cache-btn, .del-cache-btn').forEach(btn => {
+            btn.disabled = disabled;
+        });
+    }
+
     bindEvents() {
+        const mount = document.getElementById('cacheProgressMount');
+        if (mount) {
+            this.progressPanel = new SyncProgressPanel(mount, this.props.api);
+        }
+
         this.container.querySelectorAll('[data-cfilter]').forEach(btn => {
             btn.addEventListener('click', () => {
                 this.filterType = btn.dataset.cfilter;
@@ -118,14 +139,18 @@ export class CacheManagerPage extends BaseComponent {
             btn.addEventListener('click', async () => {
                 const fn = btn.closest('tr')?.dataset.fn;
                 if (!fn) return;
-                btn.disabled = true;
-                btn.textContent = '⏳...';
+                this.progressPanel?.startPolling(null, {
+                    onStateChange: (running) => this.setActionsDisabled(running),
+                });
                 try {
                     await this.props.api.post('cache_import', { filename: fn });
                     this.props.toast.show(`Import van ${fn} voltooid!`);
                     this.load();
                 } catch {
                     this.load();
+                } finally {
+                    this.progressPanel?.stopPolling();
+                    this.setActionsDisabled(false);
                 }
             });
         });
@@ -142,10 +167,10 @@ export class CacheManagerPage extends BaseComponent {
 
         const runCacheSync = async (mode, filename = null) => {
             const panel = document.getElementById('cacheProgressPanel');
-            if (panel) {
-                panel.textContent = '⏳ Cache-import bezig...';
-                panel.classList.remove('hidden');
-            }
+            panel?.classList.add('hidden');
+            this.progressPanel?.startPolling(null, {
+                onStateChange: (running) => this.setActionsDisabled(running),
+            });
             try {
                 if (filename) {
                     await this.props.api.post('cache_import', { filename });
@@ -155,7 +180,13 @@ export class CacheManagerPage extends BaseComponent {
                 this.props.toast.show('Cache-import voltooid!');
                 this.load();
             } catch (e) {
-                if (panel) panel.textContent = `✗ Fout: ${e.message}`;
+                if (panel) {
+                    panel.textContent = `✗ Fout: ${e.message}`;
+                    panel.classList.remove('hidden');
+                }
+            } finally {
+                this.progressPanel?.stopPolling();
+                this.setActionsDisabled(false);
             }
         };
 

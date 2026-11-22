@@ -1,5 +1,27 @@
 # Detailed Changes
 
+## Cachebeheer UI, Voortgangs-ETA & Xtream Bronselectie (`feature/cachecontrol`)
+- **`views/dashboard.php` & `assets/js/pages/DashboardPage.js`:**
+  - `Cachebeheer` tabknop uit de topbar verwijderd; `DashboardPage` toont nu naast `🔄 Alles Downloaden & Sync` enkel `⚡ Laad Cache` (`cache_mode=cache_only`) en `💾 Beheer Cache` (`#openCacheManagerBtn`).
+  - `#sync-progress-panel` toegevoegd met `#syncProgressMsg`, `#syncProgressPercent`, `#syncProgressEta`, `#syncProgressFill` en `#syncLiveConsole`.
+- **`app/Core/FlagRegistry.php` & `assets/js/core/FlagRegistry.js`:**
+  - Centrale ISO-landcodes + IPTV-aliassen (`UK` -> `🇬🇧`, `EN` -> `🇬🇧`, `USA` -> `🇺🇸`, enz.) en `formatTagPrefix()` helper voor visuele weergave in `GroupList.js` en `ChannelTable.js`.
+- **`assets/js/components/ChannelTable.js` & `assets/css/components.css`:**
+  - `.toggle-switch` voor de `Aan`-kolom en `.row-selected` rij-highlight voor bulk-selectie.
+  - `SyncProgressPanel` biedt een gedeelde voortgangs-UI (`startPolling()`, `stopPolling()`, `checkActive()`, ETA-formattering) voor zowel het Dashboard als Cachebeheer.
+  - `CacheManagerPage` blokkeert conflicterende knoppen via `setActionsDisabled()` zolang `sync_status` actief is.
+  - Slaat `started_at` op in `sync_progress.json` en berekent `eta_seconds` op basis van verstreken tijd en actueel voortgangspercentage.
+- **`app/Services/XtreamUrlBuilder.php` & `app/Controllers/SettingsController.php`:**
+  - `XtreamUrlBuilder::buildM3uPlusUrl()` accepteert optionele `$outputParams` (default `type=m3u_plus&output=ts`).
+  - `SettingsController::get()` en `save()` ondersteunen `source_mode` (`xtream` | `separate_urls`), `xtream_host`, `xtream_username` (AES-256-GCM versleuteld), `xtream_password` (AES-256-GCM versleuteld) en `xtream_output_params`, en genereren automatisch `m3u_source_url` en `epg_source_url` bij opslaan.
+- **`assets/js/pages/SettingsPage.js`:**
+  - Radio-selector toegevoegd tussen Xtream Codes API en Aparte M3U & EPG links met dynamische zichtbaarheid van de bijbehorende invoervelden.
+- **`app/Services/SchedulerService.php`:**
+  - `validateSourceConfiguration()` toegevoegd om vóór elke download/sync te controleren of de actieve `source_mode` compleet is geconfigureerd (incl. `xtream_epg_mode`: `xtream_xmltv` of `custom_url`) of dat lokale cache bestaat bij `cache_only`.
+- **`app/Controllers/DashboardController.php` & `app/Services/M3uParserService.php`:**
+  - `DashboardController::sync()` schakelt `ignore_user_abort(true)` en `set_time_limit(0)` in voor onafgebroken achtergrond-uitvoering; `DashboardPage::load()` hervat automatisch `startProgressPolling()` bij een lopende sync.
+  - `M3uParserService::sync()` vergelijkt binnenkomende kanalen met de huidige database-records en voert uitsluitend `INSERT`, `UPDATE` (bij gewijzigde metadata) en `DELETE` (voor verdwenen kanalen) uit.
+
 ## Architectuur
 - **Autoloading:** `src/autoload.php` (PSR-4 zonder Composer/`vendor/`).
 - **Configuratie & Beveiliging:**

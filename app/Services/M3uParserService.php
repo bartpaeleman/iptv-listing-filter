@@ -77,14 +77,26 @@ final class M3uParserService
         $groupsAdded = 0;
         $channelsAdded = 0;
         $channelsUpdated = 0;
+        $channelsUnchanged = 0;
+        $channelsDeleted = 0;
         $autoMatched = 0;
         $now = gmdate('Y-m-d H:i:s');
+        $touchIds = [];
 
         $insertGroupStmt = $this->pdo->prepare('INSERT INTO m3u_groups (original_name, is_enabled, sort_order) VALUES (:name, 1, :sort)');
-        $selectChannelStmt = $this->pdo->prepare('SELECT id, epg_channel_id, epg_match_type FROM channels WHERE stream_hash = :hash LIMIT 1');
+        $selectChannelStmt = $this->pdo->prepare(
+            'SELECT id, tvg_id, tvg_name, tvg_logo, group_id, stream_url, epg_channel_id, epg_match_type FROM channels WHERE stream_hash = :hash LIMIT 1'
+        );
         $insertChannelStmt = $this->pdo->prepare(
             'INSERT INTO channels (stream_hash, tvg_id, tvg_name, tvg_logo, group_id, stream_url, epg_channel_id, epg_match_type, is_enabled, sort_order, last_seen_at)
-             VALUES (:hash, :tvg_id, :tvg_name, :tvg_logo, :group_id, :stream_url, :epg_id, :match_type, 1, :sort, :seen)'
+             VALUES (:hash, :tvg_id, :tvg_name, :tvg_logo, :group_id, :stream_url, :epg_id, :match_type, 1, :sort, :seen)
+             ON DUPLICATE KEY UPDATE
+                tvg_id = VALUES(tvg_id),
+                tvg_name = VALUES(tvg_name),
+                tvg_logo = VALUES(tvg_logo),
+                group_id = VALUES(group_id),
+                stream_url = VALUES(stream_url),
+                last_seen_at = VALUES(last_seen_at)'
         );
         $updateChannelStmt = $this->pdo->prepare(
             'UPDATE channels SET tvg_id = :tvg_id, tvg_name = :tvg_name, tvg_logo = :tvg_logo, group_id = :group_id, stream_url = :stream_url,
@@ -120,11 +132,10 @@ final class M3uParserService
 
                 $groupId = $groupCache[$groupName];
                 $streamHash = hash('sha256', $streamUrl);
+                $seenHashes[$streamHash] = true;
+                $existing = $existingMap[$streamHash] ?? null;
 
-                $selectChannelStmt->execute([':hash' => $streamHash]);
-                $existing = $selectChannelStmt->fetch();
-
-                if ($existing) {
+                if ($existing !== null) {
                     $epgChannelId = $existing['epg_channel_id'];
                     $matchType = (string) $existing['epg_match_type'];
 
@@ -189,6 +200,17 @@ final class M3uParserService
                 }
             }
 
+            if ($touchIds !== []) {
+                $placeholders = implode(',', array_fill(0, count($touchIds), '?'));
+                $touchStmt = $this->pdo->prepare("UPDATE channels SET last_seen_at = ? WHERE id IN ({$placeholders})");
+                $touchStmt->execute(array_merge([$now], $touchIds));
+                $touchIds = [];
+            }
+
+            $delStmt = $this->pdo->prepare('DELETE FROM channels WHERE last_seen_at IS NULL OR last_seen_at < :seen');
+            $delStmt->execute([':seen' => $now]);
+            $channelsDeleted = $delStmt->rowCount();
+
             $this->pdo->commit();
         } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
@@ -199,13 +221,15 @@ final class M3uParserService
         }
 
         fclose($handle);
-        $cache->updateItemCount($sourceFile, $channelsAdded + $channelsUpdated);
+        $cache->updateItemCount($sourceFile, $channelsAdded + $channelsUpdated + $channelsUnchanged);
         $this->settings->set('last_m3u_sync', $now, false);
 
         return [
             'groups_added' => $groupsAdded,
             'channels_added' => $channelsAdded,
             'channels_updated' => $channelsUpdated,
+            'channels_deleted' => $channelsDeleted,
+            'channels_unchanged' => $channelsUnchanged,
             'auto_matched' => $autoMatched,
         ];
     }

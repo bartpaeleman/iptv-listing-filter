@@ -6,15 +6,18 @@ namespace App\Services;
 
 final class XtreamUrlBuilder
 {
-    public static function buildM3uPlusUrl(string $host, string $username, string $password): string
+    public static function buildM3uPlusUrl(string $host, string $username, string $password, string $outputParams = 'type=m3u_plus&output=ts'): string
     {
         $base = rtrim(trim($host), '/');
-        return sprintf(
-            '%s/get.php?username=%s&password=%s&type=m3u_plus&output=ts',
+        $extra = ltrim(trim($outputParams), '?&');
+        $url = sprintf(
+            '%s/get.php?username=%s&password=%s',
             $base,
             rawurlencode(trim($username)),
             rawurlencode($password)
         );
+
+        return $extra !== '' ? $url . '&' . $extra : $url;
     }
 
     public static function buildXmltvUrl(string $host, string $username, string $password): string
