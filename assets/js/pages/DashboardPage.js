@@ -1,4 +1,5 @@
 import { BaseComponent } from '../core/BaseComponent.js';
+import { ClipboardHelper } from '../core/ClipboardHelper.js';
 
 export class DashboardPage extends BaseComponent {
     async load() {
@@ -100,8 +101,7 @@ export class DashboardPage extends BaseComponent {
             btn.addEventListener('click', () => {
                 const input = document.getElementById(btn.dataset.copy);
                 if (!input) return;
-                navigator.clipboard.writeText(input.value);
-                this.props.toast.show('Gekopieerd naar klembord!');
+                ClipboardHelper.copyText(input.value, btn, null, this.props.toast);
             });
         });
 

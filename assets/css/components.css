@@ -58,7 +58,9 @@
     justify-content: center;
     gap: 0.4rem;
     text-decoration: none;
+    touch-action: manipulation;
 }
+.btn.is-copied { border-color: var(--success); color: var(--success); }
 .btn-sm { min-height: 44px; padding: 0 0.75rem; font-size: 0.85rem; }
 .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
 .btn-primary:hover { background: var(--primary-hover); }

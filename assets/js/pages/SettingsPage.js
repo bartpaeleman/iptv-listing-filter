@@ -83,11 +83,10 @@ export class SettingsPage extends BaseComponent {
             this.props.toast.show('Nieuw token gegenereerd!');
         });
 
-        document.getElementById('copyCronBtn')?.addEventListener('click', () => {
+        document.getElementById('copyCronBtn')?.addEventListener('click', ev => {
             const input = document.getElementById('qnapCronInput');
             if (!input) return;
-            navigator.clipboard.writeText(input.value);
-            this.props.toast.show('Crontab-regel gekopieerd!');
+            ClipboardHelper.copyText(input.value, ev.currentTarget, null, this.props.toast);
         });
     }
 }

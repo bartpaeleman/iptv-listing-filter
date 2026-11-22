@@ -3,6 +3,8 @@
 ## [1.1.0] - 2026-11-22
 ### Toegevoegd
 - Uitgebreide prerequisite-diagnostiek in de Web Installer (`InstallerService::checkPrerequisites()`) met kopieerbare QNAP/Linux herstelcommando's en asynchrone "Opnieuw controleren" knop (`?route=install&step=recheck`).
+### Opgelost
+- Cross-device `ClipboardHelper` met iPadOS/Safari HTTP-fallback (`execCommand('copy')` op tijdelijk `<textarea>` zonder auto-zoom) voor alle kopieerknoppen.
 
 ## [1.0.0] - 2026-11-22
 ### Toegevoegd

@@ -42,7 +42,7 @@ ob_start();
                                 <div class="remediation-title"><?= htmlspecialchars($c['fix_title'], ENT_QUOTES, 'UTF-8') ?></div>
                                 <div class="remediation-cmd-wrap">
                                     <pre><code><?= htmlspecialchars($c['fix_command'], ENT_QUOTES, 'UTF-8') ?></code></pre>
-                                    <button type="button" class="btn btn-sm copy-fix-btn" data-cmd="<?= htmlspecialchars($c['fix_command'], ENT_QUOTES, 'UTF-8') ?>">Kopieer</button>
+                                    <button type="button" class="btn btn-sm copy-fix-btn" data-copy-text="<?= htmlspecialchars($c['fix_command'], ENT_QUOTES, 'UTF-8') ?>">Kopieer</button>
                                 </div>
                             </div>
                         <?php endif; ?>

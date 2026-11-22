@@ -13,3 +13,5 @@
 - **Installer Diagnostiek (`InstallerService`, `InstallController`, `InstallerPage.js`):**
   - `checkPrerequisites()` retourneert nu `id`, `label`, `passed`, `current_value`, `fix_title` en `fix_command` met gedetecteerde webserver-user en octale rechten.
   - `?route=install&step=recheck` biedt een asynchrone JSON-hercontrole zonder paginarefresh.
+- **Cross-device Klembord (`ClipboardHelper.js`):**
+  - Probeert `navigator.clipboard.writeText()` in HTTPS/secure contexts en valt terug op een iOS/Safari-compatibel tijdelijk `<textarea>` (`readOnly`, `contentEditable`, `font-size: 16px`, `setSelectionRange`, `execCommand('copy')`) voor lokale HTTP NAS-URL's.

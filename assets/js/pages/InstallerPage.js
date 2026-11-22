@@ -1,22 +1,17 @@
 import { BaseComponent } from '../core/BaseComponent.js';
+import { ClipboardHelper } from '../core/ClipboardHelper.js';
 
 export class InstallerPage extends BaseComponent {
     mount() {
-        this.bindCopyButtons();
+        document.addEventListener('click', ev => {
+            const btn = ev.target.closest('[data-copy-text]');
+            if (!btn) return;
+            const codeEl = btn.closest('.remediation-cmd-wrap')?.querySelector('code') || null;
+            ClipboardHelper.copyText(btn.dataset.copyText || '', btn, codeEl);
+        });
+
         const recheckBtn = document.getElementById('recheckPrereqsBtn');
         recheckBtn?.addEventListener('click', () => this.recheck(recheckBtn));
-    }
-
-    bindCopyButtons() {
-        document.querySelectorAll('.copy-fix-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const cmd = btn.dataset.cmd || '';
-                await navigator.clipboard.writeText(cmd);
-                const orig = btn.textContent;
-                btn.textContent = '✓ Gekopieerd';
-                setTimeout(() => { btn.textContent = orig; }, 2000);
-            });
-        });
     }
 
     async recheck(btn) {
@@ -44,13 +39,12 @@ export class InstallerPage extends BaseComponent {
                                 <div class="remediation-title">${this.escapeHtml(c.fix_title)}</div>
                                 <div class="remediation-cmd-wrap">
                                     <pre><code>${this.escapeHtml(c.fix_command)}</code></pre>
-                                    <button type="button" class="btn btn-sm copy-fix-btn" data-cmd="${this.escapeHtml(c.fix_command)}">Kopieer</button>
+                                    <button type="button" class="btn btn-sm copy-fix-btn" data-copy-text="${this.escapeHtml(c.fix_command)}">Kopieer</button>
                                 </div>
                             </div>
                         ` : ''}
                     </li>
                 `).join('');
-                this.bindCopyButtons();
             }
 
             document.getElementById('nextStepBtn')?.classList.toggle('hidden', !all_passed);
