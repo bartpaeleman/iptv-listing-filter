@@ -4,20 +4,41 @@ export class ApiClient {
         this.toast = toast;
     }
 
-    async get(endpoint, params = {}) {
-        const qs = new URLSearchParams({ route: 'api', endpoint, ...params }).toString();
-        const res = await fetch(`index.php?${qs}`);
-        const json = await res.json();
+    buildUrl(endpoint, params = {}) {
+        const url = new URL('index.php', window.location.href);
+        url.searchParams.set('route', 'api');
+        url.searchParams.set('endpoint', String(endpoint));
+        for (const [k, v] of Object.entries(params)) {
+            if (v !== undefined && v !== null) {
+                url.searchParams.set(k, String(v));
+            }
+        }
+        return url.toString();
+    }
+
+    async parseResponse(res) {
+        const rawText = await res.text();
+        let json;
+        try {
+            json = rawText ? JSON.parse(rawText) : {};
+        } catch {
+            throw new Error('Ongeldig serverantwoord (geen JSON): ' + rawText.slice(0, 180));
+        }
         if (!json.ok) {
-            const msg = json.error || 'API fout';
+            const msg = json.error || `API fout (HTTP ${res.status})`;
             if (this.toast) this.toast.show(msg);
             throw new Error(msg);
         }
         return json.data;
     }
 
+    async get(endpoint, params = {}) {
+        const res = await fetch(this.buildUrl(endpoint, params));
+        return this.parseResponse(res);
+    }
+
     async post(endpoint, body = {}) {
-        const res = await fetch(`index.php?route=api&endpoint=${encodeURIComponent(endpoint)}`, {
+        const res = await fetch(this.buildUrl(endpoint), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -25,12 +46,6 @@ export class ApiClient {
             },
             body: JSON.stringify(body),
         });
-        const json = await res.json();
-        if (!json.ok) {
-            const msg = json.error || 'API fout';
-            if (this.toast) this.toast.show(msg);
-            throw new Error(msg);
-        }
-        return json.data;
+        return this.parseResponse(res);
     }
 }

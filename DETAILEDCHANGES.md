@@ -46,3 +46,6 @@
 - **Multi-File Cachebeheer (`FeedCacheService`, `CacheController`, `CacheManagerPage.js`):**
   - `FeedCacheService` bewaart downloads met unieke datum/bron-bestandsnamen + `.meta.json` (`listCacheFiles()`, `resolveFilePath()`, `renameLabel()`, `deleteBulk()`).
   - `CacheController` biedt `cache_list`, `cache_import`, `cache_rename` en `cache_delete` endpoints.
+- **Safari/WebKit API & JSON Guard (`ApiClient.js`, `BaseController.php`):**
+  - `ApiClient` bouwt URL's op via `new URL('index.php', window.location.href)` en leest eerst `res.text()` vóór `JSON.parse()`.
+  - `BaseController::jsonSuccess()`/`jsonError()` schonen de output buffer (`ob_clean()`) op vóór JSON-headers.

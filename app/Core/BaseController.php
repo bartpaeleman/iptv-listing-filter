@@ -21,6 +21,9 @@ abstract class BaseController
 
     protected function jsonSuccess(mixed $data = null, int $status = 200): never
     {
+        if (ob_get_length()) {
+            ob_clean();
+        }
         http_response_code($status);
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['ok' => true, 'data' => $data], JSON_UNESCAPED_UNICODE);
@@ -29,6 +32,9 @@ abstract class BaseController
 
     protected function jsonError(string $message, int $status = 400): never
     {
+        if (ob_get_length()) {
+            ob_clean();
+        }
         http_response_code($status);
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['ok' => false, 'error' => $message], JSON_UNESCAPED_UNICODE);
