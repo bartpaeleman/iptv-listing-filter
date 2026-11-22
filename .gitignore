@@ -1,0 +1,6 @@
+.env
+/storage/cache/*
+/storage/logs/*
+!/storage/**/.gitkeep
+.DS_Store
+vendor/
