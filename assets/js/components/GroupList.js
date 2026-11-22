@@ -1,17 +1,15 @@
 import { BaseComponent } from '../core/BaseComponent.js';
-import { formatTagPrefix } from '../core/FlagRegistry.js';
 
 export class GroupList extends BaseComponent {
     render() {
-        const { groups = [], selectedGroupId = null, filter = '', countryTags = [] } = this.state;
+        const { groups = [], selectedGroupId = null, filter = '' } = this.state;
         const q = filter.toLowerCase();
         const filtered = groups.filter(g => (g.custom_name || g.original_name).toLowerCase().includes(q));
 
         this.container.innerHTML = filtered.map(g => {
             const rawName = g.custom_name || g.original_name;
-            const parsed = formatTagPrefix(rawName, countryTags);
-            const display = g.display_name || (parsed.icon ? `${parsed.icon} ${parsed.cleanName}` : parsed.cleanName);
-            const tooltip = parsed.rawTag ? `${rawName} (Tag: ${parsed.rawTag})` : g.original_name;
+            const display = g.display_name || rawName;
+            const tooltip = g.original_name || rawName;
             return `
             <div class="group-item ${selectedGroupId === g.id ? 'active' : ''}" data-gid="${g.id}">
                 <input type="checkbox" class="group-toggle" ${g.is_enabled ? 'checked' : ''} title="Groep in-/uitschakelen">

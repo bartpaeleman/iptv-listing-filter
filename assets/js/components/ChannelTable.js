@@ -1,14 +1,11 @@
 import { BaseComponent } from '../core/BaseComponent.js';
-import { formatTagPrefix } from '../core/FlagRegistry.js';
 
 export class ChannelTable extends BaseComponent {
     render() {
-        const { channels = [], countryTags = [] } = this.state;
+        const { channels = [] } = this.state;
         this.container.innerHTML = channels.map(c => {
             const rawName = c.custom_name || c.tvg_name;
-            const chParsed = formatTagPrefix(rawName, countryTags);
-            const grpParsed = formatTagPrefix(c.group_name, countryTags);
-            const grpDisplay = c.group_display_name || (grpParsed.icon ? `${grpParsed.icon} ${grpParsed.cleanName}` : grpParsed.cleanName);
+            const grpDisplay = c.group_display_name || c.group_name;
 
             return `
             <tr data-cid="${c.id}">

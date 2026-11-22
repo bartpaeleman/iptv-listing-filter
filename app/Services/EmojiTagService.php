@@ -74,7 +74,7 @@ final class EmojiTagService
         $countryCode = null;
         $countryEmoji = null;
 
-        // Herken landtag vooraan met optionele |-tekens: |BE|, BE|, |BE
+        // Stap A: Herken landtag vooraan met optionele |-tekens: |BE|, BE|, |BE
         if (preg_match('/^\s*(?:\|([A-Za-z0-9]{2,4})\||([A-Za-z0-9]{2,4})\||\|([A-Za-z0-9]{2,4})(?=\s|$))\s*(.*)$/u', $rawName, $matches)) {
             $rawCode = strtoupper($matches[1] !== '' ? $matches[1] : ($matches[2] !== '' ? $matches[2] : $matches[3]));
             $rest = trim($matches[4]);
@@ -83,6 +83,9 @@ final class EmojiTagService
             if ($rest !== '') {
                 $cleanName = $rest;
             }
+        } elseif (preg_match('/^\s*\|\s*(.+)$/u', $rawName, $pipeMatches)) {
+            // Los |-teken zonder landcode (bijv. "| DISNEY+ SERIES"): strip enkel het |-teken
+            $cleanName = trim($pipeMatches[1]);
         }
 
         $keywordEmojis = [];
@@ -321,6 +324,8 @@ final class EmojiTagService
             ['pattern' => 'live stream', 'emoji' => '🎬', 'label' => 'Live Stream'],
             ['pattern' => 'series', 'emoji' => '📺', 'label' => 'Series'],
             ['pattern' => 'formula one', 'emoji' => '🏎️', 'label' => 'Formula One'],
+            ['pattern' => 'formula 1', 'emoji' => '🏎️', 'label' => 'Formula 1'],
+            ['pattern' => 'formule 1', 'emoji' => '🏎️', 'label' => 'Formule 1'],
             ['pattern' => 'adult', 'emoji' => '❤️🔥', 'label' => 'Adult'],
             ['pattern' => '18+', 'emoji' => '❤️🔥', 'label' => '18+'],
         ];
