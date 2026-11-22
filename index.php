@@ -118,7 +118,9 @@ switch ($route) {
         });
 
         try {
-            \App\Core\SchemaMigrator::ensureSchemaUpToDate(\App\Core\Database::getInstance());
+            if ($endpoint !== 'run_update_sql') {
+                \App\Core\SchemaMigrator::ensureSchemaUpToDate(\App\Core\Database::getInstance());
+            }
             $router->dispatchApi($endpoint);
         } catch (\Throwable $e) {
             $logLine = sprintf("[%s] [API ERROR] %s in %s:%d\n%s\n", date('Y-m-d H:i:s'), $e->getMessage(), $e->getFile(), $e->getLine(), $e->getTraceAsString());

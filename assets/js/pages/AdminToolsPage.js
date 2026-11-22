@@ -2,7 +2,13 @@ import { BaseComponent } from '../core/BaseComponent.js';
 
 export class AdminToolsPage extends BaseComponent {
     async load() {
-        this.render();
+        try {
+            this.render();
+        } catch (e) {
+            if (this.container) {
+                this.container.innerHTML = `<div class="card"><div class="alert alert-error">Fout bij laden van Admin Tools: ${this.escapeHtml(e.message)}</div></div>`;
+            }
+        }
     }
 
     render() {
