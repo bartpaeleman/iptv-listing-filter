@@ -45,7 +45,7 @@ final class EmojiRuleRepository extends BaseRepository
     /**
      * @return array<string, mixed>|null
      */
-    public function findById(int $id): ?array
+    public function findById(string|int $id): ?array
     {
         $stmt = $this->pdo->prepare(
             'SELECT id, match_type, pattern, emoji, label, is_active
