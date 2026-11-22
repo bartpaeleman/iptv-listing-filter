@@ -75,6 +75,10 @@ final class ChannelRepository extends BaseRepository
         $subOrder = match ($sortBy) {
             'name_asc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
             'name_desc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) DESC, c.id DESC",
+            'epg_status_asc' => "(c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> '') ASC, COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
+            'epg_status_desc' => "(c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> '') DESC, COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
+            'epg_name_asc' => "(ec.display_name IS NULL OR ec.display_name = '') ASC, ec.display_name ASC, c.id ASC",
+            'epg_name_desc' => "(ec.display_name IS NULL OR ec.display_name = '') ASC, ec.display_name DESC, c.id DESC",
             'import' => 'c.id ASC',
             default => '(c.channel_number IS NULL) ASC, c.channel_number ASC, c.id ASC',
         };

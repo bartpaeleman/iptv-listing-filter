@@ -10,6 +10,7 @@ export class EpgMappingPage extends BaseComponent {
         this.pageSize = 10;
         this.totalItems = 0;
         this.groupsLoaded = false;
+        this.sortBy = 'name_asc';
     }
 
     async load() {
@@ -29,6 +30,7 @@ export class EpgMappingPage extends BaseComponent {
             active_only: 1,
             search,
             epg_status,
+            sort_by: this.sortBy,
             limit: this.pageSize,
             offset,
         };
@@ -37,6 +39,7 @@ export class EpgMappingPage extends BaseComponent {
         const data = await this.props.api.get('channels', params);
         this.totalItems = Number(data.total || 0);
         this.mapper.setState({ channels: data.items || [] });
+        this.updateSortHeaders();
         this.renderPagination();
     }
 
@@ -80,22 +83,43 @@ export class EpgMappingPage extends BaseComponent {
         });
     }
 
+    updateSortHeaders() {
+        this.container.querySelectorAll('.epg-sort-th').forEach(th => {
+            const key = th.dataset.sort;
+            const icon = th.querySelector('.sort-chevron');
+            if (!icon) return;
+            if (this.sortBy === `${key}_asc`) {
+                icon.textContent = '▲';
+                th.style.color = 'var(--accent, #38bdf8)';
+            } else if (this.sortBy === `${key}_desc`) {
+                icon.textContent = '▼';
+                th.style.color = 'var(--accent, #38bdf8)';
+            } else {
+                icon.textContent = '⇅';
+                th.style.color = '';
+            }
+        });
+    }
+
     renderShell() {
         this.container.innerHTML = `
             <style>
                 .epg-mapping-table th, .epg-mapping-table td { padding: 0.4rem 0.65rem; }
+                .epg-sort-th { cursor: pointer; user-select: none; white-space: nowrap; }
+                .epg-sort-th:hover { opacity: 0.85; }
+                .epg-sort-th .sort-chevron { margin-left: 0.3rem; font-size: 0.75rem; opacity: 0.85; }
             </style>
             <div class="card">
                 <div class="card-header">
                     <h2>EPG Zender Koppeling</h2>
                     <button class="btn btn-primary" id="autoMatchEpgBtn" style="min-height:44px;">✨ Auto-koppel op naam</button>
                 </div>
-                <div class="toolbar" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
-                    <input type="search" id="epgChannelSearch" placeholder="Zoek actief kanaal..." style="font-size:16px;min-height:44px;">
-                    <select id="epgGroupFilter" style="font-size:16px;min-height:44px;max-width:260px;">
+                <div class="toolbar" style="display:flex;gap:0.5rem;flex-wrap:nowrap;align-items:center;overflow-x:auto;">
+                    <input type="search" id="epgChannelSearch" placeholder="Zoek actief kanaal..." style="font-size:16px;min-height:44px;flex:1;min-width:140px;">
+                    <select id="epgGroupFilter" style="font-size:16px;min-height:44px;width:auto;max-width:220px;flex-shrink:0;">
                         <option value="">Alle actieve groepen</option>
                     </select>
-                    <select id="epgStatusFilter" style="font-size:16px;min-height:44px;">
+                    <select id="epgStatusFilter" style="font-size:16px;min-height:44px;width:auto;flex-shrink:0;">
                         <option value="">Alle statussen</option>
                         <option value="unmapped">Geen EPG</option>
                         <option value="mapped">Gekoppeld</option>
@@ -103,7 +127,14 @@ export class EpgMappingPage extends BaseComponent {
                 </div>
                 <div class="table-wrap">
                     <table class="data-table epg-mapping-table">
-                        <thead><tr><th>Kanaal</th><th>Status</th><th>Gekoppelde EPG Zender</th><th>Actie</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th class="epg-sort-th" data-sort="name">Kanaal<span class="sort-chevron">▲</span></th>
+                                <th class="epg-sort-th" data-sort="epg_status">Status<span class="sort-chevron">⇅</span></th>
+                                <th class="epg-sort-th" data-sort="epg_name">Gekoppelde EPG Zender<span class="sort-chevron">⇅</span></th>
+                                <th>Actie</th>
+                            </tr>
+                        </thead>
                         <tbody id="epgMapperRoot"></tbody>
                     </table>
                 </div>
@@ -113,6 +144,15 @@ export class EpgMappingPage extends BaseComponent {
 
         this.mapper = new EpgMapper('#epgMapperRoot', {
             onPick: (channelId, channelName) => this.openPicker(channelId, channelName)
+        });
+
+        this.container.querySelectorAll('.epg-sort-th').forEach(th => {
+            th.addEventListener('click', () => {
+                const key = th.dataset.sort;
+                this.sortBy = this.sortBy === `${key}_asc` ? `${key}_desc` : `${key}_asc`;
+                this.currentPage = 1;
+                this.load();
+            });
         });
 
         document.getElementById('epgChannelSearch')?.addEventListener('input', debounce(() => {

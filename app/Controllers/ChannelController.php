@@ -123,7 +123,11 @@ final class ChannelController extends BaseController
         $status = (string) ($_GET['status'] ?? 'all');
         $limit = min(200, max(10, (int) ($_GET['limit'] ?? 100)));
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
-        $sortBy = in_array($_GET['sort_by'] ?? 'number', ['number', 'name_asc', 'name_desc', 'import'], true) ? (string) $_GET['sort_by'] : 'number';
+        $sortBy = in_array(
+            $_GET['sort_by'] ?? 'number',
+            ['number', 'name_asc', 'name_desc', 'import', 'epg_status_asc', 'epg_status_desc', 'epg_name_asc', 'epg_name_desc'],
+            true
+        ) ? (string) $_GET['sort_by'] : 'number';
         $contentTypes = $this->parseContentTypes((string) ($_GET['content_types'] ?? ''));
 
         $isDefaultGroupView = ($groupId !== null && $groupId > 0 && $search === '' && $epgStatus === '' && !$activeOnly && $countryTagId === '' && $status === 'all' && $sortBy === 'number' && $offset === 0 && $limit >= 150);
