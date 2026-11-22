@@ -89,7 +89,14 @@ final class M3uParserService
         );
         $insertChannelStmt = $this->pdo->prepare(
             'INSERT INTO channels (stream_hash, tvg_id, tvg_name, tvg_logo, group_id, stream_url, epg_channel_id, epg_match_type, is_enabled, sort_order, last_seen_at)
-             VALUES (:hash, :tvg_id, :tvg_name, :tvg_logo, :group_id, :stream_url, :epg_id, :match_type, 1, :sort, :seen)'
+             VALUES (:hash, :tvg_id, :tvg_name, :tvg_logo, :group_id, :stream_url, :epg_id, :match_type, 1, :sort, :seen)
+             ON DUPLICATE KEY UPDATE
+                tvg_id = VALUES(tvg_id),
+                tvg_name = VALUES(tvg_name),
+                tvg_logo = VALUES(tvg_logo),
+                group_id = VALUES(group_id),
+                stream_url = VALUES(stream_url),
+                last_seen_at = VALUES(last_seen_at)'
         );
         $updateChannelStmt = $this->pdo->prepare(
             'UPDATE channels SET tvg_id = :tvg_id, tvg_name = :tvg_name, tvg_logo = :tvg_logo, group_id = :group_id, stream_url = :stream_url,
