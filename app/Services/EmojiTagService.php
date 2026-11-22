@@ -75,13 +75,23 @@ final class EmojiTagService
         $countryEmoji = null;
 
         // Stap A: Herken landtag vooraan met optionele |-tekens: |BE|, BE|, |BE
-        if (preg_match('/^\s*(?:\|([A-Za-z0-9]{2,4})\||([A-Za-z0-9]{2,4})\||\|([A-Za-z0-9]{2,4})(?=\s|$))\s*(.*)$/u', $rawName, $matches)) {
+        if (preg_match('/^\s*(?:\|([A-Za-z0-9]{2,6})\||([A-Za-z0-9]{2,6})\||\|([A-Za-z0-9]{2,6})(?=\s|$))\s*(.*)$/u', $rawName, $matches)) {
             $rawCode = strtoupper($matches[1] !== '' ? $matches[1] : ($matches[2] !== '' ? $matches[2] : $matches[3]));
             $rest = trim($matches[4]);
             $countryCode = $rawCode;
             $countryEmoji = $this->countryMap[$rawCode] ?? $this->fallbackEmoji;
             if ($rest !== '') {
                 $cleanName = $rest;
+            }
+        } elseif (preg_match('/^\s*(?:\[([A-Za-z0-9]{2,6})\]|([A-Za-z0-9]{2,6})(?:\s+-\s+|:\s+))\s*(.*)$/u', $rawName, $matches)) {
+            $rawCode = strtoupper($matches[1] !== '' ? $matches[1] : $matches[2]);
+            if (isset($this->countryMap[$rawCode])) {
+                $rest = trim($matches[3]);
+                $countryCode = $rawCode;
+                $countryEmoji = $this->countryMap[$rawCode];
+                if ($rest !== '') {
+                    $cleanName = $rest;
+                }
             }
         } elseif (preg_match('/^\s*\|\s*(.+)$/u', $rawName, $pipeMatches)) {
             // Los |-teken zonder landcode (bijv. "| DISNEY+ SERIES"): strip enkel het |-teken

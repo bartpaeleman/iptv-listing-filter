@@ -17,7 +17,7 @@ export class EmojiRulesPage extends BaseComponent {
 
     async load() {
         const res = await this.props.api.get('emoji_rules');
-        this.rules = res.data || [];
+        this.rules = Array.isArray(res) ? res : (res?.data || []);
         this.render();
     }
 
