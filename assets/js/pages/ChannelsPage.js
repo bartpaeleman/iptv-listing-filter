@@ -65,12 +65,21 @@ export class ChannelsPage extends BaseComponent {
                 </aside>
                 <div class="card channels-pane">
                     <div class="card-header">
-                        <h2 id="selectedGroupTitle">Alle Kanalen</h2>
+                        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                            <h2 id="selectedGroupTitle">Alle Kanalen</h2>
+                            <button type="button" class="btn btn-sm hidden" id="renameSelectedGroupBtn" title="Geselecteerde groep hernoemen">✏️ Hernoemen</button>
+                        </div>
                         <div class="btn-group">
                             <button class="btn btn-sm" id="manageCountryTagsBtn">🏷️ Landen & Tags Beheren</button>
                             <button class="btn btn-sm" id="bulkEnableChannelsBtn">Selectie Aan</button>
                             <button class="btn btn-sm" id="bulkDisableChannelsBtn">Selectie Uit</button>
                         </div>
+                    </div>
+                    <div id="groupRenameBar" class="toolbar hidden" style="gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.5rem;">
+                        <input type="text" id="groupRenameInput" placeholder="Custom groepsnaam (leeg = origineel)" style="flex:1;min-width:180px;">
+                        <button type="button" class="btn btn-sm btn-primary" id="groupRenameSaveBtn">Opslaan</button>
+                        <button type="button" class="btn btn-sm" id="groupRenameAdoptDisplayBtn" title="Neem huidige weergavenaam inclusief emoji over">Weergavenaam overnemen</button>
+                        <button type="button" class="btn btn-sm" id="groupRenameCancelBtn">Annuleer</button>
                     </div>
                     <div class="toolbar" style="flex-wrap:wrap;">
                         <input type="search" id="channelSearchInput" placeholder="Zoek kanaalnaam..." style="flex:2;min-width:180px;">
@@ -176,6 +185,40 @@ export class ChannelsPage extends BaseComponent {
         document.getElementById('bulkEnableChannelsBtn')?.addEventListener('click', () => bulkChannels(true));
         document.getElementById('bulkDisableChannelsBtn')?.addEventListener('click', () => bulkChannels(false));
         document.getElementById('manageCountryTagsBtn')?.addEventListener('click', () => this.openCountryModal());
+
+        const renameBar = document.getElementById('groupRenameBar');
+        const renameInput = document.getElementById('groupRenameInput');
+        document.getElementById('renameSelectedGroupBtn')?.addEventListener('click', () => {
+            if (!this.selectedGroupId) return;
+            const grp = (this.groups || []).find(g => Number(g.id) === Number(this.selectedGroupId));
+            if (renameInput) {
+                renameInput.value = grp?.custom_name || grp?.original_name || '';
+            }
+            renameBar?.classList.toggle('hidden');
+            renameInput?.focus();
+        });
+        document.getElementById('groupRenameCancelBtn')?.addEventListener('click', () => {
+            renameBar?.classList.add('hidden');
+        });
+        const saveHeaderGroupName = async newName => {
+            if (!this.selectedGroupId) return;
+            await this.props.api.post('update_group', { id: this.selectedGroupId, custom_name: newName });
+            this.props.toast.show(newName ? 'Groepsnaam bijgewerkt' : 'Groepsnaam hersteld naar origineel');
+            renameBar?.classList.add('hidden');
+            await this.load();
+            const updated = (this.groups || []).find(g => Number(g.id) === Number(this.selectedGroupId));
+            if (updated) {
+                document.getElementById('selectedGroupTitle').textContent = updated.display_name || updated.custom_name || updated.original_name;
+            }
+        };
+        document.getElementById('groupRenameSaveBtn')?.addEventListener('click', () => {
+            saveHeaderGroupName((renameInput?.value || '').trim());
+        });
+        document.getElementById('groupRenameAdoptDisplayBtn')?.addEventListener('click', () => {
+            const grp = (this.groups || []).find(g => Number(g.id) === Number(this.selectedGroupId));
+            const display = grp?.display_name || document.getElementById('selectedGroupTitle')?.textContent || '';
+            saveHeaderGroupName(display.trim());
+        });
     }
 
     async openCountryModal() {

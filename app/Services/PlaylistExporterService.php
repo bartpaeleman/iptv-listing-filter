@@ -26,7 +26,7 @@ final class PlaylistExporterService
         $token = (string) $this->settings->get('output_token', '');
         $epgUrl = $appUrl . '/index.php?route=epg' . ($token !== '' ? '&token=' . urlencode($token) : '');
 
-        echo '#EXTM3U x-tvg-url="' . $this->escapeAttr($epgUrl) . "\"\n";
+        echo '#EXTM3U url-tvg="' . $this->escapeAttr($epgUrl) . '" x-tvg-url="' . $this->escapeAttr($epgUrl) . "\"\n";
 
         $sql = 'SELECT c.tvg_id, c.tvg_name, c.tvg_logo, c.stream_url, c.custom_name,
                        c.channel_number, c.epg_channel_id,
