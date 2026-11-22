@@ -28,3 +28,8 @@ Voeg een uurlijkse cronjob toe in `/etc/config/crontab` (en herlaad met `crontab
 ## LAN Client URLs (TiviMate / Kodi / VLC)
 - **M3U Playlist:** `http://<nas-ip>/iptv/public/playlist.php?token=<OUTPUT_TOKEN>`
 - **XMLTV EPG:** `http://<nas-ip>/iptv/public/epg.php?token=<OUTPUT_TOKEN>`
+
+## Ontwikkeling & Updatebeleid
+- Zie [`AGENTS.md`](AGENTS.md) voor de architectuurcontracten, security-standaarden en code-richtlijnen.
+- **Database-updates:** Nieuwe installaties gebruiken `database/schema.sql`. Bestaande QNAP-installaties gebruiken `database/update.sql` (Rolling 2-Updates beleid) en eventuele instructies in `MANUALUPDATES.md`.
+
