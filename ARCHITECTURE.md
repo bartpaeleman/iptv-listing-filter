@@ -42,16 +42,16 @@ Enkel `index.php` fungeert als publiek startpunt in de projectroot (`?route=dash
 - **Strict typing:** Elk PHP-bestand gebruikt `declare(strict_types=1);` en volledige parameter-/return-type-hints (PSR-12).
 - **Database & Migraties (`app/Core/SchemaMigrator.php`):**
   - `PDO` met `ATTR_EMULATE_PREPARES => false` en `utf8mb4`.
-  - `SchemaMigrator::ensureSchemaUpToDate(PDO $pdo)` controleert idempotent via `INFORMATION_SCHEMA` en een versie-flag in `settings` (`schema_integrity_v4`) of tabellen/kolommen up-to-date zijn, en voert ontbrekende `ALTER TABLE`-statements uit.
+  - `SchemaMigrator::ensureSchemaUpToDate(PDO $pdo)` controleert idempotent via `INFORMATION_SCHEMA` en een versie-flag in `settings` (`schema_integrity_v5`) of tabellen/kolommen up-to-date zijn, en voert ontbrekende `ALTER TABLE`-statements uit.
   - `database/update.sql` volgt het **Latest-Only Delta** beleid: bevat uitsluitend de idempotente SQL van de meest recente schemawijziging.
 - **Repositories (`app/Repositories/`):**
-  - `GroupRepository`: beheert `m3u_groups` (`original_name` blijft altijd intact als sync-sleutel; `custom_name` is optioneel en valt bij `NULL` terug op `original_name`).
-  - `ChannelRepository`: beheert `channels` (`stream_hash` en `tvg_name` blijven intact voor sync; `custom_name` overschrijft de weergavenaam).
+  - `GroupRepository`: beheert `m3u_groups` (`original_name` blijft altijd intact als sync-sleutel; `custom_name` is optioneel en valt bij `NULL` terug op `original_name`; `allWithCounts(string $sortMode)` sorteert op `import`, `asc` of `desc`).
+  - `ChannelRepository`: beheert `channels` (`stream_hash` en `tvg_name` blijven intact voor sync; `custom_name` overschrijft de weergavenaam; `reorderChannelInGroup()` hernummert kanalen binnen een groep atomisch `1..N` in een PDO-transactie).
   - `EmojiRuleRepository`: beheert `emoji_rules` (`match_type`: `country` | `keyword`).
 - **Services (`app/Services/`):**
   - `EmojiTagService`: parseert ruwe groep- en kanaalnamen, herkent landcodes (bijv. `|BE|`, `NL:`, `[UK]`) en optionele keyword-regels (bijv. `netflix`, `4k`), en genereert `display_name` zonder de originele naam te muteren. Gebruikt `storage/cache/emoji_rules.json` als cache (geïnvalideerd via `EmojiTagService::invalidateRulesCache()`).
 - **Controllers (`app/Controllers/`):**
-  - `ChannelController`: levert `groups` (inclusief `original_name`, `custom_name`, `display_name`), `channels`, en verwerkt `update_group`, `bulk_groups`, `update_channel`, `bulk_channels`.
+  - `ChannelController`: levert `groups` (inclusief `original_name`, `custom_name`, `display_name`, `group_sort_mode`), `channels` (met `sort_by`: `number`|`name`), en verwerkt `set_group_sort`, `update_group`, `bulk_groups`, `update_channel` (incl. dynamische hernummering), `bulk_channels`.
   - `EmojiRuleController`: CRUD voor `emoji_rules` met cache-invalidatie bij elke mutatie.
   - Alle muterende endpoints (`POST`/`PUT`/`DELETE`) vereisen `$this->requireAuth()` en `$this->verifyCsrf($input)`.
 

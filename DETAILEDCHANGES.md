@@ -1,5 +1,22 @@
 # Detailed Changes
 
+## Groepen & Kanalen — Stap 2 & 3: Custom Namen, Groepssortering & Dynamische Hernummering (`feature/sorting-and-numbering`)
+- **`database/schema.sql`, `database/update.sql` & `app/Core/SchemaMigrator.php`:**
+  - Kolom `import_order INT UNSIGNED NOT NULL DEFAULT 0` toegevoegd aan `m3u_groups` en `group_sort_mode` (`import`) toegevoegd aan `settings`.
+  - `SchemaMigrator::ensureSchemaUpToDate()` voert idempotente `INFORMATION_SCHEMA`-checks uit voor `m3u_groups.custom_name` en `m3u_groups.import_order` en bumpt de integriteitsflag naar `schema_integrity_v5`.
+- **`app/Repositories/GroupRepository.php`, `app/Repositories/ChannelRepository.php`, `app/Controllers/ChannelController.php` & `index.php`:**
+  - `GroupRepository::allWithCounts(string $sortMode)` ondersteunt `import`, `asc` en `desc`.
+  - Nieuw endpoint `set_group_sort` (`POST`, auth + CSRF) in `index.php` en `ChannelController::setGroupSort()`.
+  - `ChannelRepository::filter()` ondersteunt `sort_by` (`number` | `name`).
+  - `ChannelRepository::reorderChannelInGroup(int $channelId, int $newPosition)` hernummert kanalen binnen een groep atomisch (`1..N`) in een PDO-transactie; `ChannelController::updateChannel()` retourneert de bijgewerkte `items`.
+  - `ChannelController::channels()` levert `clean_name` en `emoji_prefix` afzonderlijk terug.
+- **`assets/js/components/GroupList.js`, `assets/js/components/ChannelTable.js` & `assets/js/pages/ChannelsPage.js`:**
+  - Inline groepsnaam-bewerking (`#editGroupNameBtn`, `#inlineGroupNameInput`) en 1-klik overname (`#adoptGroupNameBtn`) verplaatst naar de kanaalheader via `updateGroupHeader()`.
+  - Klikbare `Groepen`-header (`#groupSortBtn`) en `#` / `Naam` kolomheaders (`#sortChannelsByNum`, `#sortChannelsByName`).
+  - `ChannelTable` scheidt `emoji_prefix` van `<input class="ch-name">` en meldt selectietellingen via `onSelectionChange`.
+- **`app/Controllers/DashboardController.php`, `app/Services/PlaylistExporterService.php` & `assets/js/pages/DashboardPage.js`:**
+  - `DashboardController::index()` geeft `source_mode` terug; `DashboardPage` verbergt de losse EPG-URL bij `xtream` en `PlaylistExporterService` stuurt `url-tvg="..."` naast `x-tvg-url="..."` mee in `#EXTM3U`.
+
 ## Groepen & Kanalen — Stap 1: Centrale Emoji- & Tag-database + Beheerscherm (`feature/groepen-en-kanalen`)
 - **`database/schema.sql`, `database/update.sql` & `app/Core/SchemaMigrator.php`:**
   - Tabel `emoji_rules` (`id`, `match_type`, `pattern`, `emoji`, `label`, `is_active`) toegevoegd met `SchemaMigrator::ensureSchemaUpToDate()` (`schema_integrity_v3`) en automatische seeding via `EmojiTagService::seedDefaultsIfEmpty()`.
