@@ -21,6 +21,12 @@ final class InstallerService
         try {
             EnvLoader::load($envFile);
             $pdo = Database::getInstance();
+            $stmt = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = 'install_completed' LIMIT 1");
+            $stmt->execute();
+            $flag = $stmt->fetchColumn();
+            if ($flag !== false) {
+                return (string) $flag === '1';
+            }
             return (new UserRepository($pdo))->countUsers() > 0;
         } catch (\Throwable) {
             return false;
@@ -222,5 +228,60 @@ final class InstallerService
         }
 
         return ['app_user' => $appUser, 'db_name' => $dbName];
+    }
+
+    public function createOrUpdateAdminUser(string $username, string $password): void
+    {
+        $username = trim($username);
+        if ($username === '') {
+            throw new \RuntimeException('Gebruikersnaam is verplicht.');
+        }
+
+        EnvLoader::load(dirname(__DIR__, 2) . '/.env');
+        $pdo = Database::getInstance();
+        $users = new UserRepository($pdo);
+        $existing = $users->findByUsername($username);
+
+        if ($password === '') {
+            if ($existing === null) {
+                throw new \RuntimeException('Wachtwoord (min. 6 tekens) is verplicht.');
+            }
+            return;
+        }
+
+        if (strlen($password) < 6) {
+            throw new \RuntimeException('Wachtwoord moet minstens 6 tekens bevatten.');
+        }
+
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+        $stmt = $pdo->prepare(
+            'INSERT INTO users (username, password_hash) VALUES (:u, :p)
+             ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash)'
+        );
+        $stmt->execute([':u' => $username, ':p' => $hash]);
+    }
+
+    /**
+     * @param array{m3u_url: string, epg_url: string, interval_days: int, preferred_hour: int, run_sync: bool} $data
+     */
+    public function saveInitialSources(array $data): void
+    {
+        EnvLoader::load(dirname(__DIR__, 2) . '/.env');
+        $pdo = Database::getInstance();
+        $settings = new \App\Repositories\SettingsRepository($pdo);
+
+        if ($data['m3u_url'] !== '') {
+            $settings->set('m3u_source_url', $data['m3u_url'], true);
+        }
+        if ($data['epg_url'] !== '') {
+            $settings->set('epg_source_url', $data['epg_url'], true);
+        }
+        $settings->set('sync_interval_hours', (string) (max(1, $data['interval_days']) * 24), false);
+        $settings->set('sync_preferred_hour', (string) max(0, min(23, $data['preferred_hour'])), false);
+        $settings->set('install_completed', '1', false);
+
+        if ($data['run_sync'] && (string) $settings->get('m3u_source_url', '') !== '') {
+            (new SchedulerService($pdo, $settings))->run(true, 'all');
+        }
     }
 }

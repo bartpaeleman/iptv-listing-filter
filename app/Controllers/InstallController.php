@@ -98,8 +98,46 @@ final class InstallController extends BaseController
             . '://' . ($_SERVER['HTTP_HOST'] ?? 'nas.local')
             . rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
         $creds = $installer->generateAppUserCredentials();
-        $suggestedAppUser = $creds['app_user'];
-        $suggestedAppPass = $creds['app_pass'];
+        $envFile = dirname(__DIR__, 2) . '/.env';
+        $hasEnv = is_file($envFile);
+        if ($hasEnv) {
+            EnvLoader::load($envFile);
+        }
+
+        $savedDbHost = $hasEnv ? (EnvLoader::get('DB_HOST') ?? '127.0.0.1') : '127.0.0.1';
+        $savedDbPort = $hasEnv ? (EnvLoader::get('DB_PORT') ?? '3306') : '3306';
+        $savedDbName = $hasEnv ? (EnvLoader::get('DB_NAME') ?? 'iptv_manager') : 'iptv_manager';
+        $savedAppUrl = $hasEnv ? (EnvLoader::get('APP_URL') ?? $defaultAppUrl) : $defaultAppUrl;
+        $savedSubnets = $hasEnv ? (EnvLoader::get('LAN_SUBNET_ALLOW') ?? '192.168.0.0/16,10.0.0.0/8') : '192.168.0.0/16,10.0.0.0/8';
+        $suggestedAppUser = $hasEnv ? (EnvLoader::get('DB_USER') ?? $creds['app_user']) : $creds['app_user'];
+        $hasExistingDbPass = $hasEnv && (string) (EnvLoader::get('DB_PASS') ?? '') !== '';
+        $suggestedAppPass = $hasExistingDbPass ? '' : $creds['app_pass'];
+
+        $savedAdminUser = 'admin';
+        $hasExistingAdminPass = false;
+        $hasExistingM3u = false;
+        $hasExistingEpg = false;
+        $savedIntervalDays = 3;
+        $savedPreferredHour = 3;
+
+        if ($hasEnv) {
+            try {
+                $pdo = Database::getInstance();
+                $uRow = $pdo->query('SELECT username FROM users ORDER BY id ASC LIMIT 1')->fetch();
+                if ($uRow) {
+                    $savedAdminUser = (string) $uRow['username'];
+                    $hasExistingAdminPass = true;
+                }
+                $settings = new SettingsRepository($pdo);
+                $hasExistingM3u = (string) $settings->get('m3u_source_url', '') !== '';
+                $hasExistingEpg = (string) $settings->get('epg_source_url', '') !== '';
+                $savedIntervalDays = max(1, (int) floor((int) ($settings->get('sync_interval_hours', '72') ?? '72') / 24));
+                $savedPreferredHour = (int) ($settings->get('sync_preferred_hour', '3') ?? '3');
+            } catch (\Throwable) {
+                // DB not yet provisioned
+            }
+        }
+
         $isLocked = false;
 
         require dirname(__DIR__, 2) . '/views/install.php';

@@ -17,3 +17,6 @@
   - Probeert `navigator.clipboard.writeText()` in HTTPS/secure contexts en valt terug op een iOS/Safari-compatibel tijdelijk `<textarea>` (`readOnly`, `contentEditable`, `font-size: 16px`, `setSelectionRange`, `execCommand('copy')`) voor lokale HTTP NAS-URL's.
 - **Least-Privilege DB Provisioning (`InstallerService::provisionDatabaseAndUser()`):**
   - Maakt database en restricted runtime-user (`localhost` + `127.0.0.1`) aan met enkel `SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP` op de doeldatabase; admin-credentials worden direct gewist en niet in `.env` opgeslagen.
+- **Bidirectionele Wizard Navigatie (`InstallController`, `InstallerService`, `views/install.php`):**
+  - Voltooide stappen in de stepper zijn klikbaar en stappen 2–4 bevatten een "← Vorige stap" knop.
+  - Bestaande `.env` en `settings`-waarden worden vooringevuld; geheime velden worden gemarkeerd met `data-has-existing="1"` en behouden hun waarde als ze leeg blijven. `install_completed = 1` vergrendelt de wizard na stap 4.
