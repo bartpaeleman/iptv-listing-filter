@@ -239,4 +239,25 @@ final class EpgParserService
         $ts = strtotime($raw);
         return $ts !== false ? gmdate('Y-m-d H:i:s', $ts) : null;
     }
+
+    private function sanitizeString(?string $value, int $maxLength = 255): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $clean = trim((string) mb_convert_encoding($value, 'UTF-8', 'UTF-8'));
+        if ($clean === '') {
+            return null;
+        }
+        return mb_substr($clean, 0, $maxLength, 'UTF-8');
+    }
+
+    private function sanitizeText(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $clean = trim((string) mb_convert_encoding($value, 'UTF-8', 'UTF-8'));
+        return $clean !== '' ? $clean : null;
+    }
 }

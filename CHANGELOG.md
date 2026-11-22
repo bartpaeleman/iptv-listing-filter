@@ -8,6 +8,7 @@
 - **Xtream Codes & Multi-Source EPG:** Automatische `m3u_plus` + `xmltv.php` URL-builder (`XtreamUrlBuilder`), `epg_sources` fallback-tabel met prioriteit, streaming `.xml.gz` decompressie en expliciete DNS/HTTP-foutafhandeling in `HttpClient`.
 ### Opgelost
 - Cross-device `ClipboardHelper` met iPadOS/Safari HTTP-fallback (`execCommand('copy')` op tijdelijk `<textarea>` zonder auto-zoom) voor alle kopieerknoppen.
+- `SQLSTATE[22001]` bij lange `tvg_logo` / `icon_url` URL's opgelost door kolommen te verruimen naar `TEXT NULL` en M3U/EPG metadata veilig af te kappen (`sanitizeString()` / `sanitizeText()`).
 
 ## [1.0.0] - 2026-11-22
 ### Toegevoegd

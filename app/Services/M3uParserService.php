@@ -189,11 +189,32 @@ final class M3uParserService
         }
 
         return [
-            'tvg_id' => $tvgId,
-            'tvg_name' => $tvgName,
-            'tvg_logo' => $tvgLogo,
-            'group_title' => $groupTitle,
+            'tvg_id' => $this->sanitizeString($tvgId, 255) ?? '',
+            'tvg_name' => $this->sanitizeString($tvgName, 255) ?? '',
+            'tvg_logo' => $this->sanitizeText($tvgLogo) ?? '',
+            'group_title' => $this->sanitizeString($groupTitle, 255) ?? '',
         ];
+    }
+
+    private function sanitizeString(?string $value, int $maxLength = 255): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $clean = trim((string) mb_convert_encoding($value, 'UTF-8', 'UTF-8'));
+        if ($clean === '') {
+            return null;
+        }
+        return mb_substr($clean, 0, $maxLength, 'UTF-8');
+    }
+
+    private function sanitizeText(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $clean = trim((string) mb_convert_encoding($value, 'UTF-8', 'UTF-8'));
+        return $clean !== '' ? $clean : null;
     }
 
     /**

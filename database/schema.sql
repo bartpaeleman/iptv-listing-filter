@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS `channels` (
     `stream_hash` CHAR(64) NOT NULL,
     `tvg_id` VARCHAR(255) NULL,
     `tvg_name` VARCHAR(255) NOT NULL DEFAULT '',
-    `tvg_logo` VARCHAR(1000) NULL,
+    `tvg_logo` TEXT NULL,
     `group_id` INT UNSIGNED NOT NULL,
     `stream_url` TEXT NOT NULL,
     `custom_name` VARCHAR(255) NULL,
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS `channels` (
 CREATE TABLE IF NOT EXISTS `epg_channels` (
     `epg_id` VARCHAR(255) NOT NULL,
     `display_name` VARCHAR(255) NOT NULL DEFAULT '',
-    `icon_url` VARCHAR(1000) NULL,
+    `icon_url` TEXT NULL,
     PRIMARY KEY (`epg_id`),
     KEY `idx_epg_channels_display_name` (`display_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

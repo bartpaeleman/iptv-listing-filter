@@ -7,4 +7,4 @@ Dit document beschrijft handmatige acties die beheerders op de QNAP NAS moeten u
 2. **Crontab:** Werk eventuele HTTP-cron URLs bij naar `index.php?route=cron&token=JOUW_TOKEN`. De CLI-cron (`bin/sync.php`) blijft ongewijzigd.
 3. **LAN Clients (TiviMate/Kodi/VLC):** Gebruik de nieuwe URLs:
    - Playlist: `http://<nas-ip>/iptv/index.php?route=playlist&token=<OUTPUT_TOKEN>`
-   - EPG: `http://<nas-ip>/iptv/index.php?route=epg&token=<OUTPUT_TOKEN>`
+4. **Database Migratie:** Voer `database/update.sql` uit op bestaande installaties om `epg_sources` toe te voegen en `channels.tvg_logo` / `epg_channels.icon_url` naar `TEXT` te migreren.
