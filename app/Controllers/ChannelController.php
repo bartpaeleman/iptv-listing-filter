@@ -73,7 +73,10 @@ final class ChannelController extends BaseController
         if (isset($res['items']) && is_array($res['items'])) {
             foreach ($res['items'] as &$ch) {
                 $rawCh = (string) (($ch['custom_name'] ?? '') !== '' ? $ch['custom_name'] : ($ch['tvg_name'] ?? ''));
-                $ch['display_name'] = $emojiService->parseName($rawCh, false)['display_name'];
+                $parsed = $emojiService->parseName($rawCh, false);
+                $ch['display_name'] = $parsed['display_name'];
+                $ch['clean_name'] = $parsed['clean_name'];
+                $ch['emoji_prefix'] = $parsed['country_emoji'] ?? '';
                 if (isset($ch['group_name']) && (string) $ch['group_name'] !== '') {
                     $ch['group_display_name'] = $emojiService->parseName((string) $ch['group_name'], true)['display_name'];
                 }

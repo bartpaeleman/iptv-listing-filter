@@ -5,6 +5,8 @@ export class ChannelTable extends BaseComponent {
         const { channels = [] } = this.state;
         this.container.innerHTML = channels.map(c => {
             const rawName = c.custom_name || c.tvg_name;
+            const cleanName = c.clean_name || rawName;
+            const emojiPrefix = c.emoji_prefix || '';
             const grpDisplay = c.group_display_name || c.group_name;
 
             return `
@@ -19,7 +21,8 @@ export class ChannelTable extends BaseComponent {
                 <td><input type="number" class="ch-num" value="${c.channel_number ?? ''}" style="width:76px;"></td>
                 <td>
                     <div style="display:flex;align-items:center;gap:0.4rem;">
-                        <input type="text" class="ch-name" value="${this.escapeHtml(c.display_name || rawName)}">
+                        ${emojiPrefix ? `<span class="ch-emoji-prefix" title="${this.escapeHtml(c.tvg_name || '')}">${this.escapeHtml(emojiPrefix)}</span>` : ''}
+                        <input type="text" class="ch-name" value="${this.escapeHtml(cleanName)}" title="Origineel: ${this.escapeHtml(c.tvg_name || '')}">
                     </div>
                 </td>
                 <td class="muted" title="${this.escapeHtml(c.group_name)}">${this.escapeHtml(grpDisplay)}</td>

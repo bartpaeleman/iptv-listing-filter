@@ -119,6 +119,11 @@ export class ChannelsPage extends BaseComponent {
                 await this.props.api.post('update_group', { id, is_enabled: checked ? 1 : 0 });
                 this.props.toast.show('Groep bijgewerkt');
                 this.load();
+            },
+            onRename: async (id, customName) => {
+                await this.props.api.post('update_group', { id, custom_name: customName });
+                this.props.toast.show(customName ? 'Groepsnaam bijgewerkt' : 'Groepsnaam hersteld naar origineel');
+                await this.load();
             }
         });
 
@@ -126,6 +131,12 @@ export class ChannelsPage extends BaseComponent {
             onUpdate: async (id, payload) => {
                 await this.props.api.post('update_channel', { id, ...payload });
                 this.props.toast.show('Kanaal bijgewerkt');
+            },
+            onSelectionChange: count => {
+                const enableBtn = document.getElementById('bulkEnableChannelsBtn');
+                const disableBtn = document.getElementById('bulkDisableChannelsBtn');
+                if (enableBtn) enableBtn.textContent = count > 0 ? `Selectie Aan (${count})` : 'Selectie Aan';
+                if (disableBtn) disableBtn.textContent = count > 0 ? `Selectie Uit (${count})` : 'Selectie Uit';
             }
         });
 
