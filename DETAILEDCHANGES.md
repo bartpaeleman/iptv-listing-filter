@@ -8,7 +8,11 @@
 - **`app/Controllers/EmojiRuleController.php` & `index.php`:**
   - API-endpoints `emoji_rules`, `save_emoji_rule`, `toggle_emoji_rule`, `delete_emoji_rule` met CSRF-validatie en auth-check.
 - **`views/dashboard.php`, `assets/js/App.js`, `assets/js/pages/ChannelsPage.js` & `assets/js/pages/EmojiRulesPage.js`:**
-  - Verborgen subpagina `#tab-emoji-rules` toegevoegd, bereikbaar via de knop `🏷️ Landen & Tags Beheren` in `ChannelsPage.js`.
+  - Verborgen subpagina `#tab-emoji-rules` toegevoegd, bereikbaar via de knop `🏷️ Landen & Tags Beheren` (`#manageCountryTagsBtn`) in `ChannelsPage.js`.
+  - `ChannelsPage::load()` selecteert automatisch de eerste groep voor lazy-loading van kanalen.
+- **`app/Services/UiCacheService.php`, `app/Controllers/ChannelController.php`, `app/Services/M3uParserService.php`, `assets/js/components/GroupList.js` & `assets/js/components/ChannelTable.js`:**
+  - `UiCacheService` cachet `ui_groups_cache.json` en `ui_channels_group_{id}.json` en invalideert automatisch bij `updateGroup()`, `bulkGroups()`, `updateChannel()`, `bulkChannels()`, `EmojiRuleController` mutaties en `M3uParserService::sync()`.
+  - `GroupList.js` en `ChannelTable.js` gebruiken `display_name` / `group_display_name` uit `EmojiTagService`.
 
 ## Cachebeheer UI, Voortgangs-ETA & Xtream Bronselectie (`feature/cachecontrol`)
 - **`views/dashboard.php` & `assets/js/pages/DashboardPage.js`:**

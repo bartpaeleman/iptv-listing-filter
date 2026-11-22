@@ -166,6 +166,7 @@ export class ChannelsPage extends BaseComponent {
         };
         document.getElementById('bulkEnableChannelsBtn')?.addEventListener('click', () => bulkChannels(true));
         document.getElementById('bulkDisableChannelsBtn')?.addEventListener('click', () => bulkChannels(false));
+        document.getElementById('manageCountryTagsBtn')?.addEventListener('click', () => this.openCountryModal());
     }
 
     async openCountryModal() {

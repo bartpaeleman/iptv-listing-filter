@@ -223,6 +223,7 @@ final class M3uParserService
         fclose($handle);
         $cache->updateItemCount($sourceFile, $channelsAdded + $channelsUpdated + $channelsUnchanged);
         $this->settings->set('last_m3u_sync', $now, false);
+        (new UiCacheService())->invalidateAll();
 
         return [
             'groups_added' => $groupsAdded,

@@ -8,7 +8,7 @@ export class ChannelTable extends BaseComponent {
             const rawName = c.custom_name || c.tvg_name;
             const chParsed = formatTagPrefix(rawName, countryTags);
             const grpParsed = formatTagPrefix(c.group_name, countryTags);
-            const grpDisplay = grpParsed.icon ? `${grpParsed.icon} ${grpParsed.cleanName}` : grpParsed.cleanName;
+            const grpDisplay = c.group_display_name || (grpParsed.icon ? `${grpParsed.icon} ${grpParsed.cleanName}` : grpParsed.cleanName);
 
             return `
             <tr data-cid="${c.id}">

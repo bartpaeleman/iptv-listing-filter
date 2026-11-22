@@ -10,7 +10,7 @@ export class GroupList extends BaseComponent {
         this.container.innerHTML = filtered.map(g => {
             const rawName = g.custom_name || g.original_name;
             const parsed = formatTagPrefix(rawName, countryTags);
-            const display = parsed.icon ? `${parsed.icon} ${parsed.cleanName}` : parsed.cleanName;
+            const display = g.display_name || (parsed.icon ? `${parsed.icon} ${parsed.cleanName}` : parsed.cleanName);
             const tooltip = parsed.rawTag ? `${rawName} (Tag: ${parsed.rawTag})` : g.original_name;
             return `
             <div class="group-item ${selectedGroupId === g.id ? 'active' : ''}" data-gid="${g.id}">
