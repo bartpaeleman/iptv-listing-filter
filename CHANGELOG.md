@@ -21,6 +21,7 @@
 - Safari/WebKit `"The string did not match the expected pattern"` fout opgelost via `URL` + `URLSearchParams` en two-step JSON parsing in `ApiClient.js`, plus `ob_clean()` guard in `BaseController`.
 - Automatische `filemtime` cache-busting toegevoegd op CSS/JS assets in `views/layout.php`, `views/dashboard.php` en `views/install.php` voor iPad Safari, plus endpoint/URL-diagnostiek in `ApiClient.js`.
 - Globale `Throwable` JSON exception-handler toegevoegd aan `index.php` (`?route=api`) met stacktrace-logging naar `storage/logs/app.log`.
+- `FeedCacheService::getCacheInfo()` en `listCacheFiles()` gefixt zodat ontbrekende/legacy `.meta.json` `filename` keys nooit een exception gooien op het dashboard.
 
 ## [1.0.0] - 2026-11-22
 ### Toegevoegd

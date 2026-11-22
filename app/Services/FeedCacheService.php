@@ -55,6 +55,7 @@ final class FeedCacheService
                 ];
             }
 
+            $meta['filename'] = $filename;
             $result[] = $meta;
         }
 
@@ -69,21 +70,27 @@ final class FeedCacheService
     {
         $files = $this->listCacheFiles($type);
         $totalFiles = count($this->listCacheFiles(null));
+        $empty = [
+            'path' => '',
+            'filename' => null,
+            'exists' => false,
+            'downloaded_at' => null,
+            'age_minutes' => null,
+            'is_fresh' => false,
+            'size_formatted' => '0 B',
+            'total_files' => $totalFiles,
+        ];
+
         if ($files === []) {
-            return [
-                'path' => '',
-                'filename' => null,
-                'exists' => false,
-                'downloaded_at' => null,
-                'age_minutes' => null,
-                'is_fresh' => false,
-                'size_formatted' => '0 B',
-                'total_files' => $totalFiles,
-            ];
+            return $empty;
         }
 
         $newest = $files[0];
-        $path = $this->resolveFilePath((string) $newest['filename']);
+        try {
+            $path = $this->resolveFilePath((string) ($newest['filename'] ?? ''));
+        } catch (\Throwable) {
+            return $empty;
+        }
         $mtime = (int) ($newest['timestamp'] ?? time());
         $ttlMinutes = max(1, (int) ($this->settings->get('cache_ttl_minutes', '360') ?? '360'));
         $ageMinutes = max(0, (int) floor((time() - $mtime) / 60));
