@@ -70,8 +70,39 @@ final class DashboardController extends BaseController
             ? (string) $input['cache_mode']
             : 'force_download';
 
+        $script = dirname(__DIR__, 2) . '/bin/sync.php';
+        $phpBin = defined('PHP_BINARY') && PHP_BINARY !== '' ? PHP_BINARY : 'php';
+        if (function_exists('exec') && is_file($script)) {
+            $args = ['--force'];
+            if ($mode === 'm3u') {
+                $args[] = '--m3u';
+            } elseif ($mode === 'epg') {
+                $args[] = '--epg';
+            }
+            if ($cacheMode === 'cache_only') {
+                $args[] = '--use-cache';
+            }
+
+            (new \App\Services\SyncProgressService())->start(
+                $mode === 'epg' ? 'EPG synchronisatie starten...' : 'M3U & EPG synchronisatie starten...'
+            );
+
+            $cmd = 'nohup ' . escapeshellarg($phpBin) . ' ' . escapeshellarg($script)
+                . ' ' . implode(' ', $args) . ' >/dev/null 2>&1 &';
+            @exec($cmd);
+
+            $this->jsonSuccess([
+                'started' => true,
+                'background' => true,
+                'mode' => $mode,
+                'cache_mode' => $cacheMode,
+            ]);
+            return;
+        }
+
         try {
             $res = (new SchedulerService())->run(true, $mode, $cacheMode);
+            $res['background'] = false;
             $this->jsonSuccess($res);
         } catch (\Throwable $e) {
             $this->jsonError($e->getMessage(), 500);
