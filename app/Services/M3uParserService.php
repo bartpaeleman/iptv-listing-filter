@@ -130,11 +130,10 @@ final class M3uParserService
 
                 $groupId = $groupCache[$groupName];
                 $streamHash = hash('sha256', $streamUrl);
+                $seenHashes[$streamHash] = true;
+                $existing = $existingMap[$streamHash] ?? null;
 
-                $selectChannelStmt->execute([':hash' => $streamHash]);
-                $existing = $selectChannelStmt->fetch();
-
-                if ($existing) {
+                if ($existing !== null) {
                     $epgChannelId = $existing['epg_channel_id'];
                     $matchType = (string) $existing['epg_match_type'];
 

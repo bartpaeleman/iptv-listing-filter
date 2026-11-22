@@ -45,6 +45,20 @@ final class Database
         return self::$instance;
     }
 
+    public static function reconnectIfNeeded(): PDO
+    {
+        if (self::$instance instanceof PDO) {
+            try {
+                self::$instance->query('SELECT 1');
+                return self::$instance;
+            } catch (PDOException) {
+                self::$instance = null;
+            }
+        }
+
+        return self::getInstance();
+    }
+
     public static function reset(): void
     {
         self::$instance = null;
