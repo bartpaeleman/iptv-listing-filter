@@ -57,4 +57,5 @@
 - **Cache Status Guard (`FeedCacheService.php`):**
   - `listCacheFiles()` forceert `$meta['filename'] = $filename` en `getCacheInfo()` vangt ongeldige/ontbrekende bestandsnamen af zonder exception.
 - **Zelfherstellende SchemaMigrator (`SchemaMigrator.php`, `index.php`):**
-  - `ensureSchemaUpToDate()` splitst `database/schema.sql` en voert alle `CREATE TABLE IF NOT EXISTS` en `INSERT IGNORE` statements idempotent uit bij elke API-request en sync, en voegt ontbrekende `country_tag_id` / `MEDIUMTEXT` kolommen toe.
+  - `ensureSchemaUpToDate()` splitst `database/schema.sql` (na strippen van SQL-comments) en voert alle `CREATE TABLE IF NOT EXISTS` en `INSERT IGNORE` statements idempotent uit; slaat DDL over zodra `epg_sources`/`country_tags` bestaan en `schema_integrity_v2 = 1`.
+  - `register_shutdown_function()` in `index.php` vangt fatale PHP-fouten op en retourneert HTTP 500 JSON.

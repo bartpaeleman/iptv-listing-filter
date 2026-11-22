@@ -19,8 +19,18 @@ final class SchemaMigrator
         $this->settings = $settings ?? new SettingsRepository($this->pdo);
     }
 
-    public static function ensureSchemaUpToDate(PDO $pdo): void
+    public static function ensureSchemaUpToDate(PDO $pdo, bool $force = false): void
     {
+        if (!$force) {
+            $tblCount = (int) $pdo->query(
+                "SELECT COUNT(*) FROM information_schema.tables
+                 WHERE table_schema = DATABASE() AND table_name IN ('epg_sources', 'country_tags')"
+            )->fetchColumn();
+            $flag = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'schema_integrity_v2' LIMIT 1")->fetchColumn();
+            if ($tblCount === 2 && (string) $flag === '1') {
+                return;
+            }
+        }
         $schemaFile = dirname(__DIR__, 2) . '/database/schema.sql';
         if (is_file($schemaFile) && is_readable($schemaFile)) {
             $sql = (string) file_get_contents($schemaFile);
@@ -94,6 +104,7 @@ final class SchemaMigrator
                 // Ignore if already exists or insufficient privileges
             }
         }
+        $pdo->exec("INSERT INTO settings (setting_key, setting_value, is_encrypted) VALUES ('schema_integrity_v2', '1', 0) ON DUPLICATE KEY UPDATE setting_value = '1'");
     }
 
     /**
@@ -101,6 +112,8 @@ final class SchemaMigrator
      */
     private static function splitSqlStatements(string $sql): array
     {
+        $sql = preg_replace('/\/\*.*?\*\//s', '', $sql) ?? $sql;
+        $sql = preg_replace('/^\s*--.*$/m', '', $sql) ?? $sql;
         $statements = [];
         $current = '';
         $inSingle = false;

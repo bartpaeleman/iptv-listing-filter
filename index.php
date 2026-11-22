@@ -90,6 +90,26 @@ switch ($route) {
         $router->addApiRoute('cache_import', CacheController::class, 'importFile');
         $router->addApiRoute('cache_rename', CacheController::class, 'renameLabel');
         $router->addApiRoute('cache_delete', CacheController::class, 'deleteFiles');
+        register_shutdown_function(static function (): void {
+            $err = error_get_last();
+            if ($err !== null && in_array($err['type'], [E_ERROR, E_PARSE, E_COMPILE_ERROR, E_CORE_ERROR], true)) {
+                $logLine = sprintf("[%s] [FATAL] %s in %s:%d\n", date('Y-m-d H:i:s'), $err['message'], $err['file'], $err['line']);
+                @file_put_contents(__DIR__ . '/storage/logs/app.log', $logLine, FILE_APPEND);
+                if (ob_get_length()) {
+                    ob_clean();
+                }
+                if (!headers_sent()) {
+                    http_response_code(500);
+                    header('Content-Type: application/json; charset=utf-8');
+                }
+                echo json_encode([
+                    'ok' => false,
+                    'success' => false,
+                    'error' => $err['message'] . ' in ' . basename($err['file']) . ':' . $err['line'],
+                ], JSON_UNESCAPED_UNICODE);
+            }
+        });
+
         try {
             \App\Core\SchemaMigrator::ensureSchemaUpToDate(\App\Core\Database::getInstance());
             $router->dispatchApi($endpoint);
