@@ -71,8 +71,24 @@ final class DashboardController extends BaseController
             : 'force_download';
 
         $script = dirname(__DIR__, 2) . '/bin/sync.php';
-        $phpBin = defined('PHP_BINARY') && PHP_BINARY !== '' ? PHP_BINARY : 'php';
-        if (function_exists('exec') && is_file($script)) {
+        $phpBin = null;
+        $candidates = [
+            defined('PHP_BINDIR') ? PHP_BINDIR . '/php' : '',
+            '/mnt/ext/opt/apache/bin/php',
+            '/usr/local/bin/php',
+            '/usr/bin/php',
+        ];
+        if (defined('PHP_BINARY') && PHP_BINARY !== '' && basename(PHP_BINARY) === 'php') {
+            array_unshift($candidates, PHP_BINARY);
+        }
+        foreach ($candidates as $candidate) {
+            if ($candidate !== '' && @is_executable($candidate)) {
+                $phpBin = $candidate;
+                break;
+            }
+        }
+
+        if ($phpBin !== null && function_exists('exec') && is_file($script)) {
             $args = ['--force'];
             if ($mode === 'm3u') {
                 $args[] = '--m3u';
