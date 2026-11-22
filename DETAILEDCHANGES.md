@@ -4,7 +4,9 @@
 - **`views/dashboard.php` & `assets/js/pages/DashboardPage.js`:**
   - `Cachebeheer` tabknop uit de topbar verwijderd; `DashboardPage` toont nu naast `🔄 Alles Downloaden & Sync` enkel `⚡ Laad Cache` (`cache_mode=cache_only`) en `💾 Beheer Cache` (`#openCacheManagerBtn`).
   - `#sync-progress-panel` toegevoegd met `#syncProgressMsg`, `#syncProgressPercent`, `#syncProgressEta`, `#syncProgressFill` en `#syncLiveConsole`.
-- **`app/Services/SyncProgressService.php`:**
+- **`assets/js/components/SyncProgressPanel.js`, `DashboardPage.js` & `CacheManagerPage.js`:**
+  - `SyncProgressPanel` biedt een gedeelde voortgangs-UI (`startPolling()`, `stopPolling()`, `checkActive()`, ETA-formattering) voor zowel het Dashboard als Cachebeheer.
+  - `CacheManagerPage` blokkeert conflicterende knoppen via `setActionsDisabled()` zolang `sync_status` actief is.
   - Slaat `started_at` op in `sync_progress.json` en berekent `eta_seconds` op basis van verstreken tijd en actueel voortgangspercentage.
 - **`app/Services/XtreamUrlBuilder.php` & `app/Controllers/SettingsController.php`:**
   - `XtreamUrlBuilder::buildM3uPlusUrl()` accepteert optionele `$outputParams` (default `type=m3u_plus&output=ts`).
