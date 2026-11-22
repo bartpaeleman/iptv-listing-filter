@@ -10,3 +10,52 @@
   - `M3uParserService`: streaming `fopen`/`fgets` + `stream_hash` upsert zodat handmatige kanaalnamen, nummers en EPG-koppelingen behouden blijven.
   - `EpgParserService`: streaming `XMLReader` (ondersteunt `.xml` en `.xml.gz`), importeert alle `<channel>` tags en enkel `<programme>` records voor actief gekoppelde kanalen.
   - `PlaylistExporterService` & `EpgExporterService`: leveren schone, gefilterde feeds aan LAN-clients.
+- **Installer Diagnostiek (`InstallerService`, `InstallController`, `InstallerPage.js`):**
+  - `checkPrerequisites()` retourneert nu `id`, `label`, `passed`, `current_value`, `fix_title` en `fix_command` met gedetecteerde webserver-user en octale rechten.
+  - `?route=install&step=recheck` biedt een asynchrone JSON-hercontrole zonder paginarefresh.
+- **Cross-device Klembord (`ClipboardHelper.js`):**
+  - Probeert `navigator.clipboard.writeText()` in HTTPS/secure contexts en valt terug op een iOS/Safari-compatibel tijdelijk `<textarea>` (`readOnly`, `contentEditable`, `font-size: 16px`, `setSelectionRange`, `execCommand('copy')`) voor lokale HTTP NAS-URL's.
+- **Least-Privilege DB Provisioning (`InstallerService::provisionDatabaseAndUser()`):**
+  - Maakt database en restricted runtime-user (`localhost` + `127.0.0.1`) aan met enkel `SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP` op de doeldatabase; admin-credentials worden direct gewist en niet in `.env` opgeslagen.
+- **Bidirectionele Wizard Navigatie (`InstallController`, `InstallerService`, `views/install.php`):**
+  - Voltooide stappen in de stepper zijn klikbaar en stappen 2–4 bevatten een "← Vorige stap" knop.
+  - Bestaande `.env` en `settings`-waarden worden vooringevuld; geheime velden worden gemarkeerd met `data-has-existing="1"` en behouden hun waarde als ze leeg blijven. `install_completed = 1` vergrendelt de wizard na stap 4.
+- **Xtream Codes & Multi-Source EPG (`XtreamUrlBuilder`, `EpgSourceRepository`, `HttpClient`, `EpgParserService`):**
+  - `XtreamUrlBuilder` genereert `m3u_plus` en `xmltv.php` URL's en detecteert Xtream-credentials uit geplakte `get.php` links.
+  - `HttpClient` biedt expliciete DNS/HTTP-foutmeldingen en streaming `.gz` decompressie (`gzopen`/`gzread`).
+  - `EpgParserService` itereert over actieve `epg_sources` op prioriteit met per-bron statuslogging.
+- **Lokale Bestandscaching (`FeedCacheService`, `M3uParserService`, `EpgParserService`, `DashboardController`, `DashboardPage.js`):**
+  - Atomische opslag in `storage/cache/latest_playlist.m3u` en `latest_epg.xml` met `.meta.json` en `cache_ttl_minutes`.
+  - Ondersteunt `auto`, `cache_only` en `force_download` modi via UI en `bin/sync.php --use-cache`.
+- **Sync Log Leegmaken & UI Error Handling (`SyncLogRepository`, `DashboardController`, `App.js`):**
+  - `SyncLogRepository::clearAll()` en `DashboardController::clearSyncLogs()` (`?route=api&endpoint=clear_sync_logs`).
+  - `App.js::switchTab()` vangt API/JS-fouten af en toont een leesbare foutmelding in plaats van een leeg scherm; `SettingsController::get()` vangt ontbrekende `epg_sources` tabel op.
+- **Latest-Only Delta Migratie (`SchemaMigrator.php`, `database/update.sql`):**
+  - `SchemaMigrator::migrateIfNeeded()` vergelijkt `hash_file('sha256', 'database/update.sql')` met `last_update_sql_hash` in `settings` en voert `update.sql` idempotent uit bij wijzigingen.
+- **Cross-Device Cache Verharding (`FeedCacheService.php`):**
+  - `clearstatcache(true, $path)` vóór `is_file()`/`filesize()` en 0-byte validatie na `rename()`/`copy()`+`unlink()` fallback.
+- **Runtime MEDIUMTEXT Migratie & Pre-Insert Guard (`SchemaMigrator`, `M3uParserService`, `EpgParserService`, `ChannelRepository`):**
+  - `SchemaMigrator::ensureSchemaUpToDate()` bevraagt `INFORMATION_SCHEMA.COLUMNS` vóór elke M3U/EPG-sync en voert direct `ALTER TABLE ... MODIFY COLUMN ... MEDIUMTEXT NULL` uit indien nodig.
+  - `iconv('UTF-8', 'UTF-8//IGNORE', ...)` + 16MB/250-char guards voorkomen `SQLSTATE[22001]` definitief.
+- **Real-Time Sync Voortgang & Non-Blocking Polling (`SyncProgressService`, `DashboardController`, `DashboardPage.js`):**
+  - `SyncProgressService` schrijft atomisch naar `storage/cache/sync_progress.json`; `DashboardController::sync()` en `syncStatus()` roepen `session_write_close()` aan voor parallelle `800ms` polling.
+  - `UNIQUE KEY uq_epg_programmes (epg_id, start_utc)` + `INSERT IGNORE` voorkomt dubbele EPG-programma's.
+- **Land-Tags & Geïsoleerde M3U/EPG Cache (`CountryTagService`, `CountryTagRepository`, `ChannelRepository`, `ChannelsPage.js`):**
+  - `CountryTagService` converteert ISO-2 codes naar vlag-emoji's, scant onbekende `[TAG]` prefixen en past vlaggen/landgroepen toe op bestaande kanalen.
+  - `ChannelRepository::filter()` ondersteunt `country_tag_id`, `status` (`enabled`/`disabled`) en `has_epg` (`yes`/`no`).
+- **Multi-File Cachebeheer (`FeedCacheService`, `CacheController`, `CacheManagerPage.js`):**
+  - `FeedCacheService` bewaart downloads met unieke datum/bron-bestandsnamen + `.meta.json` (`listCacheFiles()`, `resolveFilePath()`, `renameLabel()`, `deleteBulk()`).
+  - `CacheController` biedt `cache_list`, `cache_import`, `cache_rename` en `cache_delete` endpoints.
+- **Safari/WebKit API & JSON Guard (`ApiClient.js`, `BaseController.php`):**
+  - `ApiClient` bouwt URL's op via `new URL('index.php', window.location.href)` en leest eerst `res.text()` vóór `JSON.parse()`.
+  - `BaseController::jsonSuccess()`/`jsonError()` schonen de output buffer (`ob_clean()`) op vóór JSON-headers.
+- **Asset Cache-Busting & WebKit Diagnostiek (`views/*.php`, `ApiClient.js`):**
+  - `?v=filemtime(...)` op `app.css`, `App.js` en `InstallerPage.js` voorkomt verouderde iPad Safari caches.
+  - `ApiClient` leidt de base-URL af uit `window.location.origin + window.location.pathname` en vermeldt `endpoint (requestUrl)` bij fouten.
+- **Globale API Exception Handler (`index.php`):**
+  - Vangt alle `\Throwable` fouten op tijdens `?route=api`, logt naar `storage/logs/app.log` en retourneert altijd geldige JSON met bestandsnaam en regelnummer.
+- **Cache Status Guard (`FeedCacheService.php`):**
+  - `listCacheFiles()` forceert `$meta['filename'] = $filename` en `getCacheInfo()` vangt ongeldige/ontbrekende bestandsnamen af zonder exception.
+- **Zelfherstellende SchemaMigrator (`SchemaMigrator.php`, `index.php`):**
+  - `ensureSchemaUpToDate()` splitst `database/schema.sql` (na strippen van SQL-comments) en voert alle `CREATE TABLE IF NOT EXISTS` en `INSERT IGNORE` statements idempotent uit; slaat DDL over zodra `epg_sources`/`country_tags` bestaan en `schema_integrity_v2 = 1`.
+  - `register_shutdown_function()` in `index.php` vangt fatale PHP-fouten op en retourneert HTTP 500 JSON.

@@ -36,13 +36,14 @@ CREATE TABLE IF NOT EXISTS `channels` (
     `stream_hash` CHAR(64) NOT NULL,
     `tvg_id` VARCHAR(255) NULL,
     `tvg_name` VARCHAR(255) NOT NULL DEFAULT '',
-    `tvg_logo` VARCHAR(1000) NULL,
+    `tvg_logo` TEXT NULL,
     `group_id` INT UNSIGNED NOT NULL,
     `stream_url` TEXT NOT NULL,
     `custom_name` VARCHAR(255) NULL,
     `channel_number` INT NULL,
     `epg_channel_id` VARCHAR(255) NULL,
     `epg_match_type` ENUM('none', 'auto', 'manual') NOT NULL DEFAULT 'none',
+    `country_tag_id` INT UNSIGNED NULL,
     `is_enabled` TINYINT(1) NOT NULL DEFAULT 1,
     `sort_order` INT NOT NULL DEFAULT 0,
     `last_seen_at` DATETIME NULL,
@@ -50,6 +51,7 @@ CREATE TABLE IF NOT EXISTS `channels` (
     UNIQUE KEY `uq_channels_stream_hash` (`stream_hash`),
     KEY `idx_channels_group` (`group_id`),
     KEY `idx_channels_epg_id` (`epg_channel_id`),
+    KEY `idx_channels_country_tag` (`country_tag_id`),
     KEY `idx_channels_enabled_sort` (`is_enabled`, `sort_order`, `channel_number`),
     CONSTRAINT `fk_channels_group`
         FOREIGN KEY (`group_id`) REFERENCES `m3u_groups` (`id`)
@@ -59,7 +61,7 @@ CREATE TABLE IF NOT EXISTS `channels` (
 CREATE TABLE IF NOT EXISTS `epg_channels` (
     `epg_id` VARCHAR(255) NOT NULL,
     `display_name` VARCHAR(255) NOT NULL DEFAULT '',
-    `icon_url` VARCHAR(1000) NULL,
+    `icon_url` TEXT NULL,
     PRIMARY KEY (`epg_id`),
     KEY `idx_epg_channels_display_name` (`display_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -73,7 +75,7 @@ CREATE TABLE IF NOT EXISTS `epg_programmes` (
     `description` TEXT NULL,
     `category` VARCHAR(255) NULL,
     PRIMARY KEY (`id`),
-    KEY `idx_epg_prog_epg_start` (`epg_id`, `start_utc`),
+    UNIQUE KEY `uq_epg_programmes` (`epg_id`, `start_utc`),
     KEY `idx_epg_prog_start` (`start_utc`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -88,11 +90,51 @@ CREATE TABLE IF NOT EXISTS `sync_logs` (
     KEY `idx_sync_logs_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `epg_sources` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(100) NOT NULL,
+    `url` TEXT NOT NULL,
+    `priority` INT NOT NULL DEFAULT 10,
+    `is_enabled` TINYINT(1) NOT NULL DEFAULT 1,
+    `last_sync_at` DATETIME NULL,
+    `last_status` VARCHAR(255) NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_epg_sources_enabled_prio` (`is_enabled`, `priority`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `country_tags` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `tag_pattern` VARCHAR(50) NOT NULL,
+    `country_code` CHAR(2) NOT NULL,
+    `country_name` VARCHAR(100) NOT NULL,
+    `flag_emoji` VARCHAR(16) NOT NULL,
+    `auto_group` TINYINT(1) NOT NULL DEFAULT 0,
+    `sort_order` INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_country_tags_pattern` (`tag_pattern`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO `country_tags` (`tag_pattern`, `country_code`, `country_name`, `flag_emoji`, `sort_order`) VALUES
+    ('[BE]', 'BE', 'België', '🇧🇪', 1),
+    ('[NL]', 'NL', 'Nederland', '🇳🇱', 2),
+    ('[EN]', 'GB', 'Verenigd Koninkrijk', '🇬🇧', 3),
+    ('[UK]', 'GB', 'Verenigd Koninkrijk', '🇬🇧', 4),
+    ('[US]', 'US', 'Verenigde Staten', '🇺🇸', 5),
+    ('[DE]', 'DE', 'Duitsland', '🇩🇪', 6),
+    ('[FR]', 'FR', 'Frankrijk', '🇫🇷', 7),
+    ('[ES]', 'ES', 'Spanje', '🇪🇸', 8),
+    ('[IT]', 'IT', 'Italië', '🇮🇹', 9);
+
 INSERT IGNORE INTO `settings` (`setting_key`, `setting_value`, `is_encrypted`) VALUES
+    ('source_mode', 'xtream', 0),
+    ('xtream_host', '', 0),
+    ('xtream_username', '', 1),
+    ('xtream_password', '', 1),
     ('m3u_source_url', '', 1),
-    ('epg_source_url', 'http://epgguide.ddns.net/epg/tvguide.xml', 1),
+    ('epg_source_url', '', 1),
     ('sync_interval_hours', '72', 0),
     ('sync_preferred_hour', '3', 0),
+    ('cache_ttl_minutes', '360', 0),
     ('last_m3u_sync', '', 0),
     ('last_epg_sync', '', 0),
     ('output_token', '', 0),
