@@ -90,7 +90,22 @@ switch ($route) {
         $router->addApiRoute('cache_import', CacheController::class, 'importFile');
         $router->addApiRoute('cache_rename', CacheController::class, 'renameLabel');
         $router->addApiRoute('cache_delete', CacheController::class, 'deleteFiles');
-        $router->dispatchApi($endpoint);
+        try {
+            $router->dispatchApi($endpoint);
+        } catch (\Throwable $e) {
+            $logLine = sprintf("[%s] [API ERROR] %s in %s:%d\n%s\n", date('Y-m-d H:i:s'), $e->getMessage(), $e->getFile(), $e->getLine(), $e->getTraceAsString());
+            @file_put_contents(__DIR__ . '/storage/logs/app.log', $logLine, FILE_APPEND);
+            if (ob_get_length()) {
+                ob_clean();
+            }
+            http_response_code(500);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'ok' => false,
+                'success' => false,
+                'error' => $e->getMessage() . ' in ' . basename($e->getFile()) . ':' . $e->getLine(),
+            ], JSON_UNESCAPED_UNICODE);
+        }
         break;
 
     case 'dashboard':

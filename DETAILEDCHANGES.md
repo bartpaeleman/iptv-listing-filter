@@ -52,3 +52,5 @@
 - **Asset Cache-Busting & WebKit Diagnostiek (`views/*.php`, `ApiClient.js`):**
   - `?v=filemtime(...)` op `app.css`, `App.js` en `InstallerPage.js` voorkomt verouderde iPad Safari caches.
   - `ApiClient` leidt de base-URL af uit `window.location.origin + window.location.pathname` en vermeldt `endpoint (requestUrl)` bij fouten.
+- **Globale API Exception Handler (`index.php`):**
+  - Vangt alle `\Throwable` fouten op tijdens `?route=api`, logt naar `storage/logs/app.log` en retourneert altijd geldige JSON met bestandsnaam en regelnummer.
