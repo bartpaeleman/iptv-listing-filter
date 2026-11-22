@@ -342,6 +342,7 @@ export class ChannelsPage extends BaseComponent {
         this.groupList = new GroupList('#groupsListRoot', {
             onSelect: (id, name) => {
                 this.selectedGroupId = id;
+                this.channelSortBy = 'number';
                 this.updateGroupHeader(name);
                 this.groupList.setState({ selectedGroupId: id });
                 this.loadChannels();
