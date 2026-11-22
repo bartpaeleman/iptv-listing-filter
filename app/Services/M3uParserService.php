@@ -81,17 +81,12 @@ final class M3uParserService
         $channelsDeleted = 0;
         $autoMatched = 0;
         $now = gmdate('Y-m-d H:i:s');
-        $seenHashes = [];
-
-        $existingMap = [];
-        $existingRows = $this->pdo->query(
-            'SELECT id, stream_hash, tvg_id, tvg_name, tvg_logo, group_id, stream_url, epg_channel_id, epg_match_type FROM channels'
-        );
-        while ($row = $existingRows->fetch()) {
-            $existingMap[(string) $row['stream_hash']] = $row;
-        }
+        $touchIds = [];
 
         $insertGroupStmt = $this->pdo->prepare('INSERT INTO m3u_groups (original_name, is_enabled, sort_order) VALUES (:name, 1, :sort)');
+        $selectChannelStmt = $this->pdo->prepare(
+            'SELECT id, tvg_id, tvg_name, tvg_logo, group_id, stream_url, epg_channel_id, epg_match_type FROM channels WHERE stream_hash = :hash LIMIT 1'
+        );
         $insertChannelStmt = $this->pdo->prepare(
             'INSERT INTO channels (stream_hash, tvg_id, tvg_name, tvg_logo, group_id, stream_url, epg_channel_id, epg_match_type, is_enabled, sort_order, last_seen_at)
              VALUES (:hash, :tvg_id, :tvg_name, :tvg_logo, :group_id, :stream_url, :epg_id, :match_type, 1, :sort, :seen)'
@@ -198,20 +193,16 @@ final class M3uParserService
                 }
             }
 
-            $deleteIds = [];
-            foreach ($existingMap as $hash => $row) {
-                if (!isset($seenHashes[$hash])) {
-                    $deleteIds[] = (int) $row['id'];
-                }
+            if ($touchIds !== []) {
+                $placeholders = implode(',', array_fill(0, count($touchIds), '?'));
+                $touchStmt = $this->pdo->prepare("UPDATE channels SET last_seen_at = ? WHERE id IN ({$placeholders})");
+                $touchStmt->execute(array_merge([$now], $touchIds));
+                $touchIds = [];
             }
-            if ($deleteIds !== []) {
-                foreach (array_chunk($deleteIds, 500) as $chunk) {
-                    $placeholders = implode(',', array_fill(0, count($chunk), '?'));
-                    $delStmt = $this->pdo->prepare("DELETE FROM channels WHERE id IN ({$placeholders})");
-                    $delStmt->execute($chunk);
-                    $channelsDeleted += $delStmt->rowCount();
-                }
-            }
+
+            $delStmt = $this->pdo->prepare('DELETE FROM channels WHERE last_seen_at IS NULL OR last_seen_at < :seen');
+            $delStmt->execute([':seen' => $now]);
+            $channelsDeleted = $delStmt->rowCount();
 
             $this->pdo->commit();
         } catch (\Throwable $e) {
