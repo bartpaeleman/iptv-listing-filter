@@ -97,6 +97,9 @@ final class InstallController extends BaseController
         $defaultAppUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http')
             . '://' . ($_SERVER['HTTP_HOST'] ?? 'nas.local')
             . rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
+        $creds = $installer->generateAppUserCredentials();
+        $suggestedAppUser = $creds['app_user'];
+        $suggestedAppPass = $creds['app_pass'];
         $isLocked = false;
 
         require dirname(__DIR__, 2) . '/views/install.php';

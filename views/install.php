@@ -59,15 +59,42 @@ ob_start();
         <?php elseif ($step === 2): ?>
             <form method="post" action="index.php?route=install&step=2" class="stack-form">
                 <input type="hidden" name="step" value="2">
-                <label>Database Host <input type="text" name="db_host" value="127.0.0.1" required></label>
-                <label>Database Poort <input type="text" name="db_port" value="3306" required></label>
-                <label>Database Naam <input type="text" name="db_name" value="iptv_manager" required></label>
-                <label>Database Gebruiker <input type="text" name="db_user" required></label>
-                <label>Database Wachtwoord <input type="password" name="db_pass"></label>
+                <label class="checkbox-row">
+                    <input type="checkbox" name="use_existing_user" id="useExistingUserToggle" value="1">
+                    <span>Ik gebruik al een bestaande restricted gebruiker (geen root-provisioning)</span>
+                </label>
+
+                <div id="adminProvisionBlock" class="card" style="margin-bottom:0;">
+                    <h3 style="margin-top:0;">Blok A — Eenmalige Database Beheerder</h3>
+                    <p class="muted" style="font-size:0.85rem;">Wordt uitsluitend gebruikt om de database en het restricted account aan te maken. Wordt <strong>niet</strong> opgeslagen in <code>.env</code>.</p>
+                    <div class="grid-2">
+                        <label>DB Host <input type="text" name="db_host" value="127.0.0.1" required></label>
+                        <label>Poort <input type="text" name="db_port" value="3306" required></label>
+                    </div>
+                    <div class="grid-2" style="margin-top:0.75rem;">
+                        <label>Beheerder / Root Gebruiker <input type="text" name="admin_user" value="root"></label>
+                        <label>Beheerder Wachtwoord <input type="password" name="admin_pass"></label>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-bottom:0;">
+                    <h3 style="margin-top:0;">Blok B — Dedicated Applicatie-account (.env)</h3>
+                    <label>Database Naam <input type="text" name="db_name" value="iptv_manager" required></label>
+                    <label style="margin-top:0.75rem;">Restricted DB Gebruiker <input type="text" name="app_user" value="<?= htmlspecialchars($suggestedAppUser ?? 'iptv_user', ENT_QUOTES, 'UTF-8') ?>" required></label>
+                    <label style="margin-top:0.75rem;">Gegenereerd DB Wachtwoord
+                        <div class="copy-group">
+                            <input type="text" name="app_pass" id="appDbPassInput" value="<?= htmlspecialchars($suggestedAppPass ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
+                            <button type="button" class="btn btn-sm" id="regenAppPassBtn" title="Nieuw wachtwoord genereren">🔄</button>
+                            <button type="button" class="btn btn-sm" id="copyAppPassBtn">Kopieer</button>
+                        </div>
+                    </label>
+                </div>
+
                 <label>Publieke / LAN App URL <input type="url" name="app_url" value="<?= htmlspecialchars($defaultAppUrl, ENT_QUOTES, 'UTF-8') ?>" required></label>
                 <label>Toegestane LAN Subnets (CIDR) <input type="text" name="lan_subnets" value="192.168.0.0/16,10.0.0.0/8" required></label>
-                <button type="submit" class="btn btn-primary">Database & .env Opslaan →</button>
+                <button type="submit" class="btn btn-primary">Database Provisionen & .env Opslaan →</button>
             </form>
+            <script type="module" src="assets/js/pages/InstallerPage.js"></script>
 
         <?php elseif ($step === 3): ?>
             <form method="post" action="index.php?route=install&step=3" class="stack-form">

@@ -15,3 +15,5 @@
   - `?route=install&step=recheck` biedt een asynchrone JSON-hercontrole zonder paginarefresh.
 - **Cross-device Klembord (`ClipboardHelper.js`):**
   - Probeert `navigator.clipboard.writeText()` in HTTPS/secure contexts en valt terug op een iOS/Safari-compatibel tijdelijk `<textarea>` (`readOnly`, `contentEditable`, `font-size: 16px`, `setSelectionRange`, `execCommand('copy')`) voor lokale HTTP NAS-URL's.
+- **Least-Privilege DB Provisioning (`InstallerService::provisionDatabaseAndUser()`):**
+  - Maakt database en restricted runtime-user (`localhost` + `127.0.0.1`) aan met enkel `SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP` op de doeldatabase; admin-credentials worden direct gewist en niet in `.env` opgeslagen.

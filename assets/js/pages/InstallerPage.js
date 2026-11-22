@@ -12,6 +12,27 @@ export class InstallerPage extends BaseComponent {
 
         const recheckBtn = document.getElementById('recheckPrereqsBtn');
         recheckBtn?.addEventListener('click', () => this.recheck(recheckBtn));
+
+        const existingToggle = document.getElementById('useExistingUserToggle');
+        const adminBlock = document.getElementById('adminProvisionBlock');
+        existingToggle?.addEventListener('change', () => {
+            adminBlock?.classList.toggle('hidden', existingToggle.checked);
+        });
+
+        document.getElementById('regenAppPassBtn')?.addEventListener('click', () => {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*-_';
+            const arr = new Uint32Array(24);
+            crypto.getRandomValues(arr);
+            const pass = Array.from(arr, n => chars[n % chars.length]).join('');
+            const input = document.getElementById('appDbPassInput');
+            if (input) input.value = pass;
+        });
+
+        document.getElementById('copyAppPassBtn')?.addEventListener('click', ev => {
+            const input = document.getElementById('appDbPassInput');
+            if (!input) return;
+            ClipboardHelper.copyText(input.value, ev.currentTarget);
+        });
     }
 
     async recheck(btn) {

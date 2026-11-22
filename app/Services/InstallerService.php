@@ -112,30 +112,108 @@ final class InstallerService
         return $perms !== false ? substr(sprintf('%o', $perms), -4) : '----';
     }
 
-    public function setupDatabaseAndEnv(
-        string $host,
-        string $port,
-        string $dbName,
-        string $user,
-        string $pass,
-        string $appUrl,
-        string $subnets
-    ): void {
-        $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', $host, $port, $dbName);
-        $pdo = new PDO($dsn, $user, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    /**
+     * @return array{app_user: string, app_pass: string}
+     */
+    public function generateAppUserCredentials(string $dbName = 'iptv_manager'): array
+    {
+        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*-_';
+        $max = strlen($alphabet) - 1;
+        $pass = '';
+        for ($i = 0; $i < 24; $i++) {
+            $pass .= $alphabet[random_int(0, $max)];
+        }
+
+        return [
+            'app_user' => 'iptv_user',
+            'app_pass' => $pass,
+        ];
+    }
+
+    /**
+     * @param array{
+     *   db_host: string,
+     *   db_port: string,
+     *   db_name: string,
+     *   admin_user: string,
+     *   admin_pass: string,
+     *   app_user: string,
+     *   app_pass: string,
+     *   app_url: string,
+     *   lan_subnets: string,
+     *   use_existing_user: bool
+     * } $config
+     * @return array{app_user: string, db_name: string}
+     */
+    public function provisionDatabaseAndUser(array $config): array
+    {
+        $host = trim($config['db_host']);
+        $port = trim($config['db_port']);
+        $dbName = trim($config['db_name']);
+        $appUser = trim($config['app_user']);
+        $appPass = $config['app_pass'];
+        $useExisting = (bool) ($config['use_existing_user'] ?? false);
+
+        if (!preg_match('/^[a-zA-Z0-9_]{1,64}$/', $dbName)) {
+            throw new \RuntimeException('Ongeldige databasenaam (enkel letters, cijfers en _ toegestaan).');
+        }
+        if (!preg_match('/^[a-zA-Z0-9_]{1,32}$/', $appUser)) {
+            throw new \RuntimeException('Ongeldige applicatie-gebruikersnaam (enkel letters, cijfers en _ toegestaan).');
+        }
+
+        if (!$useExisting) {
+            $adminDsn = sprintf('mysql:host=%s;port=%s;charset=utf8mb4', $host, $port);
+            $adminPdo = new PDO($adminDsn, $config['admin_user'], $config['admin_pass'], [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            ]);
+
+            $adminPdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+            foreach (['localhost', '127.0.0.1'] as $hostScope) {
+                $stmt = $adminPdo->prepare("CREATE USER IF NOT EXISTS :u@'{$hostScope}' IDENTIFIED BY :p");
+                $stmt->execute([':u' => $appUser, ':p' => $appPass]);
+
+                $alter = $adminPdo->prepare("ALTER USER :u@'{$hostScope}' IDENTIFIED BY :p");
+                $alter->execute([':u' => $appUser, ':p' => $appPass]);
+
+                $grant = $adminPdo->prepare(
+                    "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP ON `{$dbName}`.* TO :u@'{$hostScope}'"
+                );
+                $grant->execute([':u' => $appUser]);
+            }
+
+            $adminPdo->exec('FLUSH PRIVILEGES');
+            unset($adminPdo);
+        }
+
+        // Clear admin credentials from memory
+        $config['admin_user'] = '';
+        $config['admin_pass'] = '';
+
+        // Verify restricted user connection & import schema
+        $appDsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', $host, $port, $dbName);
+        $appPdo = new PDO($appDsn, $appUser, $appPass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        ]);
 
         $rootDir = dirname(__DIR__, 2);
+        $sql = file_get_contents($rootDir . '/database/schema.sql');
+        if ($sql === false) {
+            throw new \RuntimeException('Kan database/schema.sql niet lezen.');
+        }
+        $appPdo->exec($sql);
+
         $appKey = bin2hex(random_bytes(32));
         $envContent = implode("\n", [
             'APP_ENV=production',
             "APP_KEY={$appKey}",
-            'APP_URL=' . rtrim($appUrl, '/'),
+            'APP_URL=' . rtrim($config['app_url'], '/'),
             "DB_HOST={$host}",
             "DB_PORT={$port}",
             "DB_NAME={$dbName}",
-            "DB_USER={$user}",
-            'DB_PASS="' . str_replace('"', '\"', $pass) . '"',
-            "LAN_SUBNET_ALLOW={$subnets}",
+            "DB_USER={$appUser}",
+            'DB_PASS="' . str_replace('"', '\"', $appPass) . '"',
+            "LAN_SUBNET_ALLOW={$config['lan_subnets']}",
             '',
         ]);
 
@@ -143,10 +221,6 @@ final class InstallerService
             throw new \RuntimeException('Kan .env niet wegschrijven.');
         }
 
-        $sql = file_get_contents($rootDir . '/database/schema.sql');
-        if ($sql === false) {
-            throw new \RuntimeException('Kan database/schema.sql niet lezen.');
-        }
-        $pdo->exec($sql);
+        return ['app_user' => $appUser, 'db_name' => $dbName];
     }
 }
