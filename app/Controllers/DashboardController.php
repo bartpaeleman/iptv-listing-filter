@@ -85,6 +85,16 @@ final class DashboardController extends BaseController
         $this->jsonSuccess();
     }
 
+    public function clearSyncLogs(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $deleted = (new SyncLogRepository())->clearAll();
+        $this->jsonSuccess(['deleted' => $deleted, 'message' => 'Sync log is leeggemaakt']);
+    }
+
     public function logout(): void
     {
         $this->requireAuth();

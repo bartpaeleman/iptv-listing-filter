@@ -39,10 +39,18 @@ class App {
         this.switchTab('dashboard');
     }
 
-    switchTab(tab) {
+    async switchTab(tab) {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${tab}`));
-        this.pages[tab]?.load();
+        const page = this.pages[tab];
+        if (!page) return;
+        try {
+            await page.load();
+        } catch (e) {
+            if (page.container) {
+                page.container.innerHTML = `<div class="card"><div class="alert alert-error">Fout bij laden: ${page.escapeHtml(e.message)}</div></div>`;
+            }
+        }
     }
 }
 

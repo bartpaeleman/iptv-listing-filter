@@ -36,4 +36,11 @@ final class SyncLogRepository extends BaseRepository
         $stmt->execute();
         return $stmt->fetchAll();
     }
+
+    public function clearAll(): int
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM sync_logs');
+        $stmt->execute();
+        return $stmt->rowCount();
+    }
 }

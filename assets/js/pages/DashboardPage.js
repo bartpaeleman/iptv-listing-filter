@@ -81,19 +81,22 @@ export class DashboardPage extends BaseComponent {
             </div>
 
             <div class="card">
-                <h2>Recente Sync Logs</h2>
+                <div class="card-header">
+                    <h2>Recente Sync Logs</h2>
+                    <button type="button" id="btn-clear-sync-logs" class="btn btn-sm">🗑️ Log leegmaken</button>
+                </div>
                 <div class="table-wrap">
                     <table class="data-table">
                         <thead><tr><th>Tijd</th><th>Type</th><th>Status</th><th>Bericht</th></tr></thead>
-                        <tbody>
-                            ${(d.logs || []).map(l => `
+                        <tbody id="syncLogsBody">
+                            ${(d.logs || []).length > 0 ? (d.logs || []).map(l => `
                                 <tr>
                                     <td>${this.escapeHtml(l.created_at)}</td>
                                     <td>${this.escapeHtml(String(l.sync_type).toUpperCase())}</td>
                                     <td><span class="badge ${l.status === 'success' ? 'badge-success' : 'badge-warning'}">${this.escapeHtml(l.status)}</span></td>
                                     <td>${this.escapeHtml(l.message)}</td>
                                 </tr>
-                            `).join('')}
+                            `).join('') : '<tr><td colspan="4" class="muted">Nog geen sync-logs aanwezig</td></tr>'}
                         </tbody>
                     </table>
                 </div>
@@ -138,6 +141,16 @@ export class DashboardPage extends BaseComponent {
             await this.props.api.post('clear_cache');
             this.props.toast.show('Lokale cache geleegd!');
             await this.load();
+        });
+
+        document.getElementById('btn-clear-sync-logs')?.addEventListener('click', async () => {
+            if (!confirm('Weet je zeker dat je alle sync-logs wilt verwijderen?')) return;
+            const res = await this.props.api.post('clear_sync_logs');
+            const tbody = document.getElementById('syncLogsBody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="4" class="muted">Nog geen sync-logs aanwezig</td></tr>';
+            }
+            this.props.toast.show(res?.message || 'Sync log is leeggemaakt');
         });
     }
 }

@@ -16,7 +16,12 @@ final class SettingsController extends BaseController
         $m3u = (string) $settings->get('m3u_source_url', '');
         $epg = (string) $settings->get('epg_source_url', '');
 
-        $epgSources = (new \App\Repositories\EpgSourceRepository())->allDecrypted(false);
+        $epgSources = [];
+        try {
+            $epgSources = (new \App\Repositories\EpgSourceRepository())->allDecrypted(false);
+        } catch (\Throwable) {
+            $epgSources = [];
+        }
         $maskedSources = array_map(static function (array $s): array {
             $u = (string) ($s['url'] ?? '');
             $s['url_masked'] = $u !== '' ? substr($u, 0, 36) . (strlen($u) > 36 ? '••••' : '') : '';

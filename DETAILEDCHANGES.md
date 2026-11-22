@@ -27,3 +27,6 @@
 - **Lokale Bestandscaching (`FeedCacheService`, `M3uParserService`, `EpgParserService`, `DashboardController`, `DashboardPage.js`):**
   - Atomische opslag in `storage/cache/latest_playlist.m3u` en `latest_epg.xml` met `.meta.json` en `cache_ttl_minutes`.
   - Ondersteunt `auto`, `cache_only` en `force_download` modi via UI en `bin/sync.php --use-cache`.
+- **Sync Log Leegmaken & UI Error Handling (`SyncLogRepository`, `DashboardController`, `App.js`):**
+  - `SyncLogRepository::clearAll()` en `DashboardController::clearSyncLogs()` (`?route=api&endpoint=clear_sync_logs`).
+  - `App.js::switchTab()` vangt API/JS-fouten af en toont een leesbare foutmelding in plaats van een leeg scherm; `SettingsController::get()` vangt ontbrekende `epg_sources` tabel op.
