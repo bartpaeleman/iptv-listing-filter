@@ -120,7 +120,7 @@ export class ChannelsPage extends BaseComponent {
         this.groupList = new GroupList('#groupsListRoot', {
             onSelect: (id, name) => {
                 this.selectedGroupId = id;
-                document.getElementById('selectedGroupTitle').textContent = name;
+                this.updateGroupHeader(name);
                 this.groupList.setState({ selectedGroupId: id });
                 this.loadChannels();
             },
@@ -128,11 +128,6 @@ export class ChannelsPage extends BaseComponent {
                 await this.props.api.post('update_group', { id, is_enabled: checked ? 1 : 0 });
                 this.props.toast.show('Groep bijgewerkt');
                 this.load();
-            },
-            onRename: async (id, customName) => {
-                await this.props.api.post('update_group', { id, custom_name: customName });
-                this.props.toast.show(customName ? 'Groepsnaam bijgewerkt' : 'Groepsnaam hersteld naar origineel');
-                await this.load();
             }
         });
 
@@ -241,6 +236,26 @@ export class ChannelsPage extends BaseComponent {
             const display = grp?.display_name || titleEl?.textContent || '';
             saveHeaderGroupName(display.trim());
         });
+    }
+
+    updateGroupHeader(fallbackName = '') {
+        const titleEl = document.getElementById('selectedGroupTitle');
+        const editWrap = document.getElementById('inlineGroupEditWrap');
+        const adoptBtn = document.getElementById('adoptGroupNameBtn');
+        const editBtn = document.getElementById('editGroupNameBtn');
+
+        const hasGroup = this.selectedGroupId !== null && this.selectedGroupId !== undefined;
+        const grp = hasGroup ? (this.groups || []).find(g => Number(g.id) === Number(this.selectedGroupId)) : null;
+
+        if (titleEl) {
+            titleEl.textContent = hasGroup
+                ? (grp?.display_name || grp?.custom_name || grp?.original_name || fallbackName || 'Groep')
+                : 'Alle Kanalen';
+            titleEl.classList.remove('hidden');
+        }
+        editWrap?.classList.add('hidden');
+        adoptBtn?.classList.toggle('hidden', !hasGroup);
+        editBtn?.classList.toggle('hidden', !hasGroup);
     }
 
     async openCountryModal() {
