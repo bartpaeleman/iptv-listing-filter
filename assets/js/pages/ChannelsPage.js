@@ -10,6 +10,11 @@ export class ChannelsPage extends BaseComponent {
         this.channelSearch = '';
         this.groupSortMode = 'import';
         this.channelSortBy = 'number';
+        try {
+            this.groupChannelSortMap = JSON.parse(localStorage.getItem('iptv_group_channel_sort') || '{}');
+        } catch {
+            this.groupChannelSortMap = {};
+        }
         this.selectedContentTypes = new Set(['live']);
         this.hasLoadedData = false;
         this.loadFromDb = false;
@@ -623,6 +628,12 @@ export class ChannelsPage extends BaseComponent {
                     this.channelSortBy = this.channelSortBy === 'number' ? 'number_desc' : 'number';
                 } else if (key === 'name') {
                     this.channelSortBy = this.channelSortBy === 'name_asc' ? 'name_desc' : 'name_asc';
+                }
+                if (this.selectedGroupId) {
+                    this.groupChannelSortMap[String(this.selectedGroupId)] = this.channelSortBy;
+                    try {
+                        localStorage.setItem('iptv_group_channel_sort', JSON.stringify(this.groupChannelSortMap));
+                    } catch {}
                 }
                 this.loadChannels();
             });
