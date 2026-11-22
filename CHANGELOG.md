@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased] - feature/groepen-en-kanalen
+### Toegevoegd
+- **Stap 1 — Centrale Emoji- & Tag-database + Beheerscherm (`emoji_rules`, `EmojiTagService`, `EmojiRuleController`, `EmojiRulesPage.js`):**
+  - Idempotente database-tabel `emoji_rules` toegevoegd met automatische vulling van alle ISO 3166-1 alpha-2 landcodes, IPTV-aliassen (`UK`, `EN`, `USA`, `AR`, enz.), standaard fallback-icoon (`🏷️`) en categorie-trefwoorden (`🎬`, `📺`, `🏎️`, `❤️🔥`).
+  - Centrale `EmojiTagService` toegevoegd voor het parsen van ruwe groep- en kanaalnamen (landtags `|BE|`, `BE|`, `|BE` + categorie-emoji's) zonder de originele databasenaam te wijzigen.
+  - Apart beheerscherm **🏷️ Landen & Tags Beheren** (`EmojiRulesPage.js`) gekoppeld aan de knop op *Groepen & Kanalen* (niet in het hoofdmenu), inclusief toevoegen, bewerken, activeren/deactiveren, verwijderen, snelle emoji-kiezer en live zoekfunctie.
+### Gewijzigd
+- **Groepen & Kanalen Performance & Emoji-weergave (`UiCacheService`, `ChannelController`, `ChannelsPage.js`, `GroupList.js`, `ChannelTable.js`):**
+  - Event-listener voor `#manageCountryTagsBtn` gekoppeld aan `#tab-emoji-rules`.
+  - `ChannelController::groups()` en `ChannelController::channels()` passen `EmojiTagService::parseName()` toe zodat landvlaggen én categorie-emoji's (`🎬`, `📺`, `🏎️`, `❤️🔥`) zichtbaar zijn in groepenlijst, groepskoptekst en kanaaltabel.
+  - `UiCacheService` toegevoegd (`storage/cache/ui_groups_cache.json` en `ui_channels_group_{id}.json`) met lazy-loading van de eerste groep en automatische cache-invalidatie bij sync, groep-/kanaalwijzigingen en emoji-regelmutaties.
+
 ## [Unreleased] - feature/cachecontrol
 ### Gewijzigd
 - **Dashboard Synchronisatie & Lokale Cache (`DashboardPage.js`, `views/dashboard.php`, `SyncProgressService.php`):**

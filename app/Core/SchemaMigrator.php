@@ -24,10 +24,10 @@ final class SchemaMigrator
         if (!$force) {
             $tblCount = (int) $pdo->query(
                 "SELECT COUNT(*) FROM information_schema.tables
-                 WHERE table_schema = DATABASE() AND table_name IN ('epg_sources', 'country_tags')"
+                 WHERE table_schema = DATABASE() AND table_name IN ('epg_sources', 'country_tags', 'emoji_rules')"
             )->fetchColumn();
-            $flag = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'schema_integrity_v2' LIMIT 1")->fetchColumn();
-            if ($tblCount === 2 && (string) $flag === '1') {
+            $flag = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'schema_integrity_v4' LIMIT 1")->fetchColumn();
+            if ($tblCount === 3 && (string) $flag === '1') {
                 return;
             }
         }
@@ -104,7 +104,19 @@ final class SchemaMigrator
                 // Ignore if already exists or insufficient privileges
             }
         }
-        $pdo->exec("INSERT INTO settings (setting_key, setting_value, is_encrypted) VALUES ('schema_integrity_v2', '1', 0) ON DUPLICATE KEY UPDATE setting_value = '1'");
+        $grpColStmt = $pdo->query(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'm3u_groups' AND COLUMN_NAME = 'custom_name'"
+        );
+        if ((int) $grpColStmt->fetchColumn() === 0) {
+            try {
+                $pdo->exec('ALTER TABLE `m3u_groups` ADD COLUMN `custom_name` VARCHAR(255) NULL DEFAULT NULL AFTER `original_name`');
+            } catch (\Throwable) {
+                // Ignore if already exists or insufficient privileges
+            }
+        }
+
+        $pdo->exec("INSERT INTO settings (setting_key, setting_value, is_encrypted) VALUES ('schema_integrity_v4', '1', 0) ON DUPLICATE KEY UPDATE setting_value = '1'");
     }
 
     /**

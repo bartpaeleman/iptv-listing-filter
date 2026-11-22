@@ -30,6 +30,7 @@ Voeg een uurlijkse cronjob toe in `/etc/config/crontab` (en herlaad met `crontab
 - **XMLTV EPG:** `http://<nas-ip>/iptv/index.php?route=epg&token=<OUTPUT_TOKEN>`
 
 ## Ontwikkeling & Updatebeleid
+- Zie [`ARCHITECTURE.md`](ARCHITECTURE.md) voor het gedetailleerde technische architectuuroverzicht van backend, database en frontend.
 - Zie [`AGENTS.md`](AGENTS.md) voor de architectuurcontracten, security-standaarden en code-richtlijnen.
 - **Database-updates:** Nieuwe installaties gebruiken `database/schema.sql`. Bestaande QNAP-installaties gebruiken `database/update.sql` (Latest-Only Delta beleid) en eventuele instructies in `MANUALUPDATES.md`.
 

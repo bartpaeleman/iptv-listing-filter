@@ -65,8 +65,17 @@ export class ChannelsPage extends BaseComponent {
                 </aside>
                 <div class="card channels-pane">
                     <div class="card-header">
-                        <h2 id="selectedGroupTitle">Alle Kanalen</h2>
+                        <div id="groupHeaderTitleWrap" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                            <h2 id="selectedGroupTitle">Alle Kanalen</h2>
+                            <div id="inlineGroupEditWrap" class="hidden" style="display:inline-flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+                                <input type="text" id="inlineGroupNameInput" placeholder="Custom groepsnaam (leeg = origineel)" style="font-size:16px;min-height:44px;min-width:180px;">
+                                <button type="button" class="btn btn-sm btn-primary" id="inlineGroupSaveBtn" title="Opslaan (Enter)" style="min-height:44px;min-width:44px;">✔️</button>
+                                <button type="button" class="btn btn-sm" id="inlineGroupCancelBtn" title="Annuleren (Escape)" style="min-height:44px;min-width:44px;">✖️</button>
+                            </div>
+                        </div>
                         <div class="btn-group">
+                            <button type="button" class="btn btn-sm hidden" id="adoptGroupNameBtn" title="Huidige weergavenaam (incl. vlag/emoji) opslaan als custom naam">❐</button>
+                            <button type="button" class="btn btn-sm hidden" id="editGroupNameBtn" title="Groepsnaam aanpassen">✏️</button>
                             <button class="btn btn-sm" id="manageCountryTagsBtn">🏷️ Landen & Tags Beheren</button>
                             <button class="btn btn-sm" id="bulkEnableChannelsBtn">Selectie Aan</button>
                             <button class="btn btn-sm" id="bulkDisableChannelsBtn">Selectie Uit</button>
@@ -93,7 +102,6 @@ export class ChannelsPage extends BaseComponent {
                                     <th title="Selecteer/deselecteer alle zichtbare kanalen voor bulkacties" style="white-space:nowrap;">
                                         <label style="display:inline-flex;align-items:center;gap:0.25rem;cursor:pointer;">
                                             <input type="checkbox" id="selectAllChannels" title="Selecteer/deselecteer alle zichtbare kanalen voor bulkacties">
-                                            <span style="font-size:0.8rem;">☑️</span>
                                         </label>
                                     </th>
                                     <th>Aan</th>
@@ -112,7 +120,7 @@ export class ChannelsPage extends BaseComponent {
         this.groupList = new GroupList('#groupsListRoot', {
             onSelect: (id, name) => {
                 this.selectedGroupId = id;
-                document.getElementById('selectedGroupTitle').textContent = name;
+                this.updateGroupHeader(name);
                 this.groupList.setState({ selectedGroupId: id });
                 this.loadChannels();
             },
@@ -127,6 +135,12 @@ export class ChannelsPage extends BaseComponent {
             onUpdate: async (id, payload) => {
                 await this.props.api.post('update_channel', { id, ...payload });
                 this.props.toast.show('Kanaal bijgewerkt');
+            },
+            onSelectionChange: count => {
+                const enableBtn = document.getElementById('bulkEnableChannelsBtn');
+                const disableBtn = document.getElementById('bulkDisableChannelsBtn');
+                if (enableBtn) enableBtn.textContent = count > 0 ? `Selectie Aan (${count})` : 'Selectie Aan';
+                if (disableBtn) disableBtn.textContent = count > 0 ? `Selectie Uit (${count})` : 'Selectie Uit';
             }
         });
 
@@ -155,7 +169,6 @@ export class ChannelsPage extends BaseComponent {
                 if (cb) cb.checked = ev.target.checked;
                 tr.classList.toggle('row-selected', ev.target.checked);
             });
-            this.updateBulkButtons(this.channelTable?.getSelectedIds().length || 0);
         });
 
         const bulkChannels = async enable => {
@@ -166,67 +179,86 @@ export class ChannelsPage extends BaseComponent {
         };
         document.getElementById('bulkEnableChannelsBtn')?.addEventListener('click', () => bulkChannels(true));
         document.getElementById('bulkDisableChannelsBtn')?.addEventListener('click', () => bulkChannels(false));
+        document.getElementById('manageCountryTagsBtn')?.addEventListener('click', () => this.openCountryModal());
+
+        const titleEl = document.getElementById('selectedGroupTitle');
+        const editWrap = document.getElementById('inlineGroupEditWrap');
+        const inlineInput = document.getElementById('inlineGroupNameInput');
+
+        const cancelInlineEdit = () => {
+            editWrap?.classList.add('hidden');
+            titleEl?.classList.remove('hidden');
+        };
+
+        const saveHeaderGroupName = async newName => {
+            if (!this.selectedGroupId) return;
+            await this.props.api.post('update_group', { id: this.selectedGroupId, custom_name: newName });
+            this.props.toast.show(newName ? 'Groepsnaam bijgewerkt' : 'Groepsnaam hersteld naar origineel');
+            cancelInlineEdit();
+            await this.load();
+            const updated = (this.groups || []).find(g => Number(g.id) === Number(this.selectedGroupId));
+            if (updated && titleEl) {
+                titleEl.textContent = updated.display_name || updated.custom_name || updated.original_name;
+            }
+        };
+
+        document.getElementById('editGroupNameBtn')?.addEventListener('click', () => {
+            if (!this.selectedGroupId) return;
+            const grp = (this.groups || []).find(g => Number(g.id) === Number(this.selectedGroupId));
+            if (inlineInput) {
+                inlineInput.value = grp?.custom_name || grp?.original_name || grp?.name || '';
+            }
+            titleEl?.classList.add('hidden');
+            editWrap?.classList.remove('hidden');
+            inlineInput?.focus();
+            inlineInput?.select();
+        });
+
+        document.getElementById('inlineGroupSaveBtn')?.addEventListener('click', () => {
+            saveHeaderGroupName((inlineInput?.value || '').trim());
+        });
+
+        document.getElementById('inlineGroupCancelBtn')?.addEventListener('click', cancelInlineEdit);
+
+        inlineInput?.addEventListener('keydown', ev => {
+            if (ev.key === 'Enter') {
+                ev.preventDefault();
+                saveHeaderGroupName((inlineInput.value || '').trim());
+            } else if (ev.key === 'Escape') {
+                ev.preventDefault();
+                cancelInlineEdit();
+            }
+        });
+
+        document.getElementById('adoptGroupNameBtn')?.addEventListener('click', () => {
+            if (!this.selectedGroupId) return;
+            const grp = (this.groups || []).find(g => Number(g.id) === Number(this.selectedGroupId));
+            const display = grp?.display_name || titleEl?.textContent || '';
+            saveHeaderGroupName(display.trim());
+        });
+    }
+
+    updateGroupHeader(fallbackName = '') {
+        const titleEl = document.getElementById('selectedGroupTitle');
+        const editWrap = document.getElementById('inlineGroupEditWrap');
+        const adoptBtn = document.getElementById('adoptGroupNameBtn');
+        const editBtn = document.getElementById('editGroupNameBtn');
+
+        const hasGroup = this.selectedGroupId !== null && this.selectedGroupId !== undefined;
+        const grp = hasGroup ? (this.groups || []).find(g => Number(g.id) === Number(this.selectedGroupId)) : null;
+
+        if (titleEl) {
+            titleEl.textContent = hasGroup
+                ? (grp?.display_name || grp?.custom_name || grp?.original_name || fallbackName || 'Groep')
+                : 'Alle Kanalen';
+            titleEl.classList.remove('hidden');
+        }
+        editWrap?.classList.add('hidden');
+        adoptBtn?.classList.toggle('hidden', !hasGroup);
+        editBtn?.classList.toggle('hidden', !hasGroup);
     }
 
     async openCountryModal() {
-        const unmapped = await this.props.api.get('scan_tags');
-        const tagsHtml = (this.countryTags || []).map(t => `
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0;border-bottom:1px solid var(--border);">
-                <span>${this.escapeHtml(t.flag_emoji)} <strong>${this.escapeHtml(t.tag_pattern)}</strong> — ${this.escapeHtml(t.country_name)} (${this.escapeHtml(t.country_code)})</span>
-                <button type="button" class="btn btn-sm del-tag-btn" data-id="${t.id}">✕</button>
-            </div>
-        `).join('');
-
-        this.props.modal.open('Landen & Tags Beheren', `
-            <div style="margin-bottom:1rem;">
-                ${unmapped.length > 0 ? `<p class="muted" style="font-size:0.85rem;">Onbekende tags gevonden: <code>${unmapped.map(u => this.escapeHtml(u)).join(', ')}</code></p>` : ''}
-                <form id="addTagForm" class="grid-2" style="margin-bottom:0.75rem;">
-                    <input type="text" id="newTagPattern" placeholder="Tag (bv. [PT])" required>
-                    <input type="text" id="newTagCode" placeholder="ISO-2 (bv. PT)" maxlength="2" required>
-                    <input type="text" id="newTagName" placeholder="Landnaam (bv. Portugal)" required>
-                    <button type="submit" class="btn btn-primary">+ Tag Opslaan</button>
-                </form>
-                <div style="max-height:180px;overflow-y:auto;">${tagsHtml}</div>
-            </div>
-            <div class="btn-group">
-                <button type="button" id="applyFlagsBtn" class="btn btn-primary">🏳️ Vlaggen toepassen op namen</button>
-                <button type="button" id="groupByCountryBtn" class="btn">📁 Groepeer kanalen per land</button>
-            </div>
-        `);
-
-        document.getElementById('addTagForm')?.addEventListener('submit', async ev => {
-            ev.preventDefault();
-            await this.props.api.post('save_country_tag', {
-                tag_pattern: document.getElementById('newTagPattern').value,
-                country_code: document.getElementById('newTagCode').value,
-                country_name: document.getElementById('newTagName').value,
-            });
-            this.props.toast.show('Tag opgeslagen!');
-            await this.load();
-            this.openCountryModal();
-        });
-
-        document.querySelectorAll('.del-tag-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                await this.props.api.post('delete_country_tag', { id: Number(btn.dataset.id) });
-                await this.load();
-                this.openCountryModal();
-            });
-        });
-
-        document.getElementById('applyFlagsBtn')?.addEventListener('click', async () => {
-            const res = await this.props.api.post('apply_country_tags', { group_by_country: false });
-            this.props.toast.show(`${res.updated} kanalen van vlaggen voorzien!`);
-            this.props.modal.close();
-            this.load();
-        });
-
-        document.getElementById('groupByCountryBtn')?.addEventListener('click', async () => {
-            if (!confirm('Weet je zeker dat je gekoppelde kanalen wilt verplaatsen naar landgroepen?')) return;
-            const res = await this.props.api.post('apply_country_tags', { group_by_country: true });
-            this.props.toast.show(`${res.grouped} kanalen gegroepeerd per land!`);
-            this.props.modal.close();
-            this.load();
-        });
+        this.props.switchTab('emoji-rules');
     }
 }

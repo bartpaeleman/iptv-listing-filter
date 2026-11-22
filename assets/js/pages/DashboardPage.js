@@ -75,7 +75,8 @@ export class DashboardPage extends BaseComponent {
             </div>
 
             <div class="card">
-                <h2>LAN Client Endpoints (TiviMate / Kodi / VLC)</h2>
+                <h2>LAN Client Endpoint M3U Link</h2>
+                <p class="muted" style="font-size:0.85rem;margin:-0.25rem 0 0.75rem 0;">vb: (IPTVX / Kodi / VLC)</p>
                 <div class="endpoint-row">
                     <label>M3U Playlist URL</label>
                     <div class="copy-group">
@@ -83,6 +84,7 @@ export class DashboardPage extends BaseComponent {
                         <button class="btn copy-btn" data-copy="playlistUrlInput">Kopieer</button>
                     </div>
                 </div>
+                ${d.source_mode !== 'xtream' ? `
                 <div class="endpoint-row">
                     <label>XMLTV EPG URL</label>
                     <div class="copy-group">
@@ -90,6 +92,7 @@ export class DashboardPage extends BaseComponent {
                         <button class="btn copy-btn" data-copy="epgUrlInput">Kopieer</button>
                     </div>
                 </div>
+                ` : ''}
             </div>
 
             <div class="card">

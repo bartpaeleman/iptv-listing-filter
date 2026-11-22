@@ -46,6 +46,7 @@ final class DashboardController extends BaseController
             'sync_interval_hours' => (int) $settings->get('sync_interval_hours', '72'),
             'sync_preferred_hour' => (int) $settings->get('sync_preferred_hour', '3'),
             'output_token' => $settings->get('output_token', ''),
+            'source_mode' => $settings->get('source_mode', 'separate_urls'),
             'app_url' => rtrim((string) EnvLoader::get('APP_URL', ''), '/'),
             'logs' => $logs->recent(15),
             'cache_status' => [

@@ -1,14 +1,13 @@
 import { BaseComponent } from '../core/BaseComponent.js';
-import { formatTagPrefix } from '../core/FlagRegistry.js';
 
 export class ChannelTable extends BaseComponent {
     render() {
-        const { channels = [], countryTags = [] } = this.state;
+        const { channels = [] } = this.state;
         this.container.innerHTML = channels.map(c => {
             const rawName = c.custom_name || c.tvg_name;
-            const chParsed = formatTagPrefix(rawName, countryTags);
-            const grpParsed = formatTagPrefix(c.group_name, countryTags);
-            const grpDisplay = grpParsed.icon ? `${grpParsed.icon} ${grpParsed.cleanName}` : grpParsed.cleanName;
+            const cleanName = c.clean_name || rawName;
+            const emojiPrefix = c.emoji_prefix || '';
+            const grpDisplay = c.group_display_name || c.group_name;
 
             return `
             <tr data-cid="${c.id}">
@@ -22,8 +21,8 @@ export class ChannelTable extends BaseComponent {
                 <td><input type="number" class="ch-num" value="${c.channel_number ?? ''}" style="width:76px;"></td>
                 <td>
                     <div style="display:flex;align-items:center;gap:0.4rem;">
-                        ${chParsed.icon ? `<span title="Originele tag: ${this.escapeHtml(chParsed.rawTag)}" style="font-size:1.1rem;cursor:help;">${chParsed.icon}</span>` : ''}
-                        <input type="text" class="ch-name" value="${this.escapeHtml(rawName)}">
+                        ${emojiPrefix ? `<span class="ch-emoji-prefix" title="${this.escapeHtml(c.tvg_name || '')}">${this.escapeHtml(emojiPrefix)}</span>` : ''}
+                        <input type="text" class="ch-name" value="${this.escapeHtml(cleanName)}" title="Origineel: ${this.escapeHtml(c.tvg_name || '')}">
                     </div>
                 </td>
                 <td class="muted" title="${this.escapeHtml(c.group_name)}">${this.escapeHtml(grpDisplay)}</td>

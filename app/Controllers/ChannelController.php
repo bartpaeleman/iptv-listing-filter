@@ -7,13 +7,24 @@ namespace App\Controllers;
 use App\Core\BaseController;
 use App\Repositories\ChannelRepository;
 use App\Repositories\GroupRepository;
+use App\Services\EmojiTagService;
 
 final class ChannelController extends BaseController
 {
     public function groups(): void
     {
         $this->requireAuth();
-        $this->jsonSuccess((new GroupRepository())->allWithCounts());
+        $emojiService = new EmojiTagService();
+        $emojiService->seedDefaultsIfEmpty();
+
+        $groups = (new GroupRepository())->allWithCounts();
+        foreach ($groups as &$g) {
+            $rawName = (string) (($g['custom_name'] ?? '') !== '' ? $g['custom_name'] : ($g['original_name'] ?? ''));
+            $g['display_name'] = $emojiService->parseName($rawName, true)['display_name'];
+        }
+        unset($g);
+
+        $this->jsonSuccess($groups);
     }
 
     public function updateGroup(): void
@@ -56,6 +67,23 @@ final class ChannelController extends BaseController
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
 
         $res = (new ChannelRepository())->filter($groupId, $search, $epgStatus, $activeOnly, $limit, $offset, $countryTagId, $status);
+        $emojiService = new EmojiTagService();
+        $emojiService->seedDefaultsIfEmpty();
+
+        if (isset($res['items']) && is_array($res['items'])) {
+            foreach ($res['items'] as &$ch) {
+                $rawCh = (string) (($ch['custom_name'] ?? '') !== '' ? $ch['custom_name'] : ($ch['tvg_name'] ?? ''));
+                $parsed = $emojiService->parseName($rawCh, false);
+                $ch['display_name'] = $parsed['display_name'];
+                $ch['clean_name'] = $parsed['clean_name'];
+                $ch['emoji_prefix'] = $parsed['country_emoji'] ?? '';
+                if (isset($ch['group_name']) && (string) $ch['group_name'] !== '') {
+                    $ch['group_display_name'] = $emojiService->parseName((string) $ch['group_name'], true)['display_name'];
+                }
+            }
+            unset($ch);
+        }
+
         $this->jsonSuccess($res);
     }
 
