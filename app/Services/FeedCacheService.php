@@ -35,6 +35,7 @@ final class FeedCacheService
     {
         $path = $this->getDataPath($type);
         $metaPath = $this->getMetaPath($type);
+        clearstatcache(true, $path);
 
         if (!is_file($path)) {
             return [
@@ -75,6 +76,10 @@ final class FeedCacheService
 
     public function storeFromTempFile(string $type, string $tempPath): string
     {
+        if (!is_file($tempPath) || filesize($tempPath) === 0) {
+            throw new RuntimeException("Gedownload tijdelijk bestand voor {$type} ontbreekt of is leeg.");
+        }
+
         $destPath = $this->getDataPath($type);
         if (!@rename($tempPath, $destPath)) {
             if (!@copy($tempPath, $destPath)) {
@@ -83,8 +88,13 @@ final class FeedCacheService
             @unlink($tempPath);
         }
 
+        clearstatcache(true, $destPath);
+        $size = is_file($destPath) ? (int) filesize($destPath) : 0;
+        if ($size === 0) {
+            throw new RuntimeException("Cachebestand voor {$type} is 0 bytes of niet weggeschreven.");
+        }
+
         $now = time();
-        $size = filesize($destPath) ?: 0;
         $meta = [
             'timestamp' => $now,
             'downloaded_at' => gmdate('Y-m-d H:i:s', $now),

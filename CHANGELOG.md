@@ -13,6 +13,7 @@
 - Cross-device `ClipboardHelper` met iPadOS/Safari HTTP-fallback (`execCommand('copy')` op tijdelijk `<textarea>` zonder auto-zoom) voor alle kopieerknoppen.
 - `SQLSTATE[22001]` bij lange `tvg_logo` / `icon_url` URL's opgelost door kolommen te verruimen naar `TEXT NULL` en M3U/EPG metadata veilig af te kappen (`sanitizeString()` / `sanitizeText()`).
 - Leeg scherm op tabblad Bronnen/EPG opgelost via `try/catch` foutafhandeling in `App.js::switchTab()` en graceful fallback in `SettingsController::get()`.
+- Cross-device cache-opslag in `FeedCacheService` verhard (`clearstatcache`, `rename` -> `copy`+`unlink` fallback en 0-byte validatie).
 
 ## [1.0.0] - 2026-11-22
 ### Toegevoegd
