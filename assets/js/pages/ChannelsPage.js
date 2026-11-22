@@ -416,7 +416,7 @@ export class ChannelsPage extends BaseComponent {
         document.getElementById('manageCountryTagsBtn')?.addEventListener('click', () => this.openCountryModal());
 
         document.querySelectorAll('#contentTypeFilterBar .content-type-toggle').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 const type = btn.dataset.type;
                 if (!type) return;
                 if (this.selectedContentTypes.has(type)) {
@@ -427,6 +427,13 @@ export class ChannelsPage extends BaseComponent {
                     btn.classList.add('active');
                 }
                 this.updateActiveScopeBadge();
+                this.selectedGroupId = null;
+                const loaded = await this.tryAutoLoadFromCache();
+                if (!loaded) {
+                    this.groups = [];
+                    this.groupList?.setState({ groups: [], selectedGroupId: null, countryTags: this.countryTags || [] });
+                    this.renderPreloadPrompt();
+                }
             });
         });
 
@@ -586,22 +593,39 @@ export class ChannelsPage extends BaseComponent {
     updateChannelsTableHeader() {
         const thead = document.getElementById('channelsTableHead');
         if (!thead) return;
+        const numIcon = this.channelSortBy === 'number' ? '▲' : (this.channelSortBy === 'number_desc' ? '▼' : '⇅');
+        const nameIcon = this.channelSortBy === 'name_asc' ? '▲' : (this.channelSortBy === 'name_desc' ? '▼' : '⇅');
+        const numColor = (this.channelSortBy === 'number' || this.channelSortBy === 'number_desc') ? 'color:var(--accent,#38bdf8);' : '';
+        const nameColor = (this.channelSortBy === 'name_asc' || this.channelSortBy === 'name_desc') ? 'color:var(--accent,#38bdf8);' : '';
+
         if (!this.selectedGroupId) {
             thead.innerHTML = `
                 <tr>
                     <th style="width:72px;">Aan/Uit</th>
-                    <th style="width:90px;">#</th>
-                    <th>Naam van het kanaal</th>
+                    <th class="ch-sort-th" data-sort="number" style="width:90px;cursor:pointer;user-select:none;${numColor}"># <span style="font-size:0.75rem;">${numIcon}</span></th>
+                    <th class="ch-sort-th" data-sort="name" style="cursor:pointer;user-select:none;${nameColor}">Naam van het kanaal <span style="font-size:0.75rem;">${nameIcon}</span></th>
                 </tr>`;
         } else {
             thead.innerHTML = `
                 <tr>
                     <th style="width:40px;"><input type="checkbox" id="selectAllChannelsCheckbox" title="Selecteer alle zichtbare kanalen"></th>
                     <th style="width:72px;">Aan/Uit</th>
-                    <th style="width:90px;">#</th>
-                    <th>Naam van het kanaal</th>
+                    <th class="ch-sort-th" data-sort="number" style="width:90px;cursor:pointer;user-select:none;${numColor}"># <span style="font-size:0.75rem;">${numIcon}</span></th>
+                    <th class="ch-sort-th" data-sort="name" style="cursor:pointer;user-select:none;${nameColor}">Naam van het kanaal <span style="font-size:0.75rem;">${nameIcon}</span></th>
                     <th>Groep</th>
                 </tr>`;
         }
+
+        thead.querySelectorAll('.ch-sort-th').forEach(th => {
+            th.addEventListener('click', () => {
+                const key = th.dataset.sort;
+                if (key === 'number') {
+                    this.channelSortBy = this.channelSortBy === 'number' ? 'number_desc' : 'number';
+                } else if (key === 'name') {
+                    this.channelSortBy = this.channelSortBy === 'name_asc' ? 'name_desc' : 'name_asc';
+                }
+                this.loadChannels();
+            });
+        });
     }
 }

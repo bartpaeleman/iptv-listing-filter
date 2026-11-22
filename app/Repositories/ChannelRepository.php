@@ -80,6 +80,7 @@ final class ChannelRepository extends BaseRepository
             'epg_name_asc' => "(ec.display_name IS NULL OR ec.display_name = '') ASC, ec.display_name ASC, c.id ASC",
             'epg_name_desc' => "(ec.display_name IS NULL OR ec.display_name = '') ASC, ec.display_name DESC, c.id DESC",
             'import' => 'c.id ASC',
+            'number_desc' => '(c.channel_number IS NULL) ASC, c.channel_number DESC, c.id DESC',
             default => '(c.channel_number IS NULL) ASC, c.channel_number ASC, c.id ASC',
         };
         $orderBy = "ORDER BY c.is_enabled DESC, {$subOrder}";

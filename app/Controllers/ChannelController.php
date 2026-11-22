@@ -132,7 +132,7 @@ final class ChannelController extends BaseController
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
         $sortBy = in_array(
             $_GET['sort_by'] ?? 'number',
-            ['number', 'name_asc', 'name_desc', 'import', 'epg_status_asc', 'epg_status_desc', 'epg_name_asc', 'epg_name_desc'],
+            ['number', 'number_desc', 'name_asc', 'name_desc', 'import', 'epg_status_asc', 'epg_status_desc', 'epg_name_asc', 'epg_name_desc'],
             true
         ) ? (string) $_GET['sort_by'] : 'number';
         $contentTypes = $this->parseContentTypes((string) ($_GET['content_types'] ?? ''));
