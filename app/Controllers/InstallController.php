@@ -31,15 +31,19 @@ final class InstallController extends BaseController
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             try {
                 if ($step === 2) {
-                    $installer->setupDatabaseAndEnv(
-                        trim((string) ($_POST['db_host'] ?? '127.0.0.1')),
-                        trim((string) ($_POST['db_port'] ?? '3306')),
-                        trim((string) ($_POST['db_name'] ?? 'iptv_manager')),
-                        trim((string) ($_POST['db_user'] ?? '')),
-                        (string) ($_POST['db_pass'] ?? ''),
-                        trim((string) ($_POST['app_url'] ?? '')),
-                        trim((string) ($_POST['lan_subnets'] ?? '192.168.0.0/16,10.0.0.0/8'))
-                    );
+                    $config = [
+                        'db_host' => (string) ($_POST['db_host'] ?? '127.0.0.1'),
+                        'db_port' => (string) ($_POST['db_port'] ?? '3306'),
+                        'db_name' => (string) ($_POST['db_name'] ?? 'iptv_manager'),
+                        'admin_user' => (string) ($_POST['admin_user'] ?? 'root'),
+                        'admin_pass' => (string) ($_POST['admin_pass'] ?? ''),
+                        'app_user' => (string) ($_POST['app_user'] ?? 'iptv_user'),
+                        'app_pass' => (string) ($_POST['app_pass'] ?? ''),
+                        'app_url' => (string) ($_POST['app_url'] ?? ''),
+                        'lan_subnets' => (string) ($_POST['lan_subnets'] ?? '192.168.0.0/16,10.0.0.0/8'),
+                        'use_existing_user' => isset($_POST['use_existing_user']) && $_POST['use_existing_user'] === '1',
+                    ];
+                    $installer->setupDatabaseAndEnv($config);
                     header('Location: index.php?route=install&step=3');
                     exit;
                 }
