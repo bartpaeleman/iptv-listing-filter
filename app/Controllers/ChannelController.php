@@ -20,7 +20,7 @@ final class ChannelController extends BaseController
         $groups = (new GroupRepository())->allWithCounts();
         foreach ($groups as &$g) {
             $rawName = (string) (($g['custom_name'] ?? '') !== '' ? $g['custom_name'] : ($g['original_name'] ?? ''));
-            $g['display_name'] = $emojiService->format($rawName, true);
+            $g['display_name'] = $emojiService->parseName($rawName, true)['display_name'];
         }
         unset($g);
 
@@ -73,9 +73,9 @@ final class ChannelController extends BaseController
         if (isset($res['items']) && is_array($res['items'])) {
             foreach ($res['items'] as &$ch) {
                 $rawCh = (string) (($ch['custom_name'] ?? '') !== '' ? $ch['custom_name'] : ($ch['tvg_name'] ?? ''));
-                $ch['display_name'] = $emojiService->format($rawCh, false);
+                $ch['display_name'] = $emojiService->parseName($rawCh, false)['display_name'];
                 if (isset($ch['group_name']) && (string) $ch['group_name'] !== '') {
-                    $ch['group_display_name'] = $emojiService->format((string) $ch['group_name'], true);
+                    $ch['group_display_name'] = $emojiService->parseName((string) $ch['group_name'], true)['display_name'];
                 }
             }
             unset($ch);
