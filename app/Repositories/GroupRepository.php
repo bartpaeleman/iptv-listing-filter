@@ -11,9 +11,10 @@ final class GroupRepository extends BaseRepository
     protected string $table = 'm3u_groups';
 
     /**
+     * @param array<int, string> $contentTypes
      * @return array<int, array<string, mixed>>
      */
-    public function allWithCounts(string $sortMode = 'import'): array
+    public function allWithCounts(string $sortMode = 'import', array $contentTypes = []): array
     {
         $orderBy = match ($sortMode) {
             'asc' => "ORDER BY COALESCE(NULLIF(g.custom_name, ''), g.original_name) ASC, g.id ASC",
@@ -21,8 +22,23 @@ final class GroupRepository extends BaseRepository
             default => 'ORDER BY g.import_order ASC, g.id ASC',
         };
 
+        if ($contentTypes !== []) {
+            $placeholders = implode(', ', array_fill(0, count($contentTypes), '?'));
+            $stmt = $this->pdo->prepare(
+                "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type,
+                        COUNT(c.id) AS channel_count,
+                        SUM(CASE WHEN c.is_enabled = 1 THEN 1 ELSE 0 END) AS active_channel_count
+                 FROM m3u_groups g
+                 INNER JOIN channels c ON c.group_id = g.id AND c.content_type IN ({$placeholders})
+                 GROUP BY g.id
+                 {$orderBy}"
+            );
+            $stmt->execute(array_values($contentTypes));
+            return $stmt->fetchAll();
+        }
+
         return $this->pdo->query(
-            "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order,
+            "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type,
                     COUNT(c.id) AS channel_count,
                     SUM(CASE WHEN c.is_enabled = 1 THEN 1 ELSE 0 END) AS active_channel_count
              FROM m3u_groups g

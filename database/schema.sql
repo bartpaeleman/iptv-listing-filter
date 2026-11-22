@@ -27,9 +27,11 @@ CREATE TABLE IF NOT EXISTS `m3u_groups` (
     `is_enabled` TINYINT(1) NOT NULL DEFAULT 1,
     `sort_order` INT NOT NULL DEFAULT 0,
     `import_order` INT UNSIGNED NOT NULL DEFAULT 0,
+    `content_type` ENUM('live','movie','series') NOT NULL DEFAULT 'live',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_m3u_groups_original_name` (`original_name`),
-    KEY `idx_m3u_groups_enabled_sort` (`is_enabled`, `sort_order`)
+    KEY `idx_m3u_groups_enabled_sort` (`is_enabled`, `sort_order`),
+    KEY `idx_groups_content_type` (`content_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `channels` (
@@ -39,6 +41,7 @@ CREATE TABLE IF NOT EXISTS `channels` (
     `tvg_name` VARCHAR(255) NOT NULL DEFAULT '',
     `tvg_logo` TEXT NULL,
     `group_id` INT UNSIGNED NOT NULL,
+    `content_type` ENUM('live','movie','series') NOT NULL DEFAULT 'live',
     `stream_url` TEXT NOT NULL,
     `custom_name` VARCHAR(255) NULL,
     `channel_number` INT NULL,
@@ -51,6 +54,7 @@ CREATE TABLE IF NOT EXISTS `channels` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_channels_stream_hash` (`stream_hash`),
     KEY `idx_channels_group` (`group_id`),
+    KEY `idx_channels_content_type` (`content_type`),
     KEY `idx_channels_epg_id` (`epg_channel_id`),
     KEY `idx_channels_country_tag` (`country_tag_id`),
     KEY `idx_channels_enabled_sort` (`is_enabled`, `sort_order`, `channel_number`),

@@ -11,6 +11,7 @@ final class ChannelRepository extends BaseRepository
     protected string $table = 'channels';
 
     /**
+     * @param array<int, string> $contentTypes
      * @return array{items: array<int, array<string, mixed>>, total: int}
      */
     public function filter(
@@ -22,7 +23,8 @@ final class ChannelRepository extends BaseRepository
         int $offset,
         string $countryTagId = '',
         string $status = 'all',
-        string $sortBy = 'number'
+        string $sortBy = 'number',
+        array $contentTypes = []
     ): array {
         $where = ['1=1'];
         $params = [];
@@ -32,8 +34,12 @@ final class ChannelRepository extends BaseRepository
             $params[':gid'] = $groupId;
         }
         if ($search !== '') {
-            $where[] = '(c.tvg_name LIKE :q OR c.custom_name LIKE :q OR c.tvg_id LIKE :q OR c.epg_channel_id LIKE :q)';
-            $params[':q'] = '%' . $search . '%';
+            $where[] = '(c.tvg_name LIKE :q1 OR c.custom_name LIKE :q2 OR c.tvg_id LIKE :q3 OR c.epg_channel_id LIKE :q4)';
+            $like = '%' . $search . '%';
+            $params[':q1'] = $like;
+            $params[':q2'] = $like;
+            $params[':q3'] = $like;
+            $params[':q4'] = $like;
         }
         if ($activeOnly || $status === 'enabled') {
             $where[] = 'g.is_enabled = 1 AND c.is_enabled = 1';
@@ -50,6 +56,15 @@ final class ChannelRepository extends BaseRepository
         } elseif ($countryTagId !== '' && ctype_digit($countryTagId)) {
             $where[] = 'c.country_tag_id = :ctid';
             $params[':ctid'] = (int) $countryTagId;
+        }
+        if ($contentTypes !== []) {
+            $ctPlaceholders = [];
+            foreach (array_values($contentTypes) as $idx => $ct) {
+                $key = ":ct_{$idx}";
+                $ctPlaceholders[] = $key;
+                $params[$key] = $ct;
+            }
+            $where[] = 'c.content_type IN (' . implode(', ', $ctPlaceholders) . ')';
         }
 
         $whereSql = implode(' AND ', $where);

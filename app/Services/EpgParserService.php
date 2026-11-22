@@ -153,7 +153,8 @@ final class EpgParserService
         }
 
         $activeEpgIds = $this->loadActiveLinkedEpgIds();
-        $cutoffUtc = gmdate('Y-m-d H:i:s', strtotime('-1 day'));
+        $cutoffUtc = gmdate('Y-m-d H:i:s', time() - 7200);
+        $futureCutoffUtc = gmdate('Y-m-d H:i:s', time() + (3 * 86400));
 
         $pruneStmt = $this->pdo->prepare('DELETE FROM epg_programmes WHERE stop_utc < :cutoff');
         $pruneStmt->execute([':cutoff' => $cutoffUtc]);
@@ -210,7 +211,7 @@ final class EpgParserService
                     }
                     $startUtc = $this->parseXmltvTime((string) ($el['start'] ?? ''));
                     $stopUtc = $this->parseXmltvTime((string) ($el['stop'] ?? ''));
-                    if ($startUtc === null || $stopUtc === null || $stopUtc < $cutoffUtc) {
+                    if ($startUtc === null || $stopUtc === null || $stopUtc < $cutoffUtc || $startUtc > $futureCutoffUtc) {
                         continue;
                     }
 
