@@ -65,28 +65,87 @@ export class ChannelsPage extends BaseComponent {
         }
     }
 
+    getScopeLabel() {
+        const labels = { live: 'Live TV', movie: 'Films', series: 'TV Series' };
+        const active = Array.from(this.selectedContentTypes).map(t => labels[t] || t);
+        return active.length > 0 ? active.join(' + ') : 'Geen selectie';
+    }
+
+    updateActiveScopeBadge() {
+        const badge = document.getElementById('activeScopeBadge');
+        if (!badge) return;
+        const label = this.getScopeLabel();
+        badge.textContent = `Scope: ${label}`;
+        badge.style.opacity = this.selectedContentTypes.size > 0 ? '1' : '0.6';
+    }
+
+    startLoadProgress() {
+        const wrap = document.getElementById('channelsLoadProgressWrap');
+        const text = document.getElementById('channelsLoadProgressText');
+        const timeEl = document.getElementById('channelsLoadProgressTime');
+        const bar = document.getElementById('channelsLoadProgressBar');
+        if (!wrap || !text || !timeEl || !bar) return;
+
+        if (this._progressTimer) clearInterval(this._progressTimer);
+        const start = Date.now();
+        const sourceLabel = this.loadFromDb ? 'database' : 'view-cache';
+        text.textContent = `Laden uit ${sourceLabel} (${this.getScopeLabel()})...`;
+        timeEl.textContent = '0s verstreken';
+        bar.style.width = '12%';
+        wrap.classList.remove('hidden');
+
+        this._progressTimer = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - start) / 1000);
+            const estTotal = this.loadFromDb ? Math.max(8, elapsed + 3) : 2;
+            const pct = Math.min(92, Math.round(12 + (elapsed / estTotal) * 80));
+            bar.style.width = `${pct}%`;
+            timeEl.textContent = this.loadFromDb
+                ? `${elapsed}s verstreken • even geduld`
+                : `${elapsed}s verstreken`;
+        }, 400);
+    }
+
+    stopLoadProgress() {
+        if (this._progressTimer) {
+            clearInterval(this._progressTimer);
+            this._progressTimer = null;
+        }
+        const wrap = document.getElementById('channelsLoadProgressWrap');
+        const text = document.getElementById('channelsLoadProgressText');
+        const bar = document.getElementById('channelsLoadProgressBar');
+        if (!wrap || !text || !bar) return;
+        bar.style.width = '100%';
+        text.textContent = `Geladen (${this.getScopeLabel()}) ✓`;
+        setTimeout(() => wrap.classList.add('hidden'), 900);
+    }
+
     async loadFilteredData() {
         if (this.selectedContentTypes.size === 0) {
             this.props.toast?.show('Selecteer minstens één categorie (Live TV, Films of Series).', 'warning');
             return;
         }
-        const contentTypes = Array.from(this.selectedContentTypes).join(',');
-        const [groupsRes, tags] = await Promise.all([
-            this.props.api.get('groups', { content_types: contentTypes, scope: 'active', refresh: this.loadFromDb ? '1' : '0' }),
-            this.props.api.get('country_tags'),
-        ]);
-        this.hasLoadedData = true;
-        this.groups = Array.isArray(groupsRes) ? groupsRes : (groupsRes?.items || []);
-        this.groupSortMode = groupsRes?.group_sort_mode || this.groupSortMode || 'import';
-        this.countryTags = tags || [];
-        this.populateCountryFilter();
-        this.updateGroupSortButton();
-        this.groupList.setState({ groups: this.groups, selectedGroupId: this.selectedGroupId, countryTags: this.countryTags });
-        this.updateGroupHeader();
-        if (this.selectedGroupId) {
-            await this.loadChannels();
-        } else {
-            this.renderSelectGroupPrompt();
+        this.startLoadProgress();
+        try {
+            const contentTypes = Array.from(this.selectedContentTypes).join(',');
+            const [groupsRes, tags] = await Promise.all([
+                this.props.api.get('groups', { content_types: contentTypes, scope: 'active', refresh: this.loadFromDb ? '1' : '0' }),
+                this.props.api.get('country_tags'),
+            ]);
+            this.hasLoadedData = true;
+            this.groups = Array.isArray(groupsRes) ? groupsRes : (groupsRes?.items || []);
+            this.groupSortMode = groupsRes?.group_sort_mode || this.groupSortMode || 'import';
+            this.countryTags = tags || [];
+            this.populateCountryFilter();
+            this.updateGroupSortButton();
+            this.groupList.setState({ groups: this.groups, selectedGroupId: this.selectedGroupId, countryTags: this.countryTags });
+            this.updateGroupHeader();
+            if (this.selectedGroupId) {
+                await this.loadChannels();
+            } else {
+                this.renderSelectGroupPrompt();
+            }
+        } finally {
+            this.stopLoadProgress();
         }
     }
 
@@ -180,13 +239,25 @@ export class ChannelsPage extends BaseComponent {
 
     renderShell() {
         this.container.innerHTML = `
-            <div id="contentTypeFilterBar" class="card" style="margin-bottom:1rem;padding:0.75rem 1rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                <button type="button" class="btn content-type-toggle active" data-type="live" style="min-height:44px;padding:0 1rem;">📺 Live TV</button>
-                <button type="button" class="btn content-type-toggle" data-type="movie" style="min-height:44px;padding:0 1rem;">🎬 Films</button>
-                <button type="button" class="btn content-type-toggle" data-type="series" style="min-height:44px;padding:0 1rem;">🎞️ Series</button>
-                <div style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                    <button type="button" class="btn" id="loadSourceToggleBtn" title="Kies of Filter & Laad uit de snelle view-cache of vers uit de database laadt" style="min-height:44px;padding:0 0.9rem;">⚡ Cache</button>
-                    <button type="button" class="btn btn-primary" id="applyContentTypeFilterBtn" style="min-height:44px;padding:0 1.25rem;">🔍 Filter &amp; Laad</button>
+            <div id="contentTypeFilterBar" class="card" style="margin-bottom:1rem;padding:0.75rem 1rem;display:flex;flex-direction:column;gap:0.6rem;">
+                <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;width:100%;">
+                    <button type="button" class="btn content-type-toggle active" data-type="live" style="min-height:44px;padding:0 1rem;">📺 Live TV</button>
+                    <button type="button" class="btn content-type-toggle" data-type="movie" style="min-height:44px;padding:0 1rem;">🎬 Films</button>
+                    <button type="button" class="btn content-type-toggle" data-type="series" style="min-height:44px;padding:0 1rem;">🎞️ Series</button>
+                    <span id="activeScopeBadge" class="muted" style="font-size:0.88rem;padding:0.25rem 0.6rem;border-radius:6px;background:rgba(56,189,248,0.12);color:var(--accent,#38bdf8);">Scope: Live TV</span>
+                    <div style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                        <button type="button" class="btn" id="loadSourceToggleBtn" title="Toont welke bron de knop Filter & Laad gebruikt (klik om te wisselen)" style="min-height:44px;padding:0 0.9rem;">Bron: ⚡ Cache</button>
+                        <button type="button" class="btn btn-primary" id="applyContentTypeFilterBtn" style="min-height:44px;padding:0 1.25rem;">🔍 Filter &amp; Laad</button>
+                    </div>
+                </div>
+                <div id="channelsLoadProgressWrap" class="hidden" style="width:100%;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.85rem;margin-bottom:0.25rem;">
+                        <span id="channelsLoadProgressText">Laden...</span>
+                        <span id="channelsLoadProgressTime" class="muted">0s</span>
+                    </div>
+                    <div style="width:100%;height:6px;background:rgba(255,255,255,0.1);border-radius:999px;overflow:hidden;">
+                        <div id="channelsLoadProgressBar" style="width:0%;height:100%;background:var(--accent,#38bdf8);transition:width 0.25s ease;"></div>
+                    </div>
                 </div>
             </div>
             <div class="split-view">
@@ -355,6 +426,7 @@ export class ChannelsPage extends BaseComponent {
                     this.selectedContentTypes.add(type);
                     btn.classList.add('active');
                 }
+                this.updateActiveScopeBadge();
             });
         });
 
