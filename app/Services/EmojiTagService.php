@@ -26,6 +26,15 @@ final class EmojiTagService
     public function __construct(?PDO $pdo = null, ?EmojiRuleRepository $repo = null)
     {
         $this->repo = $repo ?? new EmojiRuleRepository($pdo ?? Database::getInstance());
+        $this->rulesCacheFile = dirname(__DIR__, 2) . '/storage/cache/emoji_rules.json';
+    }
+
+    public function getRulesCacheFile(): string
+    {
+        if (!isset($this->rulesCacheFile) || $this->rulesCacheFile === '') {
+            $this->rulesCacheFile = dirname(__DIR__, 2) . '/storage/cache/emoji_rules.json';
+        }
+        return $this->rulesCacheFile;
     }
 
     public function seedDefaultsIfEmpty(): void
@@ -151,8 +160,9 @@ final class EmojiTagService
             return;
         }
 
-        if (is_file($this->rulesCacheFile) && is_readable($this->rulesCacheFile)) {
-            $cached = json_decode((string) file_get_contents($this->rulesCacheFile), true);
+        $cacheFile = $this->getRulesCacheFile();
+        if (is_file($cacheFile) && is_readable($cacheFile)) {
+            $cached = json_decode((string) file_get_contents($cacheFile), true);
             if (is_array($cached) && isset($cached['countryMap'], $cached['keywordRules'])) {
                 $this->countryMap = $cached['countryMap'];
                 $this->keywordRules = $cached['keywordRules'];
@@ -185,12 +195,12 @@ final class EmojiTagService
             }
         }
 
-        $dir = dirname($this->rulesCacheFile);
+        $dir = dirname($cacheFile);
         if (!is_dir($dir)) {
             @mkdir($dir, 0775, true);
         }
         @file_put_contents(
-            $this->rulesCacheFile,
+            $cacheFile,
             json_encode([
                 'countryMap' => $this->countryMap,
                 'keywordRules' => $this->keywordRules,
