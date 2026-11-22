@@ -66,6 +66,7 @@ switch ($route) {
         $router->addApiRoute('sync_status', DashboardController::class, 'syncStatus');
         $router->addApiRoute('clear_cache', DashboardController::class, 'clearCache');
         $router->addApiRoute('clear_sync_logs', DashboardController::class, 'clearSyncLogs');
+        $router->addApiRoute('run_update_sql', DashboardController::class, 'runUpdateSql');
         $router->addApiRoute('logout', DashboardController::class, 'logout');
         $router->addApiRoute('groups', ChannelController::class, 'groups');
         $router->addApiRoute('set_group_sort', ChannelController::class, 'setGroupSort');

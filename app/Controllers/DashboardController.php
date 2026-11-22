@@ -112,6 +112,37 @@ final class DashboardController extends BaseController
         $this->jsonSuccess(['deleted' => $deleted, 'message' => 'Sync log is leeggemaakt']);
     }
 
+    public function runUpdateSql(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $updateFile = dirname(__DIR__, 2) . '/database/update.sql';
+        if (!is_file($updateFile) || !is_readable($updateFile)) {
+            $this->jsonError('database/update.sql niet gevonden of niet leesbaar.', 404);
+            return;
+        }
+
+        $sql = file_get_contents($updateFile);
+        if ($sql === false || trim($sql) === '') {
+            $this->jsonError('database/update.sql is leeg.', 422);
+            return;
+        }
+
+        try {
+            $pdo = Database::getInstance();
+            $pdo->exec($sql);
+            $hash = hash_file('sha256', $updateFile);
+            if ($hash !== false) {
+                (new SettingsRepository($pdo))->set('last_update_sql_hash', $hash, false);
+            }
+            $this->jsonSuccess(['message' => 'database/update.sql succesvol uitgevoerd.']);
+        } catch (\Throwable $e) {
+            $this->jsonError('Fout bij uitvoeren van update.sql: ' . $e->getMessage(), 500);
+        }
+    }
+
     public function logout(): void
     {
         $this->requireAuth();
