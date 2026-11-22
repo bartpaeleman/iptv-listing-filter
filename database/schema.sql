@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS `channels` (
     `channel_number` INT NULL,
     `epg_channel_id` VARCHAR(255) NULL,
     `epg_match_type` ENUM('none', 'auto', 'manual') NOT NULL DEFAULT 'none',
+    `country_tag_id` INT UNSIGNED NULL,
     `is_enabled` TINYINT(1) NOT NULL DEFAULT 1,
     `sort_order` INT NOT NULL DEFAULT 0,
     `last_seen_at` DATETIME NULL,
@@ -50,6 +51,7 @@ CREATE TABLE IF NOT EXISTS `channels` (
     UNIQUE KEY `uq_channels_stream_hash` (`stream_hash`),
     KEY `idx_channels_group` (`group_id`),
     KEY `idx_channels_epg_id` (`epg_channel_id`),
+    KEY `idx_channels_country_tag` (`country_tag_id`),
     KEY `idx_channels_enabled_sort` (`is_enabled`, `sort_order`, `channel_number`),
     CONSTRAINT `fk_channels_group`
         FOREIGN KEY (`group_id`) REFERENCES `m3u_groups` (`id`)
@@ -99,6 +101,29 @@ CREATE TABLE IF NOT EXISTS `epg_sources` (
     PRIMARY KEY (`id`),
     KEY `idx_epg_sources_enabled_prio` (`is_enabled`, `priority`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `country_tags` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `tag_pattern` VARCHAR(50) NOT NULL,
+    `country_code` CHAR(2) NOT NULL,
+    `country_name` VARCHAR(100) NOT NULL,
+    `flag_emoji` VARCHAR(16) NOT NULL,
+    `auto_group` TINYINT(1) NOT NULL DEFAULT 0,
+    `sort_order` INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_country_tags_pattern` (`tag_pattern`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO `country_tags` (`tag_pattern`, `country_code`, `country_name`, `flag_emoji`, `sort_order`) VALUES
+    ('[BE]', 'BE', 'België', '🇧🇪', 1),
+    ('[NL]', 'NL', 'Nederland', '🇳🇱', 2),
+    ('[EN]', 'GB', 'Verenigd Koninkrijk', '🇬🇧', 3),
+    ('[UK]', 'GB', 'Verenigd Koninkrijk', '🇬🇧', 4),
+    ('[US]', 'US', 'Verenigde Staten', '🇺🇸', 5),
+    ('[DE]', 'DE', 'Duitsland', '🇩🇪', 6),
+    ('[FR]', 'FR', 'Frankrijk', '🇫🇷', 7),
+    ('[ES]', 'ES', 'Spanje', '🇪🇸', 8),
+    ('[IT]', 'IT', 'Italië', '🇮🇹', 9);
 
 INSERT IGNORE INTO `settings` (`setting_key`, `setting_value`, `is_encrypted`) VALUES
     ('source_mode', 'xtream', 0),

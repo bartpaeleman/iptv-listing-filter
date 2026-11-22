@@ -48,12 +48,14 @@ final class ChannelController extends BaseController
         $this->requireAuth();
         $groupId = isset($_GET['group_id']) && $_GET['group_id'] !== '' ? (int) $_GET['group_id'] : null;
         $search = trim((string) ($_GET['search'] ?? ''));
-        $epgStatus = (string) ($_GET['epg_status'] ?? '');
+        $epgStatus = (string) ($_GET['has_epg'] ?? $_GET['epg_status'] ?? '');
         $activeOnly = isset($_GET['active_only']) && $_GET['active_only'] === '1';
+        $countryTagId = trim((string) ($_GET['country_tag_id'] ?? ''));
+        $status = (string) ($_GET['status'] ?? 'all');
         $limit = min(200, max(10, (int) ($_GET['limit'] ?? 100)));
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
 
-        $res = (new ChannelRepository())->filter($groupId, $search, $epgStatus, $activeOnly, $limit, $offset);
+        $res = (new ChannelRepository())->filter($groupId, $search, $epgStatus, $activeOnly, $limit, $offset, $countryTagId, $status);
         $this->jsonSuccess($res);
     }
 
@@ -78,5 +80,55 @@ final class ChannelController extends BaseController
         $ids = is_array($input['ids'] ?? null) ? array_map('intval', $input['ids']) : [];
         (new ChannelRepository())->bulkSetEnabled($enable, $ids);
         $this->jsonSuccess();
+    }
+
+    public function countryTags(): void
+    {
+        $this->requireAuth();
+        $this->jsonSuccess((new \App\Repositories\CountryTagRepository())->allOrdered());
+    }
+
+    public function saveCountryTag(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $pattern = trim((string) ($input['tag_pattern'] ?? ''));
+        $code = strtoupper(trim((string) ($input['country_code'] ?? '')));
+        $name = trim((string) ($input['country_name'] ?? ''));
+        $flag = trim((string) ($input['flag_emoji'] ?? ''));
+        if ($flag === '' && strlen($code) === 2) {
+            $flag = \App\Services\CountryTagService::isoToFlag($code);
+        }
+        $id = (new \App\Repositories\CountryTagRepository())->saveTag($pattern, $code, $name, $flag);
+        $this->jsonSuccess(['id' => $id]);
+    }
+
+    public function deleteCountryTag(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        (new \App\Repositories\CountryTagRepository())->deleteById((int) ($input['id'] ?? 0));
+        $this->jsonSuccess();
+    }
+
+    public function scanTags(): void
+    {
+        $this->requireAuth();
+        $this->jsonSuccess((new \App\Services\CountryTagService())->scanUnmappedTags());
+    }
+
+    public function applyCountryTags(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $groupByCountry = (bool) ($input['group_by_country'] ?? false);
+        $res = (new \App\Services\CountryTagService())->applyTagsToExistingChannels($groupByCountry);
+        $this->jsonSuccess($res);
     }
 }

@@ -40,3 +40,6 @@
 - **Real-Time Sync Voortgang & Non-Blocking Polling (`SyncProgressService`, `DashboardController`, `DashboardPage.js`):**
   - `SyncProgressService` schrijft atomisch naar `storage/cache/sync_progress.json`; `DashboardController::sync()` en `syncStatus()` roepen `session_write_close()` aan voor parallelle `800ms` polling.
   - `UNIQUE KEY uq_epg_programmes (epg_id, start_utc)` + `INSERT IGNORE` voorkomt dubbele EPG-programma's.
+- **Land-Tags & Geïsoleerde M3U/EPG Cache (`CountryTagService`, `CountryTagRepository`, `ChannelRepository`, `ChannelsPage.js`):**
+  - `CountryTagService` converteert ISO-2 codes naar vlag-emoji's, scant onbekende `[TAG]` prefixen en past vlaggen/landgroepen toe op bestaande kanalen.
+  - `ChannelRepository::filter()` ondersteunt `country_tag_id`, `status` (`enabled`/`disabled`) en `has_epg` (`yes`/`no`).

@@ -72,6 +72,11 @@ switch ($route) {
         $router->addApiRoute('channels', ChannelController::class, 'channels');
         $router->addApiRoute('update_channel', ChannelController::class, 'updateChannel');
         $router->addApiRoute('bulk_channels', ChannelController::class, 'bulkChannels');
+        $router->addApiRoute('country_tags', ChannelController::class, 'countryTags');
+        $router->addApiRoute('save_country_tag', ChannelController::class, 'saveCountryTag');
+        $router->addApiRoute('delete_country_tag', ChannelController::class, 'deleteCountryTag');
+        $router->addApiRoute('scan_tags', ChannelController::class, 'scanTags');
+        $router->addApiRoute('apply_country_tags', ChannelController::class, 'applyCountryTags');
         $router->addApiRoute('epg_search', EpgController::class, 'search');
         $router->addApiRoute('auto_match_epg', EpgController::class, 'autoMatch');
         $router->addApiRoute('get_settings', SettingsController::class, 'get');

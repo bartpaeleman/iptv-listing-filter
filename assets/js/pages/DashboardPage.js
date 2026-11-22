@@ -47,10 +47,12 @@ export class DashboardPage extends BaseComponent {
                 <div class="card-header">
                     <h2>Synchronisatie & Lokale Cache</h2>
                     <div class="btn-group">
-                        <button class="btn btn-primary" data-sync="all" data-cache-mode="force_download">🔄 Nieuwe download & import</button>
-                        <button class="btn" data-sync="all" data-cache-mode="cache_only" ${!(d.cache_status?.m3u?.exists || d.cache_status?.epg?.exists) ? 'disabled' : ''}>⚡ Herimporteer uit cache</button>
-                        <button class="btn" data-sync="m3u" data-cache-mode="force_download">Alleen M3U</button>
-                        <button class="btn" data-sync="epg" data-cache-mode="force_download">Alleen EPG</button>
+                        <button class="btn btn-primary" data-sync="all" data-cache-mode="force_download">🔄 Alles Downloaden & Sync</button>
+                        <button class="btn" data-sync="all" data-cache-mode="cache_only" ${!(d.cache_status?.m3u?.exists || d.cache_status?.epg?.exists) ? 'disabled' : ''}>⚡ Alles uit Cache</button>
+                        <button class="btn" data-sync="m3u" data-cache-mode="force_download">M3U Download</button>
+                        <button class="btn" data-sync="m3u" data-cache-mode="cache_only" ${!d.cache_status?.m3u?.exists ? 'disabled' : ''}>M3U Cache</button>
+                        <button class="btn" data-sync="epg" data-cache-mode="force_download">EPG Download</button>
+                        <button class="btn" data-sync="epg" data-cache-mode="cache_only" ${!d.cache_status?.epg?.exists ? 'disabled' : ''}>EPG Cache</button>
                         <button class="btn" id="clearCacheBtn">🗑️ Cache legen</button>
                     </div>
                 </div>

@@ -13,8 +13,16 @@ final class ChannelRepository extends BaseRepository
     /**
      * @return array{items: array<int, array<string, mixed>>, total: int}
      */
-    public function filter(?int $groupId, string $search, string $epgStatus, bool $activeOnly, int $limit, int $offset): array
-    {
+    public function filter(
+        ?int $groupId,
+        string $search,
+        string $epgStatus,
+        bool $activeOnly,
+        int $limit,
+        int $offset,
+        string $countryTagId = '',
+        string $status = 'all'
+    ): array {
         $where = ['1=1'];
         $params = [];
 
@@ -23,16 +31,24 @@ final class ChannelRepository extends BaseRepository
             $params[':gid'] = $groupId;
         }
         if ($search !== '') {
-            $where[] = '(c.tvg_name LIKE :q OR c.custom_name LIKE :q OR c.epg_channel_id LIKE :q)';
+            $where[] = '(c.tvg_name LIKE :q OR c.custom_name LIKE :q OR c.tvg_id LIKE :q OR c.epg_channel_id LIKE :q)';
             $params[':q'] = '%' . $search . '%';
         }
-        if ($activeOnly) {
+        if ($activeOnly || $status === 'enabled') {
             $where[] = 'g.is_enabled = 1 AND c.is_enabled = 1';
+        } elseif ($status === 'disabled') {
+            $where[] = 'c.is_enabled = 0';
         }
-        if ($epgStatus === 'mapped') {
+        if ($epgStatus === 'mapped' || $epgStatus === 'yes') {
             $where[] = "c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> ''";
-        } elseif ($epgStatus === 'unmapped') {
+        } elseif ($epgStatus === 'unmapped' || $epgStatus === 'no') {
             $where[] = "(c.epg_channel_id IS NULL OR c.epg_channel_id = '')";
+        }
+        if ($countryTagId === 'untagged') {
+            $where[] = 'c.country_tag_id IS NULL';
+        } elseif ($countryTagId !== '' && ctype_digit($countryTagId)) {
+            $where[] = 'c.country_tag_id = :ctid';
+            $params[':ctid'] = (int) $countryTagId;
         }
 
         $whereSql = implode(' AND ', $where);

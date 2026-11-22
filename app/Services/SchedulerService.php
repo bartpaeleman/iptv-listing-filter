@@ -49,10 +49,18 @@ final class SchedulerService
         try {
             if ($mode === 'all' || $mode === 'epg') {
                 $progress->update('running', 'parse_epg', 10, 'EPG bronnen synchroniseren...', [], 'Start EPG synchronisatie');
-                $epgStats = (new EpgParserService($this->pdo, $this->settings))->sync(null, $cacheMode);
-                $result['epg'] = $epgStats;
-                $this->logs->addLog('epg', 'success', 'EPG synchronisatie voltooid.', $epgStats);
-                $this->writeFileLog('epg', 'success', 'EPG synchronisatie voltooid.', $epgStats);
+                try {
+                    $epgStats = (new EpgParserService($this->pdo, $this->settings))->sync(null, $cacheMode);
+                    $result['epg'] = $epgStats;
+                    $this->logs->addLog('epg', 'success', 'EPG synchronisatie voltooid.', $epgStats);
+                    $this->writeFileLog('epg', 'success', 'EPG synchronisatie voltooid.', $epgStats);
+                } catch (\Throwable $epgErr) {
+                    if ($mode === 'all' && $cacheMode === 'cache_only') {
+                        $this->logs->addLog('epg', 'skipped', $epgErr->getMessage(), []);
+                    } else {
+                        throw $epgErr;
+                    }
+                }
             }
 
             if ($mode === 'all' || $mode === 'm3u') {
