@@ -151,6 +151,16 @@ final class EmojiTagService
             return;
         }
 
+        if (is_file($this->rulesCacheFile) && is_readable($this->rulesCacheFile)) {
+            $cached = json_decode((string) file_get_contents($this->rulesCacheFile), true);
+            if (is_array($cached) && isset($cached['countryMap'], $cached['keywordRules'])) {
+                $this->countryMap = $cached['countryMap'];
+                $this->keywordRules = $cached['keywordRules'];
+                $this->fallbackEmoji = (string) ($cached['fallbackEmoji'] ?? self::DEFAULT_FALLBACK_EMOJI);
+                return;
+            }
+        }
+
         $this->countryMap = [];
         $this->keywordRules = [];
         $this->fallbackEmoji = self::DEFAULT_FALLBACK_EMOJI;
@@ -174,6 +184,19 @@ final class EmojiTagService
                 ];
             }
         }
+
+        $dir = dirname($this->rulesCacheFile);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+        @file_put_contents(
+            $this->rulesCacheFile,
+            json_encode([
+                'countryMap' => $this->countryMap,
+                'keywordRules' => $this->keywordRules,
+                'fallbackEmoji' => $this->fallbackEmoji,
+            ], JSON_UNESCAPED_UNICODE)
+        );
     }
 
     /**

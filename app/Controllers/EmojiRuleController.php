@@ -63,7 +63,7 @@ final class EmojiRuleController extends BaseController
             $id
         );
 
-        (new UiCacheService())->invalidateAll();
+        (new EmojiTagService())->invalidateRulesCache();
         $this->jsonSuccess(['id' => $savedId]);
     }
 
@@ -81,7 +81,7 @@ final class EmojiRuleController extends BaseController
 
         $isActive = (bool) ($input['is_active'] ?? true);
         $this->repo->toggleActive($id, $isActive);
-        (new UiCacheService())->invalidateAll();
+        (new EmojiTagService())->invalidateRulesCache();
         $this->jsonSuccess();
     }
 
@@ -98,7 +98,7 @@ final class EmojiRuleController extends BaseController
         }
 
         $this->repo->deleteById($id);
-        (new UiCacheService())->invalidateAll();
+        (new EmojiTagService())->invalidateRulesCache();
         $this->jsonSuccess();
     }
 }

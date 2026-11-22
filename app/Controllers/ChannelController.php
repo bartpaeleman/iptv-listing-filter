@@ -8,14 +8,23 @@ use App\Core\BaseController;
 use App\Repositories\ChannelRepository;
 use App\Repositories\GroupRepository;
 use App\Services\EmojiTagService;
-use App\Services\UiCacheService;
 
 final class ChannelController extends BaseController
 {
     public function groups(): void
     {
         $this->requireAuth();
-        $this->jsonSuccess((new GroupRepository())->allWithCounts());
+        $emojiService = new EmojiTagService();
+        $emojiService->seedDefaultsIfEmpty();
+
+        $groups = (new GroupRepository())->allWithCounts();
+        foreach ($groups as &$g) {
+            $rawName = (string) (($g['custom_name'] ?? '') !== '' ? $g['custom_name'] : ($g['original_name'] ?? ''));
+            $g['display_name'] = $emojiService->format($rawName, true);
+        }
+        unset($g);
+
+        $this->jsonSuccess($groups);
     }
 
     public function updateGroup(): void
@@ -30,7 +39,6 @@ final class ChannelController extends BaseController
         $sortOrder = isset($input['sort_order']) ? (int) $input['sort_order'] : null;
 
         (new GroupRepository())->updateGroup($id, $isEnabled, $customName, $sortOrder);
-        (new UiCacheService())->invalidateAll();
         $this->jsonSuccess();
     }
 
@@ -43,7 +51,6 @@ final class ChannelController extends BaseController
         $enable = (bool) ((int) ($input['is_enabled'] ?? 1));
         $ids = is_array($input['ids'] ?? null) ? array_map('intval', $input['ids']) : [];
         (new GroupRepository())->bulkSetEnabled($enable, $ids);
-        (new UiCacheService())->invalidateAll();
         $this->jsonSuccess();
     }
 
@@ -59,16 +66,6 @@ final class ChannelController extends BaseController
         $limit = min(200, max(10, (int) ($_GET['limit'] ?? 100)));
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
 
-        $isCacheable = $groupId !== null && $search === '' && $epgStatus === '' && !$activeOnly && $countryTagId === '' && $status === 'all' && $offset === 0;
-        $cache = new UiCacheService();
-        if ($isCacheable) {
-            $cached = $cache->getGroupChannels($groupId);
-            if ($cached !== null) {
-                $this->jsonSuccess($cached);
-                return;
-            }
-        }
-
         $res = (new ChannelRepository())->filter($groupId, $search, $epgStatus, $activeOnly, $limit, $offset, $countryTagId, $status);
         $emojiService = new EmojiTagService();
         $emojiService->seedDefaultsIfEmpty();
@@ -76,16 +73,12 @@ final class ChannelController extends BaseController
         if (isset($res['items']) && is_array($res['items'])) {
             foreach ($res['items'] as &$ch) {
                 $rawCh = (string) (($ch['custom_name'] ?? '') !== '' ? $ch['custom_name'] : ($ch['tvg_name'] ?? ''));
-                $ch['display_name'] = $emojiService->parseName($rawCh, false)['display_name'];
+                $ch['display_name'] = $emojiService->format($rawCh, false);
                 if (isset($ch['group_name']) && (string) $ch['group_name'] !== '') {
-                    $ch['group_display_name'] = $emojiService->parseName((string) $ch['group_name'], true)['display_name'];
+                    $ch['group_display_name'] = $emojiService->format((string) $ch['group_name'], true);
                 }
             }
             unset($ch);
-        }
-
-        if ($isCacheable) {
-            $cache->saveGroupChannels($groupId, $res);
         }
 
         $this->jsonSuccess($res);
@@ -99,7 +92,6 @@ final class ChannelController extends BaseController
 
         $id = (int) ($input['id'] ?? 0);
         (new ChannelRepository())->updateChannel($id, $input);
-        (new UiCacheService())->invalidateAll();
         $this->jsonSuccess();
     }
 
@@ -112,7 +104,6 @@ final class ChannelController extends BaseController
         $enable = (bool) ((int) ($input['is_enabled'] ?? 1));
         $ids = is_array($input['ids'] ?? null) ? array_map('intval', $input['ids']) : [];
         (new ChannelRepository())->bulkSetEnabled($enable, $ids);
-        (new UiCacheService())->invalidateAll();
         $this->jsonSuccess();
     }
 

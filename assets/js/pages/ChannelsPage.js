@@ -93,7 +93,6 @@ export class ChannelsPage extends BaseComponent {
                                     <th title="Selecteer/deselecteer alle zichtbare kanalen voor bulkacties" style="white-space:nowrap;">
                                         <label style="display:inline-flex;align-items:center;gap:0.25rem;cursor:pointer;">
                                             <input type="checkbox" id="selectAllChannels" title="Selecteer/deselecteer alle zichtbare kanalen voor bulkacties">
-                                            <span style="font-size:0.8rem;">☑️</span>
                                         </label>
                                     </th>
                                     <th>Aan</th>
@@ -155,7 +154,6 @@ export class ChannelsPage extends BaseComponent {
                 if (cb) cb.checked = ev.target.checked;
                 tr.classList.toggle('row-selected', ev.target.checked);
             });
-            this.updateBulkButtons(this.channelTable?.getSelectedIds().length || 0);
         });
 
         const bulkChannels = async enable => {
