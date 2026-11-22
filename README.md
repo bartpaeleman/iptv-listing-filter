@@ -4,8 +4,8 @@ Modulaire, objectgeoriënteerde IPTV & EPG Manager zonder externe dependencies, 
 
 ## Installatie
 1. Plaats de bestanden in je webroot (bijv. `/share/Web/iptv`).
-2. Zorg dat je webserver naar `public/` wijst (of open `http://<nas-ip>/iptv/public/install.php`).
-3. Doorloop de 4-staps **Web Installer** (`public/install.php`):
+2. Zorg dat je webserver naar de projectroot wijst (`index.php` + `.htaccess`).
+3. Open `http://<nas-ip>/iptv/index.php?route=install` en doorloop de 4-staps **Web Installer**:
    - **Systeemcontrole:** PHP >= 8.2, `pdo_mysql`, `xmlreader`, `curl`, `openssl`, schrijfrechten.
    - **Database & Secrets:** Maakt `.env` aan met een 64-char hex `APP_KEY` en importeert `database/schema.sql`.
    - **Admin Account:** Maakt de eerste beheerder aan.
@@ -22,12 +22,12 @@ Voeg een uurlijkse cronjob toe in `/etc/config/crontab` (en herlaad met `crontab
 0 * * * * /opt/bin/php /share/Web/iptv/bin/sync.php >/dev/null 2>&1
 
 # Optie C: HTTP Fallback via curl
-0 * * * * curl -s "http://127.0.0.1/iptv/public/api.php?action=cron&token=JOUW_TOKEN" >/dev/null 2>&1
+0 * * * * curl -s "http://127.0.0.1/iptv/index.php?route=cron&token=JOUW_TOKEN" >/dev/null 2>&1
 ```
 
 ## LAN Client URLs (TiviMate / Kodi / VLC)
-- **M3U Playlist:** `http://<nas-ip>/iptv/public/playlist.php?token=<OUTPUT_TOKEN>`
-- **XMLTV EPG:** `http://<nas-ip>/iptv/public/epg.php?token=<OUTPUT_TOKEN>`
+- **M3U Playlist:** `http://<nas-ip>/iptv/index.php?route=playlist&token=<OUTPUT_TOKEN>`
+- **XMLTV EPG:** `http://<nas-ip>/iptv/index.php?route=epg&token=<OUTPUT_TOKEN>`
 
 ## Ontwikkeling & Updatebeleid
 - Zie [`AGENTS.md`](AGENTS.md) voor de architectuurcontracten, security-standaarden en code-richtlijnen.

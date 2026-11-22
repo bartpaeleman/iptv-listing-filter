@@ -8,8 +8,9 @@ Dit document bevat de bindende regels voor alle AI-agents en ontwikkelaars die a
 - **Streaming-first principe:** Verwerk grote M3U- en XMLTV-bestanden (`tvguide.xml`) altijd regel-voor-regel (`fgets`) of via `XMLReader`. Laad nooit volledige remote bestanden in het RAM-geheugen.
 
 ## 2. Architectuur & OOP-Standaarden
-- **Strikte scheiding van verantwoordelijkheden in `src/`:** `Config/`, `Database/`, `Security/`, `Services/`, `Repositories/`, `Controllers/`.
-- **Dunne entrypoints:** Houd `public/index.php`, `public/api.php`, `public/playlist.php`, `public/epg.php` en `public/install.php` dun; delegeer alle bedrijfslogica naar Services en Repositories.
+- **Root-isolatie:** Enkel `index.php` fungeert als publiek startpunt in de projectroot (`?route=dashboard|install|playlist|epg|cron|api`). Interne mappen (`app/`, `database/`, `storage/`, `bin/`, `views/`) zijn afgeschermd via `.htaccess`.
+- **Strikte scheiding van verantwoordelijkheden in `app/`:** `Core/`, `Security/`, `Repositories/`, `Services/`, `Controllers/`.
+- **Frontend modulariteit in `assets/js/`:** `core/`, `components/`, `pages/`, `App.js` (ES6 modules, geen build-steps).
 - **Code-stijl:** PSR-12 naamgeving, expliciete type-hints op alle parameters en return-types, maximaal 1 class per bestand.
 
 ## 3. Security & Secrets Management (OWASP Top 10:2025)

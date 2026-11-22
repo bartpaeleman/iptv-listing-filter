@@ -8,12 +8,22 @@ if (PHP_SAPI !== 'cli') {
     exit(1);
 }
 
-require_once dirname(__DIR__) . '/src/autoload.php';
+spl_autoload_register(static function (string $class): void {
+    $prefix = 'App\\';
+    $baseDir = dirname(__DIR__) . '/app/';
+    if (strncmp($prefix, $class, strlen($prefix)) !== 0) {
+        return;
+    }
+    $file = $baseDir . str_replace('\\', '/', substr($class, strlen($prefix))) . '.php';
+    if (is_file($file)) {
+        require_once $file;
+    }
+});
 
-use App\Config\EnvLoader;
+use App\Core\EnvLoader;
 use App\Services\SchedulerService;
 
-EnvLoader::load();
+EnvLoader::load(dirname(__DIR__) . '/.env');
 
 $force = in_array('--force', $argv, true);
 $mode = 'all';
@@ -24,8 +34,7 @@ if (in_array('--m3u', $argv, true)) {
 }
 
 try {
-    $scheduler = new SchedulerService();
-    $result = $scheduler->run($force, $mode);
+    $result = (new SchedulerService())->run($force, $mode);
     echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
     exit(0);
 } catch (\Throwable $e) {
