@@ -137,6 +137,17 @@ final class InstallerService
     }
 
     /**
+     * Backward-compatible wrapper delegating to provisionDatabaseAndUser().
+     *
+     * @param array<string, mixed> $config
+     * @return array{app_user: string, db_name: string}
+     */
+    public function setupDatabaseAndEnv(array $config): array
+    {
+        return $this->provisionDatabaseAndUser($config);
+    }
+
+    /**
      * @param array{
      *   db_host: string,
      *   db_port: string,
