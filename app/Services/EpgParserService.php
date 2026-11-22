@@ -27,8 +27,38 @@ final class EpgParserService
     /**
      * @return array{epg_channels: int, programmes_imported: int, programmes_pruned: int, sources_ok: int, sources_failed: int}
      */
-    public function sync(?string $overrideUrl = null): array
+    public function sync(?string $overrideUrl = null, string $cacheMode = 'auto'): array
     {
+        $cache = new FeedCacheService($this->settings);
+        $cacheInfo = $cache->getCacheInfo('epg');
+
+        if ($cacheMode === 'cache_only') {
+            if (!$cacheInfo['exists']) {
+                throw new RuntimeException('Geen lokaal EPG cachebestand gevonden. Voer eerst een nieuwe download uit.');
+            }
+            $stats = $this->parseXmlFile($cacheInfo['path']);
+            $this->settings->set('last_epg_sync', gmdate('Y-m-d H:i:s'), false);
+            return [
+                'epg_channels' => $stats['epg_channels'],
+                'programmes_imported' => $stats['programmes_imported'],
+                'programmes_pruned' => $stats['programmes_pruned'],
+                'sources_ok' => 1,
+                'sources_failed' => 0,
+            ];
+        }
+
+        if ($cacheMode === 'auto' && $cacheInfo['is_fresh'] && $overrideUrl === null) {
+            $stats = $this->parseXmlFile($cacheInfo['path']);
+            $this->settings->set('last_epg_sync', gmdate('Y-m-d H:i:s'), false);
+            return [
+                'epg_channels' => $stats['epg_channels'],
+                'programmes_imported' => $stats['programmes_imported'],
+                'programmes_pruned' => $stats['programmes_pruned'],
+                'sources_ok' => 1,
+                'sources_failed' => 0,
+            ];
+        }
+
         $sourceRepo = new \App\Repositories\EpgSourceRepository($this->pdo);
         $sources = [];
 
@@ -61,7 +91,10 @@ final class EpgParserService
         foreach ($sources as $src) {
             $srcId = (int) ($src['id'] ?? 0);
             try {
-                $stats = $this->syncSingleUrl((string) $src['url']);
+                $tmpFile = dirname(__DIR__, 2) . '/storage/cache/epg_source.xml.tmp';
+                $this->http->downloadToFile((string) $src['url'], $tmpFile, 300, true);
+                $cachedFile = $cache->storeFromTempFile('epg', $tmpFile);
+                $stats = $this->parseXmlFile($cachedFile);
                 $totalChannels += $stats['epg_channels'];
                 $totalProgs += $stats['programmes_imported'];
                 $totalPruned += $stats['programmes_pruned'];
@@ -93,14 +126,10 @@ final class EpgParserService
     /**
      * @return array{epg_channels: int, programmes_imported: int, programmes_pruned: int}
      */
-    private function syncSingleUrl(string $url): array
+    private function parseXmlFile(string $tmpFile): array
     {
-        $tmpFile = dirname(__DIR__, 2) . '/storage/cache/epg_source.xml';
-        $this->http->downloadToFile($url, $tmpFile, 300, true);
-
         $reader = new XMLReader();
         if (!$reader->open($tmpFile, null, LIBXML_NONET | LIBXML_COMPACT)) {
-            @unlink($tmpFile);
             throw new RuntimeException('Kan EPG XML niet openen met XMLReader.');
         }
 
@@ -194,12 +223,10 @@ final class EpgParserService
                 $this->pdo->rollBack();
             }
             $reader->close();
-            @unlink($tmpFile);
             throw $e;
         }
 
         $reader->close();
-        @unlink($tmpFile);
         $this->settings->set('last_epg_sync', gmdate('Y-m-d H:i:s'), false);
 
         return [

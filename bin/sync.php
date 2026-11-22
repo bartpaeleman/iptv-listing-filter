@@ -26,6 +26,7 @@ use App\Services\SchedulerService;
 EnvLoader::load(dirname(__DIR__) . '/.env');
 
 $force = in_array('--force', $argv, true);
+$cacheMode = in_array('--use-cache', $argv, true) ? 'cache_only' : 'force_download';
 $mode = 'all';
 if (in_array('--m3u', $argv, true)) {
     $mode = 'm3u';
@@ -34,7 +35,7 @@ if (in_array('--m3u', $argv, true)) {
 }
 
 try {
-    $result = (new SchedulerService())->run($force, $mode);
+    $result = (new SchedulerService())->run($force, $mode, $cacheMode);
     echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
     exit(0);
 } catch (\Throwable $e) {

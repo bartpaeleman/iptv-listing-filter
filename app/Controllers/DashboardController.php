@@ -32,6 +32,8 @@ final class DashboardController extends BaseController
         )->fetchColumn();
         $epgChannelsCount = (int) $pdo->query('SELECT COUNT(*) FROM epg_channels')->fetchColumn();
 
+        $cache = new \App\Services\FeedCacheService($settings);
+
         $this->jsonSuccess([
             'active_channels' => $activeChannels,
             'total_channels' => $totalChannels,
@@ -46,6 +48,10 @@ final class DashboardController extends BaseController
             'output_token' => $settings->get('output_token', ''),
             'app_url' => rtrim((string) EnvLoader::get('APP_URL', ''), '/'),
             'logs' => $logs->recent(15),
+            'cache_status' => [
+                'm3u' => $cache->getCacheInfo('m3u'),
+                'epg' => $cache->getCacheInfo('epg'),
+            ],
         ]);
     }
 
@@ -56,12 +62,27 @@ final class DashboardController extends BaseController
         $this->verifyCsrf($input);
 
         $mode = in_array($input['mode'] ?? 'all', ['all', 'm3u', 'epg'], true) ? (string) $input['mode'] : 'all';
+        $cacheMode = in_array($input['cache_mode'] ?? 'force_download', ['auto', 'cache_only', 'force_download'], true)
+            ? (string) $input['cache_mode']
+            : 'force_download';
+
         try {
-            $res = (new SchedulerService())->run(true, $mode);
+            $res = (new SchedulerService())->run(true, $mode, $cacheMode);
             $this->jsonSuccess($res);
         } catch (\Throwable $e) {
             $this->jsonError($e->getMessage(), 500);
         }
+    }
+
+    public function clearCache(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $type = in_array($input['type'] ?? null, ['m3u', 'epg'], true) ? (string) $input['type'] : null;
+        (new \App\Services\FeedCacheService())->clearCache($type);
+        $this->jsonSuccess();
     }
 
     public function logout(): void

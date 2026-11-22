@@ -45,13 +45,20 @@ export class DashboardPage extends BaseComponent {
 
             <div class="card">
                 <div class="card-header">
-                    <h2>Synchronisatie</h2>
+                    <h2>Synchronisatie & Lokale Cache</h2>
                     <div class="btn-group">
-                        <button class="btn btn-primary" data-sync="all">🔄 Nu Alles Synchroniseren</button>
-                        <button class="btn" data-sync="m3u">Alleen M3U</button>
-                        <button class="btn" data-sync="epg">Alleen EPG</button>
+                        <button class="btn btn-primary" data-sync="all" data-cache-mode="force_download">🔄 Nieuwe download & import</button>
+                        <button class="btn" data-sync="all" data-cache-mode="cache_only" ${!(d.cache_status?.m3u?.exists || d.cache_status?.epg?.exists) ? 'disabled' : ''}>⚡ Herimporteer uit cache</button>
+                        <button class="btn" data-sync="m3u" data-cache-mode="force_download">Alleen M3U</button>
+                        <button class="btn" data-sync="epg" data-cache-mode="force_download">Alleen EPG</button>
+                        <button class="btn" id="clearCacheBtn">🗑️ Cache legen</button>
                     </div>
                 </div>
+                <p class="muted" style="font-size:0.85rem;margin:0 0 0.5rem 0;">
+                    Lokale M3U cache: ${d.cache_status?.m3u?.exists ? `${this.escapeHtml(d.cache_status.m3u.size_formatted)} — ${d.cache_status.m3u.age_minutes} min geleden` : 'Geen'}
+                    &nbsp;|&nbsp;
+                    Lokale EPG cache: ${d.cache_status?.epg?.exists ? `${this.escapeHtml(d.cache_status.epg.size_formatted)} — ${d.cache_status.epg.age_minutes} min geleden` : 'Geen'}
+                </p>
                 <div id="syncStatusBanner" class="sync-banner hidden"></div>
             </div>
 
@@ -113,13 +120,24 @@ export class DashboardPage extends BaseComponent {
                     banner.classList.remove('hidden');
                 }
                 try {
-                    await this.props.api.post('sync', { mode: btn.dataset.sync });
+                    await this.props.api.post('sync', {
+                        mode: btn.dataset.sync,
+                        cache_mode: btn.dataset.cacheMode || 'force_download',
+                    });
                     this.props.toast.show('Synchronisatie voltooid!');
                     await this.load();
                 } catch (e) {
-                    if (banner) banner.textContent = `✗ Fout: ${e.message}`;
+                    if (banner) {
+                        banner.textContent = `✗ Fout: ${e.message} (Tip: reeds gedownloade bestanden blijven bewaard in storage/cache/ voor herimport.)`;
+                    }
                 }
             });
+        });
+
+        document.getElementById('clearCacheBtn')?.addEventListener('click', async () => {
+            await this.props.api.post('clear_cache');
+            this.props.toast.show('Lokale cache geleegd!');
+            await this.load();
         });
     }
 }

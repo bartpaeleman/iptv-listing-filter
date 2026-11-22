@@ -109,6 +109,7 @@ INSERT IGNORE INTO `settings` (`setting_key`, `setting_value`, `is_encrypted`) V
     ('epg_source_url', '', 1),
     ('sync_interval_hours', '72', 0),
     ('sync_preferred_hour', '3', 0),
+    ('cache_ttl_minutes', '360', 0),
     ('last_m3u_sync', '', 0),
     ('last_epg_sync', '', 0),
     ('output_token', '', 0),

@@ -19,7 +19,8 @@ INSERT IGNORE INTO `settings` (`setting_key`, `setting_value`, `is_encrypted`) V
     ('source_mode', 'xtream', 0),
     ('xtream_host', '', 0),
     ('xtream_username', '', 1),
-    ('xtream_password', '', 1);
+    ('xtream_password', '', 1),
+    ('cache_ttl_minutes', '360', 0);
 
 ALTER TABLE `channels`
     MODIFY COLUMN `tvg_id` VARCHAR(255) NULL,

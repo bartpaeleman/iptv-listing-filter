@@ -32,19 +32,31 @@ final class M3uParserService
     /**
      * @return array{groups_added: int, channels_added: int, channels_updated: int, auto_matched: int}
      */
-    public function sync(?string $overrideUrl = null): array
+    public function sync(?string $overrideUrl = null, string $cacheMode = 'auto'): array
     {
-        $url = $overrideUrl ?? (string) $this->settings->get('m3u_source_url', '');
-        if ($url === '') {
-            throw new RuntimeException('Geen M3U bron-URL geconfigureerd.');
+        $cache = new FeedCacheService($this->settings);
+        $cacheInfo = $cache->getCacheInfo('m3u');
+
+        if ($cacheMode === 'cache_only') {
+            if (!$cacheInfo['exists']) {
+                throw new RuntimeException('Geen lokaal M3U cachebestand gevonden. Voer eerst een nieuwe download uit.');
+            }
+            $sourceFile = $cacheInfo['path'];
+        } elseif ($cacheMode === 'auto' && $cacheInfo['is_fresh'] && $overrideUrl === null) {
+            $sourceFile = $cacheInfo['path'];
+        } else {
+            $url = $overrideUrl ?? (string) $this->settings->get('m3u_source_url', '');
+            if ($url === '') {
+                throw new RuntimeException('Geen M3U bron-URL geconfigureerd.');
+            }
+            $tmpFile = dirname(__DIR__, 2) . '/storage/cache/m3u_source.tmp';
+            $this->http->downloadToFile($url, $tmpFile, 180);
+            $sourceFile = $cache->storeFromTempFile('m3u', $tmpFile);
         }
 
-        $tmpFile = dirname(__DIR__, 2) . '/storage/cache/m3u_source.tmp';
-        $this->http->downloadToFile($url, $tmpFile, 180);
-
-        $handle = fopen($tmpFile, 'rb');
+        $handle = fopen($sourceFile, 'rb');
         if ($handle === false) {
-            throw new RuntimeException('Kan gedownloade M3U bestand niet openen.');
+            throw new RuntimeException('Kan M3U bestand niet openen.');
         }
 
         $groupCache = $this->loadGroupCache();
@@ -156,12 +168,10 @@ final class M3uParserService
                 $this->pdo->rollBack();
             }
             fclose($handle);
-            @unlink($tmpFile);
             throw $e;
         }
 
         fclose($handle);
-        @unlink($tmpFile);
         $this->settings->set('last_m3u_sync', $now, false);
 
         return [

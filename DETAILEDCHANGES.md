@@ -24,3 +24,6 @@
   - `XtreamUrlBuilder` genereert `m3u_plus` en `xmltv.php` URL's en detecteert Xtream-credentials uit geplakte `get.php` links.
   - `HttpClient` biedt expliciete DNS/HTTP-foutmeldingen en streaming `.gz` decompressie (`gzopen`/`gzread`).
   - `EpgParserService` itereert over actieve `epg_sources` op prioriteit met per-bron statuslogging.
+- **Lokale Bestandscaching (`FeedCacheService`, `M3uParserService`, `EpgParserService`, `DashboardController`, `DashboardPage.js`):**
+  - Atomische opslag in `storage/cache/latest_playlist.m3u` en `latest_epg.xml` met `.meta.json` en `cache_ttl_minutes`.
+  - Ondersteunt `auto`, `cache_only` en `force_download` modi via UI en `bin/sync.php --use-cache`.
