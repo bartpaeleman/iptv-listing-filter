@@ -57,6 +57,14 @@ final class ChannelRepository extends BaseRepository
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
+        $subOrder = match ($sortBy) {
+            'name_asc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
+            'name_desc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) DESC, c.id DESC",
+            'import' => 'c.id ASC',
+            default => '(c.channel_number IS NULL) ASC, c.channel_number ASC, c.id ASC',
+        };
+        $orderBy = "ORDER BY c.is_enabled DESC, {$subOrder}";
+
         $sql = "SELECT c.id, c.tvg_id, c.tvg_name, c.tvg_logo, c.group_id, c.custom_name,
                        c.channel_number, c.epg_channel_id, c.epg_match_type, c.is_enabled, c.sort_order,
                        COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS group_name,
@@ -65,7 +73,7 @@ final class ChannelRepository extends BaseRepository
                 INNER JOIN m3u_groups g ON g.id = c.group_id
                 LEFT JOIN epg_channels ec ON ec.epg_id = c.epg_channel_id
                 WHERE {$whereSql}
-                ORDER BY COALESCE(c.channel_number, 999999) ASC, c.sort_order ASC, c.id ASC
+                {$orderBy}
                 LIMIT {$limit} OFFSET {$offset}";
 
         $stmt = $this->pdo->prepare($sql);
@@ -116,15 +124,29 @@ final class ChannelRepository extends BaseRepository
     /**
      * @param array<int, int> $ids
      */
-    public function bulkSetEnabled(bool $enabled, array $ids): void
+    public function bulkSetEnabled(bool $enabled, array $ids = [], ?int $groupId = null, string $search = ''): void
     {
-        if ($ids === []) {
+        $val = $enabled ? 1 : 0;
+        if ($ids !== []) {
+            $cleanIds = array_map('intval', $ids);
+            $ph = implode(',', array_fill(0, count($cleanIds), '?'));
+            $stmt = $this->pdo->prepare("UPDATE channels SET is_enabled = ? WHERE id IN ({$ph})");
+            $stmt->execute(array_merge([$val], $cleanIds));
             return;
         }
-        $cleanIds = array_map('intval', $ids);
-        $ph = implode(',', array_fill(0, count($cleanIds), '?'));
-        $stmt = $this->pdo->prepare("UPDATE channels SET is_enabled = ? WHERE id IN ({$ph})");
-        $stmt->execute(array_merge([$enabled ? 1 : 0], $cleanIds));
+
+        $where = ['1=1'];
+        $params = [':val' => $val];
+        if ($groupId !== null) {
+            $where[] = 'group_id = :gid';
+            $params[':gid'] = $groupId;
+        }
+        if ($search !== '') {
+            $where[] = '(tvg_name LIKE :q OR custom_name LIKE :q OR tvg_id LIKE :q)';
+            $params[':q'] = '%' . $search . '%';
+        }
+        $stmt = $this->pdo->prepare('UPDATE channels SET is_enabled = :val WHERE ' . implode(' AND ', $where));
+        $stmt->execute($params);
     }
 
     /**
@@ -145,7 +167,7 @@ final class ChannelRepository extends BaseRepository
 
             $listStmt = $this->pdo->prepare(
                 'SELECT id FROM channels
-                 WHERE group_id = :gid
+                 WHERE group_id = :gid AND is_enabled = 1
                  ORDER BY (channel_number IS NULL) ASC, channel_number ASC, sort_order ASC, id ASC'
             );
             $listStmt->execute([':gid' => $groupId]);

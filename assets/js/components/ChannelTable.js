@@ -31,16 +31,11 @@ export class ChannelTable extends BaseComponent {
         }).join('');
 
         this.bindEvents();
-        this.props.onSelectionChange?.(0);
     }
 
     bindEvents() {
         this.container.querySelectorAll('tr').forEach(tr => {
             const id = Number(tr.dataset.cid);
-            tr.querySelector('.ch-select')?.addEventListener('change', ev => {
-                tr.classList.toggle('row-selected', ev.target.checked);
-                this.props.onSelectionChange?.(this.getSelectedIds().length);
-            });
             tr.querySelector('.ch-enable')?.addEventListener('change', ev => {
                 this.props.onUpdate?.(id, { is_enabled: ev.target.checked ? 1 : 0 });
             });
@@ -51,11 +46,5 @@ export class ChannelTable extends BaseComponent {
                 this.props.onUpdate?.(id, { custom_name: ev.target.value });
             });
         });
-    }
-
-    getSelectedIds() {
-        return Array.from(this.container.querySelectorAll('tr'))
-            .filter(tr => tr.querySelector('.ch-select')?.checked)
-            .map(tr => Number(tr.dataset.cid));
     }
 }

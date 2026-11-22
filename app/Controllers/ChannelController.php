@@ -65,7 +65,7 @@ final class ChannelController extends BaseController
         $status = (string) ($_GET['status'] ?? 'all');
         $limit = min(200, max(10, (int) ($_GET['limit'] ?? 100)));
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
-        $sortBy = in_array($_GET['sort_by'] ?? 'number', ['number', 'name'], true) ? (string) $_GET['sort_by'] : 'number';
+        $sortBy = in_array($_GET['sort_by'] ?? 'number', ['number', 'name_asc', 'name_desc', 'import'], true) ? (string) $_GET['sort_by'] : 'number';
 
         $res = (new ChannelRepository())->filter($groupId, $search, $epgStatus, $activeOnly, $limit, $offset, $countryTagId, $status, $sortBy);
         $emojiService = new EmojiTagService();
@@ -127,7 +127,10 @@ final class ChannelController extends BaseController
 
         $enable = (bool) ((int) ($input['is_enabled'] ?? 1));
         $ids = is_array($input['ids'] ?? null) ? array_map('intval', $input['ids']) : [];
-        (new ChannelRepository())->bulkSetEnabled($enable, $ids);
+        $groupId = isset($input['group_id']) && $input['group_id'] !== '' && $input['group_id'] !== null ? (int) $input['group_id'] : null;
+        $search = trim((string) ($input['search'] ?? ''));
+
+        (new ChannelRepository())->bulkSetEnabled($enable, $ids, $groupId, $search);
         $this->jsonSuccess();
     }
 

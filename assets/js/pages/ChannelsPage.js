@@ -84,8 +84,8 @@ export class ChannelsPage extends BaseComponent {
                             <button type="button" class="btn btn-sm hidden" id="adoptGroupNameBtn" title="Huidige weergavenaam (incl. vlag/emoji) opslaan als custom naam">❐</button>
                             <button type="button" class="btn btn-sm hidden" id="editGroupNameBtn" title="Groepsnaam aanpassen">✏️</button>
                             <button class="btn btn-sm" id="manageCountryTagsBtn">🏷️ Landen & Tags Beheren</button>
-                            <button class="btn btn-sm" id="bulkEnableChannelsBtn">Selectie Aan</button>
-                            <button class="btn btn-sm" id="bulkDisableChannelsBtn">Selectie Uit</button>
+                            <button class="btn btn-sm" id="bulkEnableChannelsBtn">Alles Aan</button>
+                            <button class="btn btn-sm" id="bulkDisableChannelsBtn">Alles Uit</button>
                         </div>
                     </div>
                     <div class="toolbar" style="flex-wrap:wrap;">
@@ -106,14 +106,9 @@ export class ChannelsPage extends BaseComponent {
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th title="Selecteer/deselecteer alle zichtbare kanalen voor bulkacties" style="white-space:nowrap;">
-                                        <label style="display:inline-flex;align-items:center;gap:0.25rem;cursor:pointer;">
-                                            <input type="checkbox" id="selectAllChannels" title="Selecteer/deselecteer alle zichtbare kanalen voor bulkacties">
-                                        </label>
-                                    </th>
                                     <th>Aan</th>
                                     <th id="sortChannelsByNum" style="cursor:pointer;user-select:none;" title="Sorteer op kanaalnummer">#</th>
-                                    <th id="sortChannelsByName" style="cursor:pointer;user-select:none;" title="Sorteer alfabetisch op kanaalnaam">Naam (Origineel / Custom)</th>
+                                    <th id="sortChannelsByName" style="cursor:pointer;user-select:none;" title="Klik om te sorteren: A-Z / Z-A / Import">Naam (Origineel / Custom) <span id="channelNameSortBadge" class="muted" style="font-size:0.8rem;font-weight:normal;"></span></th>
                                     <th>Groep</th>
                                 </tr>
                             </thead>
@@ -170,18 +165,13 @@ export class ChannelsPage extends BaseComponent {
             this.load();
         });
 
-        document.getElementById('selectAllChannels')?.addEventListener('change', ev => {
-            document.querySelectorAll('#channelsTableRoot tr').forEach(tr => {
-                const cb = tr.querySelector('.ch-select');
-                if (cb) cb.checked = ev.target.checked;
-                tr.classList.toggle('row-selected', ev.target.checked);
-            });
-        });
-
         const bulkChannels = async enable => {
-            const ids = this.channelTable.getSelectedIds();
-            if (ids.length === 0) return this.props.toast.show('Selecteer eerst kanalen.');
-            await this.props.api.post('bulk_channels', { ids, is_enabled: enable ? 1 : 0 });
+            await this.props.api.post('bulk_channels', {
+                is_enabled: enable ? 1 : 0,
+                group_id: this.selectedGroupId,
+                search: this.channelSearch,
+            });
+            this.props.toast.show(enable ? 'Alle kanalen ingeschakeld' : 'Alle kanalen uitgeschakeld');
             this.loadChannels();
         };
         document.getElementById('bulkEnableChannelsBtn')?.addEventListener('click', () => bulkChannels(true));
@@ -256,11 +246,20 @@ export class ChannelsPage extends BaseComponent {
 
         document.getElementById('sortChannelsByNum')?.addEventListener('click', () => {
             this.channelSortBy = 'number';
+            const badge = document.getElementById('channelNameSortBadge');
+            if (badge) badge.textContent = '';
             this.loadChannels();
         });
 
         document.getElementById('sortChannelsByName')?.addEventListener('click', () => {
-            this.channelSortBy = 'name';
+            const order = ['name_asc', 'name_desc', 'import'];
+            const idx = order.indexOf(this.channelSortBy);
+            this.channelSortBy = order[(idx + 1) % order.length];
+            const badge = document.getElementById('channelNameSortBadge');
+            if (badge) {
+                const labels = { name_asc: '↑', name_desc: '↓', import: '⇅' };
+                badge.textContent = labels[this.channelSortBy] || '';
+            }
             this.loadChannels();
         });
     }
