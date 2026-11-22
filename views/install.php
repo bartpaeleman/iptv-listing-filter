@@ -60,7 +60,7 @@ ob_start();
                 <a href="index.php?route=install&step=2" id="nextStepBtn" class="btn btn-primary <?= $allChecksOk ? '' : 'hidden' ?>" style="flex:1;justify-content:center;">Volgende stap →</a>
             </div>
             <p id="prereqErrorHint" class="muted <?= $allChecksOk ? 'hidden' : '' ?>" style="color:var(--danger);margin-top:0.75rem;">Los bovenstaande fouten op en klik op "Opnieuw controleren".</p>
-            <script type="module" src="assets/js/pages/InstallerPage.js"></script>
+            <script type="module" src="assets/js/pages/InstallerPage.js?v=<?= (int) @filemtime(dirname(__DIR__) . '/assets/js/pages/InstallerPage.js') ?>"></script>
 
         <?php elseif ($step === 2): ?>
             <form method="post" action="index.php?route=install&step=2" class="stack-form">
@@ -106,7 +106,7 @@ ob_start();
                     <button type="submit" class="btn btn-primary">Database Provisionen & .env Opslaan →</button>
                 </div>
             </form>
-            <script type="module" src="assets/js/pages/InstallerPage.js"></script>
+            <script type="module" src="assets/js/pages/InstallerPage.js?v=<?= (int) @filemtime(dirname(__DIR__) . '/assets/js/pages/InstallerPage.js') ?>"></script>
 
         <?php elseif ($step === 3): ?>
             <form method="post" action="index.php?route=install&step=3" class="stack-form">

@@ -31,7 +31,7 @@ ob_start();
 
 <div id="modalRoot"></div>
 <div id="toastRoot" class="toast hidden"></div>
-<script type="module" src="assets/js/App.js"></script>
+<script type="module" src="assets/js/App.js?v=<?= (int) @filemtime(dirname(__DIR__) . '/assets/js/App.js') ?>"></script>
 <?php
 $content = ob_get_clean();
 $pageTitle = 'IPTV & EPG Manager';

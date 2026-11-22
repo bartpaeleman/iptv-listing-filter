@@ -19,6 +19,7 @@
 - Cross-device cache-opslag in `FeedCacheService` verhard (`clearstatcache`, `rename` -> `copy`+`unlink` fallback en 0-byte validatie).
 - Runtime `MEDIUMTEXT` kolom-check (`SchemaMigrator::ensureSchemaUpToDate()`) vóór elke M3U/EPG-sync + harde pre-insert `iconv`/lengte-guard op `tvg_logo` en `VARCHAR(255)` velden.
 - Safari/WebKit `"The string did not match the expected pattern"` fout opgelost via `URL` + `URLSearchParams` en two-step JSON parsing in `ApiClient.js`, plus `ob_clean()` guard in `BaseController`.
+- Automatische `filemtime` cache-busting toegevoegd op CSS/JS assets in `views/layout.php`, `views/dashboard.php` en `views/install.php` voor iPad Safari, plus endpoint/URL-diagnostiek in `ApiClient.js`.
 
 ## [1.0.0] - 2026-11-22
 ### Toegevoegd

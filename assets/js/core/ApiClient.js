@@ -5,7 +5,10 @@ export class ApiClient {
     }
 
     buildUrl(endpoint, params = {}) {
-        const url = new URL('index.php', window.location.href);
+        const path = window.location.pathname.endsWith('/')
+            ? window.location.pathname + 'index.php'
+            : window.location.pathname;
+        const url = new URL(window.location.origin + path);
         url.searchParams.set('route', 'api');
         url.searchParams.set('endpoint', String(endpoint));
         for (const [k, v] of Object.entries(params)) {
@@ -16,13 +19,13 @@ export class ApiClient {
         return url.toString();
     }
 
-    async parseResponse(res) {
+    async parseResponse(res, endpoint, requestUrl) {
         const rawText = await res.text();
         let json;
         try {
             json = rawText ? JSON.parse(rawText) : {};
         } catch {
-            throw new Error('Ongeldig serverantwoord (geen JSON): ' + rawText.slice(0, 180));
+            throw new Error(`Ongeldig serverantwoord (${endpoint} -> ${requestUrl}): ${rawText.slice(0, 180)}`);
         }
         if (!json.ok) {
             const msg = json.error || `API fout (HTTP ${res.status})`;
@@ -33,19 +36,29 @@ export class ApiClient {
     }
 
     async get(endpoint, params = {}) {
-        const res = await fetch(this.buildUrl(endpoint, params));
-        return this.parseResponse(res);
+        const requestUrl = this.buildUrl(endpoint, params);
+        try {
+            const res = await fetch(requestUrl);
+            return await this.parseResponse(res, endpoint, requestUrl);
+        } catch (err) {
+            throw new Error(`${endpoint} (${requestUrl}): ${err.message}`);
+        }
     }
 
     async post(endpoint, body = {}) {
-        const res = await fetch(this.buildUrl(endpoint), {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': this.csrfToken,
-            },
-            body: JSON.stringify(body),
-        });
-        return this.parseResponse(res);
+        const requestUrl = this.buildUrl(endpoint);
+        try {
+            const res = await fetch(requestUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': this.csrfToken,
+                },
+                body: JSON.stringify(body),
+            });
+            return await this.parseResponse(res, endpoint, requestUrl);
+        } catch (err) {
+            throw new Error(`${endpoint} (${requestUrl}): ${err.message}`);
+        }
     }
 }
