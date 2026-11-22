@@ -31,6 +31,7 @@ final class SettingsController extends BaseController
 
         $xtreamUser = (string) $settings->get('xtream_username', '');
         $xtreamPass = (string) $settings->get('xtream_password', '');
+        $xtreamCustomEpg = (string) $settings->get('xtream_custom_epg_url', '');
 
         $this->jsonSuccess([
             'source_mode' => $settings->get('source_mode', 'xtream'),
@@ -38,6 +39,8 @@ final class SettingsController extends BaseController
             'xtream_username_masked' => $xtreamUser !== '' ? substr($xtreamUser, 0, 3) . '••••' : '',
             'xtream_password_set' => $xtreamPass !== '',
             'xtream_output_params' => $settings->get('xtream_output_params', 'type=m3u_plus&output=ts'),
+            'xtream_epg_mode' => $settings->get('xtream_epg_mode', 'xtream_xmltv'),
+            'xtream_custom_epg_url_masked' => $xtreamCustomEpg !== '' ? substr($xtreamCustomEpg, 0, 36) . (strlen($xtreamCustomEpg) > 36 ? '••••' : '') : '',
             'm3u_source_url_masked' => $m3u !== '' ? substr($m3u, 0, 28) . '••••••' : '',
             'epg_source_url_masked' => $epg !== '' ? substr($epg, 0, 36) . (strlen($epg) > 36 ? '••••' : '') : '',
             'sync_interval_hours' => (int) $settings->get('sync_interval_hours', '72'),
@@ -86,7 +89,25 @@ final class SettingsController extends BaseController
             $settings->set('xtream_output_params', $outputParams, false);
 
             $m3uUrl = \App\Services\XtreamUrlBuilder::buildM3uPlusUrl($host, $username, $password, $outputParams);
-            $epgUrl = \App\Services\XtreamUrlBuilder::buildXmltvUrl($host, $username, $password);
+            $epgMode = in_array($input['xtream_epg_mode'] ?? '', ['xtream_xmltv', 'custom_url'], true)
+                ? (string) $input['xtream_epg_mode']
+                : (string) $settings->get('xtream_epg_mode', 'xtream_xmltv');
+            $settings->set('xtream_epg_mode', $epgMode, false);
+
+            if ($epgMode === 'custom_url') {
+                $customEpg = trim((string) ($input['xtream_custom_epg_url'] ?? ''));
+                if ($customEpg === '') {
+                    $customEpg = (string) $settings->get('xtream_custom_epg_url', '');
+                }
+                if ($customEpg === '' || !filter_var($customEpg, FILTER_VALIDATE_URL)) {
+                    $this->jsonError('Vul een geldige aangepaste EPG URL in.', 400);
+                }
+                $settings->set('xtream_custom_epg_url', $customEpg, true);
+                $epgUrl = $customEpg;
+            } else {
+                $epgUrl = \App\Services\XtreamUrlBuilder::buildXmltvUrl($host, $username, $password);
+            }
+
             $settings->set('m3u_source_url', $m3uUrl, true);
             $settings->set('epg_source_url', $epgUrl, true);
         } else {

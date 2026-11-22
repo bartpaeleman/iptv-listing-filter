@@ -128,41 +128,7 @@ export class DashboardPage extends BaseComponent {
 
         this.container.querySelectorAll('[data-sync]').forEach(btn => {
             btn.addEventListener('click', async () => {
-                const panel = document.getElementById('sync-progress-panel');
-                const msgEl = document.getElementById('syncProgressMsg');
-                const pctEl = document.getElementById('syncProgressPercent');
-                const etaEl = document.getElementById('syncProgressEta');
-                const fillEl = document.getElementById('syncProgressFill');
-                const consoleEl = document.getElementById('syncLiveConsole');
-                const banner = document.getElementById('syncStatusBanner');
-                panel?.classList.remove('hidden');
-                banner?.classList.add('hidden');
-                if (fillEl) fillEl.style.width = '5%';
-                if (pctEl) pctEl.textContent = '5%';
-                if (etaEl) etaEl.textContent = 'ETA: berekenen...';
-
-                const formatEta = (secs) => {
-                    if (secs === null || secs === undefined) return 'ETA: berekenen...';
-                    if (secs < 60) return `ETA: ~${secs}s`;
-                    const mins = Math.floor(secs / 60);
-                    const rem = secs % 60;
-                    return `ETA: ~${mins}m ${rem}s`;
-                };
-
-                const poller = setInterval(async () => {
-                    try {
-                        const st = await this.props.api.get('sync_status');
-                        const p = st.progress || {};
-                        const pct = Number(p.percent || 0);
-                        if (msgEl) msgEl.textContent = p.message || 'Bezig...';
-                        if (pctEl) pctEl.textContent = `${pct}%`;
-                        if (etaEl) etaEl.textContent = pct >= 100 ? 'Voltooid' : formatEta(p.eta_seconds);
-                        if (fillEl) fillEl.style.width = `${pct}%`;
-                        if (consoleEl) consoleEl.textContent = (p.live_lines || []).join('\n');
-                        if (st.logs) this.renderSyncLogs(st.logs);
-                    } catch { /* ignore transient poll errors */ }
-                }, 800);
-
+                this.startProgressPolling();
                 try {
                     await this.props.api.post('sync', {
                         mode: btn.dataset.sync,
@@ -171,12 +137,13 @@ export class DashboardPage extends BaseComponent {
                     this.props.toast.show('Synchronisatie voltooid!');
                     await this.load();
                 } catch (e) {
+                    const banner = document.getElementById('syncStatusBanner');
                     if (banner) {
                         banner.textContent = `✗ Fout: ${e.message} (Tip: reeds gedownloade bestanden blijven bewaard in storage/cache/ voor herimport.)`;
                         banner.classList.remove('hidden');
                     }
                 } finally {
-                    clearInterval(poller);
+                    this.stopProgressPolling();
                 }
             });
         });
@@ -191,6 +158,60 @@ export class DashboardPage extends BaseComponent {
             this.renderSyncLogs([]);
             this.props.toast.show(res?.message || 'Sync log is leeggemaakt');
         });
+    }
+
+    startProgressPolling(initialProgress = null) {
+        this.stopProgressPolling();
+        const panel = document.getElementById('sync-progress-panel');
+        const banner = document.getElementById('syncStatusBanner');
+        panel?.classList.remove('hidden');
+        banner?.classList.add('hidden');
+
+        const formatEta = (secs) => {
+            if (secs === null || secs === undefined) return 'ETA: berekenen...';
+            if (secs < 60) return `ETA: ~${secs}s`;
+            const mins = Math.floor(secs / 60);
+            const rem = secs % 60;
+            return `ETA: ~${mins}m ${rem}s`;
+        };
+
+        const applyProgress = (p) => {
+            const msgEl = document.getElementById('syncProgressMsg');
+            const pctEl = document.getElementById('syncProgressPercent');
+            const etaEl = document.getElementById('syncProgressEta');
+            const fillEl = document.getElementById('syncProgressFill');
+            const consoleEl = document.getElementById('syncLiveConsole');
+            const pct = Number(p?.percent || 0);
+            if (msgEl) msgEl.textContent = p?.message || 'Bezig...';
+            if (pctEl) pctEl.textContent = `${pct}%`;
+            if (etaEl) etaEl.textContent = pct >= 100 ? 'Voltooid' : formatEta(p?.eta_seconds);
+            if (fillEl) fillEl.style.width = `${pct}%`;
+            if (consoleEl) consoleEl.textContent = (p?.live_lines || []).join('\n');
+        };
+
+        applyProgress(initialProgress || { percent: 5, message: 'Synchronisatie voorbereiden...' });
+
+        this.poller = setInterval(async () => {
+            try {
+                const st = await this.props.api.get('sync_status');
+                const p = st.progress || {};
+                applyProgress(p);
+                if (st.logs) this.renderSyncLogs(st.logs);
+                if (p.status === 'completed' || p.status === 'error' || p.status === 'idle') {
+                    this.stopProgressPolling();
+                    if (p.status === 'completed') {
+                        await this.load();
+                    }
+                }
+            } catch { /* ignore transient poll errors */ }
+        }, 800);
+    }
+
+    stopProgressPolling() {
+        if (this.poller) {
+            clearInterval(this.poller);
+            this.poller = null;
+        }
     }
 
     renderSyncLogs(logs) {

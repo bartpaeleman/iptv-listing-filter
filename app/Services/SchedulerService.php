@@ -104,7 +104,15 @@ final class SchedulerService
 
             if ($host !== '' && $user !== '' && $pass !== '') {
                 $this->settings->set('m3u_source_url', XtreamUrlBuilder::buildM3uPlusUrl($host, $user, $pass, $outputParams), true);
-                $this->settings->set('epg_source_url', XtreamUrlBuilder::buildXmltvUrl($host, $user, $pass), true);
+                $epgMode = (string) $this->settings->get('xtream_epg_mode', 'xtream_xmltv');
+                if ($epgMode === 'custom_url') {
+                    $customEpg = trim((string) $this->settings->get('xtream_custom_epg_url', ''));
+                    if ($customEpg !== '') {
+                        $this->settings->set('epg_source_url', $customEpg, true);
+                    }
+                } else {
+                    $this->settings->set('epg_source_url', XtreamUrlBuilder::buildXmltvUrl($host, $user, $pass), true);
+                }
                 return;
             }
 

@@ -61,6 +61,8 @@ final class DashboardController extends BaseController
         $input = $this->getJsonInput();
         $this->verifyCsrf($input);
         session_write_close();
+        ignore_user_abort(true);
+        set_time_limit(0);
 
         $mode = in_array($input['mode'] ?? 'all', ['all', 'm3u', 'epg'], true) ? (string) $input['mode'] : 'all';
         $cacheMode = in_array($input['cache_mode'] ?? 'force_download', ['auto', 'cache_only', 'force_download'], true)

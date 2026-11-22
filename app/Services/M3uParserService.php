@@ -77,11 +77,21 @@ final class M3uParserService
         $groupsAdded = 0;
         $channelsAdded = 0;
         $channelsUpdated = 0;
+        $channelsUnchanged = 0;
+        $channelsDeleted = 0;
         $autoMatched = 0;
         $now = gmdate('Y-m-d H:i:s');
+        $seenHashes = [];
+
+        $existingMap = [];
+        $existingRows = $this->pdo->query(
+            'SELECT id, stream_hash, tvg_id, tvg_name, tvg_logo, group_id, stream_url, epg_channel_id, epg_match_type FROM channels'
+        );
+        while ($row = $existingRows->fetch()) {
+            $existingMap[(string) $row['stream_hash']] = $row;
+        }
 
         $insertGroupStmt = $this->pdo->prepare('INSERT INTO m3u_groups (original_name, is_enabled, sort_order) VALUES (:name, 1, :sort)');
-        $selectChannelStmt = $this->pdo->prepare('SELECT id, epg_channel_id, epg_match_type FROM channels WHERE stream_hash = :hash LIMIT 1');
         $insertChannelStmt = $this->pdo->prepare(
             'INSERT INTO channels (stream_hash, tvg_id, tvg_name, tvg_logo, group_id, stream_url, epg_channel_id, epg_match_type, is_enabled, sort_order, last_seen_at)
              VALUES (:hash, :tvg_id, :tvg_name, :tvg_logo, :group_id, :stream_url, :epg_id, :match_type, 1, :sort, :seen)'
@@ -189,6 +199,21 @@ final class M3uParserService
                 }
             }
 
+            $deleteIds = [];
+            foreach ($existingMap as $hash => $row) {
+                if (!isset($seenHashes[$hash])) {
+                    $deleteIds[] = (int) $row['id'];
+                }
+            }
+            if ($deleteIds !== []) {
+                foreach (array_chunk($deleteIds, 500) as $chunk) {
+                    $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+                    $delStmt = $this->pdo->prepare("DELETE FROM channels WHERE id IN ({$placeholders})");
+                    $delStmt->execute($chunk);
+                    $channelsDeleted += $delStmt->rowCount();
+                }
+            }
+
             $this->pdo->commit();
         } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
@@ -199,13 +224,15 @@ final class M3uParserService
         }
 
         fclose($handle);
-        $cache->updateItemCount($sourceFile, $channelsAdded + $channelsUpdated);
+        $cache->updateItemCount($sourceFile, $channelsAdded + $channelsUpdated + $channelsUnchanged);
         $this->settings->set('last_m3u_sync', $now, false);
 
         return [
             'groups_added' => $groupsAdded,
             'channels_added' => $channelsAdded,
             'channels_updated' => $channelsUpdated,
+            'channels_deleted' => $channelsDeleted,
+            'channels_unchanged' => $channelsUnchanged,
             'auto_matched' => $autoMatched,
         ];
     }

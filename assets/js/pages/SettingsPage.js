@@ -47,6 +47,24 @@ export class SettingsPage extends BaseComponent {
                         <label>Output-parameters (optioneel)
                             <input type="text" id="settingXtreamOutputParams" value="${this.escapeHtml(s.xtream_output_params || 'type=m3u_plus&output=ts')}" placeholder="type=m3u_plus&output=ts">
                         </label>
+                        <div style="display:flex;flex-direction:column;gap:0.4rem;margin-top:0.25rem;">
+                            <span style="font-size:0.9rem;font-weight:600;">EPG-bron binnen Xtream</span>
+                            <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+                                <label class="checkbox-row" style="min-height:44px;cursor:pointer;">
+                                    <input type="radio" name="xtream_epg_mode" value="xtream_xmltv" ${(s.xtream_epg_mode || 'xtream_xmltv') === 'xtream_xmltv' ? 'checked' : ''}>
+                                    <span>Standaard Xtream XMLTV (`/xmltv.php`)</span>
+                                </label>
+                                <label class="checkbox-row" style="min-height:44px;cursor:pointer;">
+                                    <input type="radio" name="xtream_epg_mode" value="custom_url" ${s.xtream_epg_mode === 'custom_url' ? 'checked' : ''}>
+                                    <span>Eigen aangepaste EPG-URL</span>
+                                </label>
+                            </div>
+                            <div id="xtreamCustomEpgWrap" class="${s.xtream_epg_mode === 'custom_url' ? '' : 'hidden'}">
+                                <label>Aangepaste EPG Bron URL (laat leeg om huidige te behouden)
+                                    <input type="url" id="settingXtreamCustomEpgUrl" placeholder="${this.escapeHtml(s.xtream_custom_epg_url_masked || 'http://epgguide.ddns.net/epg/tvguide.xml')}">
+                                </label>
+                            </div>
+                        </div>
                     </div>
 
                     <div id="separateUrlFields" class="${sourceMode === 'separate_urls' ? '' : 'hidden'}" style="display:flex;flex-direction:column;gap:0.75rem;">
@@ -105,15 +123,25 @@ export class SettingsPage extends BaseComponent {
             });
         });
 
+        this.container.querySelectorAll('input[name="xtream_epg_mode"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                const epgMode = this.container.querySelector('input[name="xtream_epg_mode"]:checked')?.value || 'xtream_xmltv';
+                document.getElementById('xtreamCustomEpgWrap')?.classList.toggle('hidden', epgMode !== 'custom_url');
+            });
+        });
+
         document.getElementById('settingsForm')?.addEventListener('submit', async ev => {
             ev.preventDefault();
             const sourceMode = this.container.querySelector('input[name="source_mode"]:checked')?.value || 'xtream';
+            const xtreamEpgMode = this.container.querySelector('input[name="xtream_epg_mode"]:checked')?.value || 'xtream_xmltv';
             await this.props.api.post('save_settings', {
                 source_mode: sourceMode,
                 xtream_host: document.getElementById('settingXtreamHost')?.value || '',
                 xtream_username: document.getElementById('settingXtreamUser')?.value || '',
                 xtream_password: document.getElementById('settingXtreamPass')?.value || '',
                 xtream_output_params: document.getElementById('settingXtreamOutputParams')?.value || 'type=m3u_plus&output=ts',
+                xtream_epg_mode: xtreamEpgMode,
+                xtream_custom_epg_url: document.getElementById('settingXtreamCustomEpgUrl')?.value || '',
                 m3u_source_url: document.getElementById('settingM3uUrl')?.value || '',
                 epg_source_url: document.getElementById('settingEpgUrl')?.value || '',
                 sync_interval_hours: Number(document.getElementById('settingIntervalHours').value),

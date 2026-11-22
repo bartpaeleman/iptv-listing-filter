@@ -7,8 +7,11 @@
   - Dubbele **Cachebeheer**-knop uit de bovenste navigatiebalk verwijderd.
   - Dynamisch voortgangspaneel (`#sync-progress-panel`) toegevoegd met percentage, statusbalk, actuele actie en berekende ETA (`eta_seconds`).
 - **Bronnen & Cron: Xtream Codes & Bronselectie (`SettingsPage.js`, `SettingsController.php`, `XtreamUrlBuilder.php`, `SchedulerService.php`):**
-  - Radio-selector toegevoegd voor bronmodus: **Xtream Codes API** (`xtream` met `Server URL`, `Gebruikersnaam`, `Wachtwoord` en optionele output-parameters) of **Aparte M3U & EPG links** (`separate_urls`).
-  - `SchedulerService::run()` valideert vooraf of de actieve bronmodus volledig is geconfigureerd (of dat lokale cachebestanden aanwezig zijn bij `cache_only`) en genereert automatisch beide Xtream-URL's (`/get.php` + `/xmltv.php`).
+  - Radio-selector toegevoegd voor bronmodus: **Xtream Codes API** (`xtream` met `Server URL`, `Gebruikersnaam`, `Wachtwoord`, optionele output-parameters en keuze tussen standaard `/xmltv.php` of een eigen aangepaste EPG-URL) of **Aparte M3U & EPG links** (`separate_urls`).
+  - `SchedulerService::run()` valideert vooraf of de actieve bronmodus volledig is geconfigureerd (of dat lokale cachebestanden aanwezig zijn bij `cache_only`) en genereert automatisch beide Xtream-URL's.
+- **Achtergrond-uitvoering & Delta-Sync (`DashboardController.php`, `DashboardPage.js`, `M3uParserService.php`):**
+  - `DashboardController::sync()` gebruikt `ignore_user_abort(true)` en `set_time_limit(0)` zodat synchronisaties doorlopen bij paginawissel; `DashboardPage::load()` herstelt automatisch de voortgangs-UI bij terugkeer.
+  - `M3uParserService::sync()` voert echte delta-vergelijking uit (`INSERT` nieuwe, `UPDATE` enkel gewijzigde, `DELETE` verwijderde kanalen).
 
 ## [1.1.0] - 2026-11-22
 ### Toegevoegd

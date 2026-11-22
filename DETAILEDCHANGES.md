@@ -12,7 +12,10 @@
 - **`assets/js/pages/SettingsPage.js`:**
   - Radio-selector toegevoegd tussen Xtream Codes API en Aparte M3U & EPG links met dynamische zichtbaarheid van de bijbehorende invoervelden.
 - **`app/Services/SchedulerService.php`:**
-  - `validateSourceConfiguration()` toegevoegd om vóór elke download/sync te controleren of de actieve `source_mode` compleet is geconfigureerd (of dat lokale cache bestaat bij `cache_only`).
+  - `validateSourceConfiguration()` toegevoegd om vóór elke download/sync te controleren of de actieve `source_mode` compleet is geconfigureerd (incl. `xtream_epg_mode`: `xtream_xmltv` of `custom_url`) of dat lokale cache bestaat bij `cache_only`.
+- **`app/Controllers/DashboardController.php` & `app/Services/M3uParserService.php`:**
+  - `DashboardController::sync()` schakelt `ignore_user_abort(true)` en `set_time_limit(0)` in voor onafgebroken achtergrond-uitvoering; `DashboardPage::load()` hervat automatisch `startProgressPolling()` bij een lopende sync.
+  - `M3uParserService::sync()` vergelijkt binnenkomende kanalen met de huidige database-records en voert uitsluitend `INSERT`, `UPDATE` (bij gewijzigde metadata) en `DELETE` (voor verdwenen kanalen) uit.
 
 ## Architectuur
 - **Autoloading:** `src/autoload.php` (PSR-4 zonder Composer/`vendor/`).
