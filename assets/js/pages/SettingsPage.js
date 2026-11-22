@@ -52,7 +52,7 @@ export class SettingsPage extends BaseComponent {
                             <div style="display:flex;gap:1rem;flex-wrap:wrap;">
                                 <label class="checkbox-row" style="min-height:44px;cursor:pointer;">
                                     <input type="radio" name="xtream_epg_mode" value="xtream_xmltv" ${(s.xtream_epg_mode || 'xtream_xmltv') === 'xtream_xmltv' ? 'checked' : ''}>
-                                    <span>Standaard Xtream XMLTV (`/xmltv.php`)</span>
+                                    <span>Standaard Xtream XMLTV (<code>/xmltv.php</code>)</span>
                                 </label>
                                 <label class="checkbox-row" style="min-height:44px;cursor:pointer;">
                                     <input type="radio" name="xtream_epg_mode" value="custom_url" ${s.xtream_epg_mode === 'custom_url' ? 'checked' : ''}>
