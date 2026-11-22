@@ -20,7 +20,7 @@ final class PlaylistExporterService
         $this->settings = $settings ?? new SettingsRepository($this->pdo);
     }
 
-    public function streamPlaylist(): void
+    public function streamPlaylist(string $sortMode = 'import'): void
     {
         $appUrl = rtrim((string) EnvLoader::get('APP_URL', ''), '/');
         $token = (string) $this->settings->get('output_token', '');
@@ -28,15 +28,21 @@ final class PlaylistExporterService
 
         echo '#EXTM3U url-tvg="' . $this->escapeAttr($epgUrl) . '" x-tvg-url="' . $this->escapeAttr($epgUrl) . "\"\n";
 
-        $sql = 'SELECT c.tvg_id, c.tvg_name, c.tvg_logo, c.stream_url, c.custom_name,
+        $groupOrder = match ($sortMode) {
+            'asc' => 'g.original_name ASC, g.id ASC',
+            'desc' => 'g.original_name DESC, g.id DESC',
+            default => 'g.import_order ASC, g.id ASC',
+        };
+
+        $sql = "SELECT c.tvg_id, c.tvg_name, c.tvg_logo, c.stream_url, c.custom_name,
                        c.channel_number, c.epg_channel_id,
-                       COALESCE(NULLIF(g.custom_name, \'\'), g.original_name) AS group_name
+                       COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS group_name
                 FROM channels c
                 INNER JOIN m3u_groups g ON g.id = c.group_id
                 WHERE g.is_enabled = 1 AND c.is_enabled = 1
-                ORDER BY g.sort_order ASC, g.id ASC,
+                ORDER BY {$groupOrder},
                          COALESCE(c.channel_number, 999999) ASC,
-                         c.sort_order ASC, c.id ASC';
+                         c.sort_order ASC, c.id ASC";
 
         $stmt = $this->pdo->query($sql);
         while ($row = $stmt->fetch()) {
