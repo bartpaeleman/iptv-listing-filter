@@ -114,6 +114,18 @@ CREATE TABLE IF NOT EXISTS `country_tags` (
     UNIQUE KEY `uq_country_tags_pattern` (`tag_pattern`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `emoji_rules` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `match_type` ENUM('country', 'keyword') NOT NULL,
+    `pattern` VARCHAR(100) NOT NULL,
+    `emoji` VARCHAR(32) NOT NULL,
+    `label` VARCHAR(150) NULL,
+    `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_emoji_rules_type_pattern` (`match_type`, `pattern`),
+    KEY `idx_emoji_rules_active_type` (`is_active`, `match_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 INSERT IGNORE INTO `country_tags` (`tag_pattern`, `country_code`, `country_name`, `flag_emoji`, `sort_order`) VALUES
     ('[BE]', 'BE', 'België', '🇧🇪', 1),
     ('[NL]', 'NL', 'Nederland', '🇳🇱', 2),

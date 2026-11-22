@@ -24,10 +24,10 @@ final class SchemaMigrator
         if (!$force) {
             $tblCount = (int) $pdo->query(
                 "SELECT COUNT(*) FROM information_schema.tables
-                 WHERE table_schema = DATABASE() AND table_name IN ('epg_sources', 'country_tags')"
+                 WHERE table_schema = DATABASE() AND table_name IN ('epg_sources', 'country_tags', 'emoji_rules')"
             )->fetchColumn();
-            $flag = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'schema_integrity_v2' LIMIT 1")->fetchColumn();
-            if ($tblCount === 2 && (string) $flag === '1') {
+            $flag = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'schema_integrity_v3' LIMIT 1")->fetchColumn();
+            if ($tblCount === 3 && (string) $flag === '1') {
                 return;
             }
         }

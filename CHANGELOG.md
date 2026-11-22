@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased] - feature/groepen-en-kanalen
+### Toegevoegd
+- **Stap 1 — Centrale Emoji- & Tag-database + Beheerscherm (`emoji_rules`, `EmojiTagService`, `EmojiRuleController`, `EmojiRulesPage.js`):**
+  - Idempotente database-tabel `emoji_rules` toegevoegd met automatische vulling van alle ISO 3166-1 alpha-2 landcodes, IPTV-aliassen (`UK`, `EN`, `USA`, `AR`, enz.), standaard fallback-icoon (`🏷️`) en categorie-trefwoorden (`🎬`, `📺`, `🏎️`, `❤️🔥`).
+  - Centrale `EmojiTagService` toegevoegd voor het parsen van ruwe groep- en kanaalnamen (landtags `|BE|`, `BE|`, `|BE` + categorie-emoji's) zonder de originele databasenaam te wijzigen.
+  - Apart beheerscherm **🏷️ Landen & Tags Beheren** (`EmojiRulesPage.js`) gekoppeld aan de knop op *Groepen & Kanalen* (niet in het hoofdmenu), inclusief toevoegen, bewerken, activeren/deactiveren, verwijderen, snelle emoji-kiezer en live zoekfunctie.
+
 ## [Unreleased] - feature/cachecontrol
 ### Gewijzigd
 - **Dashboard Synchronisatie & Lokale Cache (`DashboardPage.js`, `views/dashboard.php`, `SyncProgressService.php`):**

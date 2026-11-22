@@ -78,6 +78,10 @@ switch ($route) {
         $router->addApiRoute('delete_country_tag', ChannelController::class, 'deleteCountryTag');
         $router->addApiRoute('scan_tags', ChannelController::class, 'scanTags');
         $router->addApiRoute('apply_country_tags', ChannelController::class, 'applyCountryTags');
+        $router->addApiRoute('emoji_rules', EmojiRuleController::class, 'list');
+        $router->addApiRoute('save_emoji_rule', EmojiRuleController::class, 'save');
+        $router->addApiRoute('toggle_emoji_rule', EmojiRuleController::class, 'toggle');
+        $router->addApiRoute('delete_emoji_rule', EmojiRuleController::class, 'delete');
         $router->addApiRoute('epg_search', EpgController::class, 'search');
         $router->addApiRoute('auto_match_epg', EpgController::class, 'autoMatch');
         $router->addApiRoute('get_settings', SettingsController::class, 'get');

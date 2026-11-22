@@ -25,6 +25,7 @@ ob_start();
     <section id="tab-channels" class="tab-panel"></section>
     <section id="tab-epg" class="tab-panel"></section>
     <section id="tab-cache" class="tab-panel"></section>
+    <section id="tab-emoji-rules" class="tab-panel"></section>
     <section id="tab-settings" class="tab-panel"></section>
 </main>
 

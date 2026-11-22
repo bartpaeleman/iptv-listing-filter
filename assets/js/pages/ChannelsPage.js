@@ -169,64 +169,6 @@ export class ChannelsPage extends BaseComponent {
     }
 
     async openCountryModal() {
-        const unmapped = await this.props.api.get('scan_tags');
-        const tagsHtml = (this.countryTags || []).map(t => `
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0;border-bottom:1px solid var(--border);">
-                <span>${this.escapeHtml(t.flag_emoji)} <strong>${this.escapeHtml(t.tag_pattern)}</strong> — ${this.escapeHtml(t.country_name)} (${this.escapeHtml(t.country_code)})</span>
-                <button type="button" class="btn btn-sm del-tag-btn" data-id="${t.id}">✕</button>
-            </div>
-        `).join('');
-
-        this.props.modal.open('Landen & Tags Beheren', `
-            <div style="margin-bottom:1rem;">
-                ${unmapped.length > 0 ? `<p class="muted" style="font-size:0.85rem;">Onbekende tags gevonden: <code>${unmapped.map(u => this.escapeHtml(u)).join(', ')}</code></p>` : ''}
-                <form id="addTagForm" class="grid-2" style="margin-bottom:0.75rem;">
-                    <input type="text" id="newTagPattern" placeholder="Tag (bv. [PT])" required>
-                    <input type="text" id="newTagCode" placeholder="ISO-2 (bv. PT)" maxlength="2" required>
-                    <input type="text" id="newTagName" placeholder="Landnaam (bv. Portugal)" required>
-                    <button type="submit" class="btn btn-primary">+ Tag Opslaan</button>
-                </form>
-                <div style="max-height:180px;overflow-y:auto;">${tagsHtml}</div>
-            </div>
-            <div class="btn-group">
-                <button type="button" id="applyFlagsBtn" class="btn btn-primary">🏳️ Vlaggen toepassen op namen</button>
-                <button type="button" id="groupByCountryBtn" class="btn">📁 Groepeer kanalen per land</button>
-            </div>
-        `);
-
-        document.getElementById('addTagForm')?.addEventListener('submit', async ev => {
-            ev.preventDefault();
-            await this.props.api.post('save_country_tag', {
-                tag_pattern: document.getElementById('newTagPattern').value,
-                country_code: document.getElementById('newTagCode').value,
-                country_name: document.getElementById('newTagName').value,
-            });
-            this.props.toast.show('Tag opgeslagen!');
-            await this.load();
-            this.openCountryModal();
-        });
-
-        document.querySelectorAll('.del-tag-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                await this.props.api.post('delete_country_tag', { id: Number(btn.dataset.id) });
-                await this.load();
-                this.openCountryModal();
-            });
-        });
-
-        document.getElementById('applyFlagsBtn')?.addEventListener('click', async () => {
-            const res = await this.props.api.post('apply_country_tags', { group_by_country: false });
-            this.props.toast.show(`${res.updated} kanalen van vlaggen voorzien!`);
-            this.props.modal.close();
-            this.load();
-        });
-
-        document.getElementById('groupByCountryBtn')?.addEventListener('click', async () => {
-            if (!confirm('Weet je zeker dat je gekoppelde kanalen wilt verplaatsen naar landgroepen?')) return;
-            const res = await this.props.api.post('apply_country_tags', { group_by_country: true });
-            this.props.toast.show(`${res.grouped} kanalen gegroepeerd per land!`);
-            this.props.modal.close();
-            this.load();
-        });
+        this.props.switchTab('emoji_rules');
     }
 }

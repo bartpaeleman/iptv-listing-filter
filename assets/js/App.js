@@ -5,6 +5,7 @@ import { DashboardPage } from './pages/DashboardPage.js';
 import { ChannelsPage } from './pages/ChannelsPage.js';
 import { EpgMappingPage } from './pages/EpgMappingPage.js';
 import { CacheManagerPage } from './pages/CacheManagerPage.js';
+import { EmojiRulesPage } from './pages/EmojiRulesPage.js';
 import { SettingsPage } from './pages/SettingsPage.js';
 
 class App {
@@ -19,6 +20,7 @@ class App {
             channels: new ChannelsPage('#tab-channels', deps),
             epg: new EpgMappingPage('#tab-epg', deps),
             cache: new CacheManagerPage('#tab-cache', deps),
+            emoji_rules: new EmojiRulesPage('#tab-emoji-rules', deps),
             settings: new SettingsPage('#tab-settings', deps),
         };
     }
