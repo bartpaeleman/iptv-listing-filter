@@ -12,6 +12,7 @@ export class ChannelsPage extends BaseComponent {
         this.channelSortBy = 'number';
         this.selectedContentTypes = new Set(['live']);
         this.hasLoadedData = false;
+        this.loadFromDb = false;
         this.groupList = null;
         this.channelTable = null;
     }
@@ -22,10 +23,35 @@ export class ChannelsPage extends BaseComponent {
             this.container.dataset.mounted = '1';
         }
         if (!this.hasLoadedData) {
-            this.renderPreloadPrompt();
+            const loadedFromCache = await this.tryAutoLoadFromCache();
+            if (!loadedFromCache) {
+                this.renderPreloadPrompt();
+            }
             return;
         }
         await this.loadFilteredData();
+    }
+
+    async tryAutoLoadFromCache() {
+        if (this.selectedContentTypes.size === 0) return false;
+        const contentTypes = Array.from(this.selectedContentTypes).join(',');
+        const [groupsRes, tags] = await Promise.all([
+            this.props.api.get('groups', { content_types: contentTypes, scope: 'active', cache_only: 1 }),
+            this.props.api.get('country_tags'),
+        ]);
+        const list = Array.isArray(groupsRes) ? groupsRes : (groupsRes?.items || []);
+        if (list.length === 0) {
+            return false;
+        }
+        this.hasLoadedData = true;
+        this.groups = list;
+        this.countryTags = tags || [];
+        this.populateCountryFilter();
+        this.updateGroupSortButton();
+        this.groupList.setState({ groups: this.groups, selectedGroupId: this.selectedGroupId, countryTags: this.countryTags });
+        this.updateGroupHeader();
+        this.renderSelectGroupPrompt();
+        return true;
     }
 
     renderPreloadPrompt() {
@@ -46,7 +72,7 @@ export class ChannelsPage extends BaseComponent {
         }
         const contentTypes = Array.from(this.selectedContentTypes).join(',');
         const [groupsRes, tags] = await Promise.all([
-            this.props.api.get('groups', { content_types: contentTypes, scope: 'active' }),
+            this.props.api.get('groups', { content_types: contentTypes, scope: 'active', refresh: this.loadFromDb ? '1' : '0' }),
             this.props.api.get('country_tags'),
         ]);
         this.hasLoadedData = true;
@@ -158,7 +184,10 @@ export class ChannelsPage extends BaseComponent {
                 <button type="button" class="btn content-type-toggle active" data-type="live" style="min-height:44px;padding:0 1rem;">📺 Live TV</button>
                 <button type="button" class="btn content-type-toggle" data-type="movie" style="min-height:44px;padding:0 1rem;">🎬 Films</button>
                 <button type="button" class="btn content-type-toggle" data-type="series" style="min-height:44px;padding:0 1rem;">🎞️ Series</button>
-                <button type="button" class="btn btn-primary" id="applyContentTypeFilterBtn" style="min-height:44px;padding:0 1.25rem;margin-left:auto;">🔍 Filter &amp; Laad</button>
+                <div style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                    <button type="button" class="btn" id="loadSourceToggleBtn" title="Kies of Filter & Laad uit de snelle view-cache of vers uit de database laadt" style="min-height:44px;padding:0 0.9rem;">⚡ Cache</button>
+                    <button type="button" class="btn btn-primary" id="applyContentTypeFilterBtn" style="min-height:44px;padding:0 1.25rem;">🔍 Filter &amp; Laad</button>
+                </div>
             </div>
             <div class="split-view">
                 <aside class="card groups-pane">
@@ -327,6 +356,13 @@ export class ChannelsPage extends BaseComponent {
                     btn.classList.add('active');
                 }
             });
+        });
+
+        document.getElementById('loadSourceToggleBtn')?.addEventListener('click', e => {
+            this.loadFromDb = !this.loadFromDb;
+            const btn = e.currentTarget;
+            btn.textContent = this.loadFromDb ? '🗄️ Database' : '⚡ Cache';
+            btn.classList.toggle('btn-warning', this.loadFromDb);
         });
 
         document.getElementById('applyContentTypeFilterBtn')?.addEventListener('click', () => {

@@ -17,14 +17,21 @@ final class ChannelController extends BaseController
         $this->requireAuth();
         $contentTypes = $this->parseContentTypes((string) ($_GET['content_types'] ?? ''));
         $scope = (string) ($_GET['scope'] ?? 'active');
+        $cacheOnly = isset($_GET['cache_only']) && $_GET['cache_only'] === '1';
+        $forceRefresh = isset($_GET['refresh']) && $_GET['refresh'] === '1';
         $viewCache = new ViewCacheService();
 
-        if ($scope === 'active') {
+        if ($scope === 'active' && !$forceRefresh) {
             $cached = $viewCache->getActiveGroups('import', $contentTypes);
             if ($cached !== null) {
                 $this->jsonSuccess($cached);
                 return;
             }
+        }
+
+        if ($cacheOnly) {
+            $this->jsonSuccess([]);
+            return;
         }
 
         $emojiService = new EmojiTagService();
