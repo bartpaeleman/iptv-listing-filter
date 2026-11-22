@@ -83,9 +83,7 @@ final class DashboardController extends BaseController
                 $args[] = '--use-cache';
             }
 
-            (new \App\Services\SyncProgressService())->start(
-                $mode === 'epg' ? 'EPG synchronisatie starten...' : 'M3U & EPG synchronisatie starten...'
-            );
+            (new \App\Services\SyncProgressService())->reset();
 
             $cmd = 'nohup ' . escapeshellarg($phpBin) . ' ' . escapeshellarg($script)
                 . ' ' . implode(' ', $args) . ' >/dev/null 2>&1 &';
