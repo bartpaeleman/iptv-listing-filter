@@ -121,10 +121,33 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; }
 .wizard-steps span { padding: 0.3rem 0.6rem; border-radius: 6px; background: var(--surface-2); color: var(--muted); }
 .wizard-steps span.active { background: var(--primary); color: #fff; }
 
-.check-list { list-style: none; padding: 0; margin: 1rem 0; display: flex; flex-direction: column; gap: 0.5rem; }
-.check-list li { display: flex; gap: 0.5rem; padding: 0.5rem; border-radius: 6px; background: var(--surface-2); }
-.check-list li.ok span { color: var(--success); }
-.check-list li.fail span { color: var(--danger); }
+.check-list { list-style: none; padding: 0; margin: 1rem 0; display: flex; flex-direction: column; gap: 0.6rem; }
+.check-item { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.65rem 0.75rem; border-radius: 8px; background: var(--surface-2); }
+.check-row { display: flex; align-items: center; gap: 0.5rem; }
+.check-label { flex: 1; font-weight: 500; }
+.check-val { font-size: 0.8rem; }
+.check-item.ok .check-icon { color: var(--success); font-weight: 700; }
+.check-item.fail .check-icon { color: var(--danger); font-weight: 700; }
+
+.remediation-box {
+    border-left: 3px solid var(--danger);
+    background: rgba(239, 68, 68, 0.08);
+    padding: 0.65rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+.remediation-title { margin-bottom: 0.4rem; color: var(--text); }
+.remediation-cmd-wrap { display: flex; align-items: flex-start; gap: 0.5rem; }
+.remediation-cmd-wrap pre {
+    margin: 0;
+    flex: 1;
+    background: var(--bg);
+    padding: 0.5rem 0.65rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+}
 
 .alert { padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1rem; }
 .alert-error { background: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger); color: #fecaca; }

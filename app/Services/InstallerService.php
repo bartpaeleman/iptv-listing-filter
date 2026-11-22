@@ -28,20 +28,88 @@ final class InstallerService
     }
 
     /**
-     * @return array<int, array{label: string, ok: bool}>
+     * @return array<int, array{
+     *   id: string,
+     *   label: string,
+     *   passed: bool,
+     *   current_value: string,
+     *   fix_title: string,
+     *   fix_command: string
+     * }>
      */
-    public function getSystemChecks(): array
+    public function checkPrerequisites(): array
     {
-        $rootDir = dirname(__DIR__, 2);
+        $rootDir = realpath(dirname(__DIR__, 2)) ?: dirname(__DIR__, 2);
+        $storageDir = realpath($rootDir . '/storage') ?: ($rootDir . '/storage');
+        $webUser = $this->detectWebUser();
+        $phpIni = php_ini_loaded_file() ?: '/etc/config/php.ini';
+
+        $rootPerms = $this->getOctalPerms($rootDir);
+        $storagePerms = $this->getOctalPerms($storageDir);
+
         return [
-            ['label' => 'PHP >= 8.2 (' . PHP_VERSION . ')', 'ok' => version_compare(PHP_VERSION, '8.2.0', '>=')],
-            ['label' => 'Extensie: pdo_mysql', 'ok' => extension_loaded('pdo_mysql')],
-            ['label' => 'Extensie: xmlreader', 'ok' => extension_loaded('xmlreader')],
-            ['label' => 'Extensie: curl', 'ok' => extension_loaded('curl')],
-            ['label' => 'Extensie: openssl', 'ok' => extension_loaded('openssl')],
-            ['label' => 'Schrijfrechten root (.env)', 'ok' => is_writable($rootDir)],
-            ['label' => 'Schrijfrechten storage/', 'ok' => is_writable($rootDir . '/storage')],
+            [
+                'id' => 'php_version',
+                'label' => 'PHP >= 8.2',
+                'passed' => version_compare(PHP_VERSION, '8.2.0', '>='),
+                'current_value' => PHP_VERSION,
+                'fix_title' => 'PHP 8.2 of hoger is vereist voor strict types en moderne OpenSSL/XML functies.',
+                'fix_command' => "# QNAP: Schakel PHP 8.2+ in via Web Station / Apache instellingen\n# Of installeer via Entware: opkg update && opkg install php8-cli php8-fpm",
+            ],
+            $this->extCheck('ext_pdo_mysql', 'pdo_mysql', $phpIni, 'Vereist voor MariaDB/MySQL databaseverbindingen.'),
+            $this->extCheck('ext_xmlreader', 'xmlreader', $phpIni, 'Vereist voor streaming EPG XMLTV parsing met laag RAM-verbruik.'),
+            $this->extCheck('ext_curl', 'curl', $phpIni, 'Vereist voor het downloaden van externe M3U- en EPG-bestanden.'),
+            $this->extCheck('ext_openssl', 'openssl', $phpIni, 'Vereist voor AES-256-GCM encryptie van gevoelige bron-URLs.'),
+            [
+                'id' => 'perm_root',
+                'label' => 'Schrijfrechten root (.env)',
+                'passed' => is_writable($rootDir),
+                'current_value' => "user: {$webUser}, chmod: {$rootPerms}",
+                'fix_title' => "De webserver ({$webUser}) moet .env kunnen aanmaken in {$rootDir}.",
+                'fix_command' => "chown -R {$webUser}:administrators {$rootDir} && chmod 775 {$rootDir}",
+            ],
+            [
+                'id' => 'perm_storage',
+                'label' => 'Schrijfrechten storage/',
+                'passed' => is_writable($storageDir) && is_writable($storageDir . '/cache') && is_writable($storageDir . '/logs'),
+                'current_value' => "user: {$webUser}, chmod: {$storagePerms}",
+                'fix_title' => "De webserver ({$webUser}) moet cache- en logbestanden kunnen schrijven in {$storageDir}.",
+                'fix_command' => "chown -R {$webUser}:administrators {$storageDir} && chmod -R 775 {$storageDir}",
+            ],
         ];
+    }
+
+    /**
+     * @return array{id: string, label: string, passed: bool, current_value: string, fix_title: string, fix_command: string}
+     */
+    private function extCheck(string $id, string $ext, string $phpIni, string $reason): array
+    {
+        $loaded = extension_loaded($ext);
+        return [
+            'id' => $id,
+            'label' => "Extensie: {$ext}",
+            'passed' => $loaded,
+            'current_value' => $loaded ? 'Actief' : 'Ontbreekt',
+            'fix_title' => $reason,
+            'fix_command' => "# Voeg toe aan {$phpIni} (of schakel in via QNAP Web Station):\nextension={$ext}.so\n# Herstart daarna Apache/PHP-FPM: /etc/init.d/Qthttpd.sh restart",
+        ];
+    }
+
+    private function detectWebUser(): string
+    {
+        if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
+            $info = posix_getpwuid(posix_geteuid());
+            if (is_array($info) && !empty($info['name'])) {
+                return (string) $info['name'];
+            }
+        }
+        return get_current_user() ?: 'httpdusr';
+    }
+
+    private function getOctalPerms(string $path): string
+    {
+        $perms = @fileperms($path);
+        return $perms !== false ? substr(sprintf('%o', $perms), -4) : '----';
     }
 
     public function setupDatabaseAndEnv(

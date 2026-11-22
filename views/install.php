@@ -29,19 +29,32 @@ ob_start();
 
         <?php if ($step === 1): ?>
             <p class="muted">Controle van vereiste PHP-extensies en schrijfrechten op je QNAP NAS / server.</p>
-            <ul class="check-list">
+            <ul class="check-list" id="prereqList">
                 <?php foreach ($checks as $c): ?>
-                    <li class="<?= $c['ok'] ? 'ok' : 'fail' ?>">
-                        <span><?= $c['ok'] ? '✓' : '✗' ?></span>
-                        <?= htmlspecialchars($c['label'], ENT_QUOTES, 'UTF-8') ?>
+                    <li class="check-item <?= $c['passed'] ? 'ok' : 'fail' ?>" data-check-id="<?= htmlspecialchars($c['id'], ENT_QUOTES, 'UTF-8') ?>">
+                        <div class="check-row">
+                            <span class="check-icon"><?= $c['passed'] ? '✓' : '✗' ?></span>
+                            <span class="check-label"><?= htmlspecialchars($c['label'], ENT_QUOTES, 'UTF-8') ?></span>
+                            <span class="check-val muted"><?= htmlspecialchars($c['current_value'], ENT_QUOTES, 'UTF-8') ?></span>
+                        </div>
+                        <?php if (!$c['passed']): ?>
+                            <div class="remediation-box" role="alert">
+                                <div class="remediation-title"><?= htmlspecialchars($c['fix_title'], ENT_QUOTES, 'UTF-8') ?></div>
+                                <div class="remediation-cmd-wrap">
+                                    <pre><code><?= htmlspecialchars($c['fix_command'], ENT_QUOTES, 'UTF-8') ?></code></pre>
+                                    <button type="button" class="btn btn-sm copy-fix-btn" data-cmd="<?= htmlspecialchars($c['fix_command'], ENT_QUOTES, 'UTF-8') ?>">Kopieer</button>
+                                </div>
+                            </div>
+                        <?php endif; ?>
                     </li>
                 <?php endforeach; ?>
             </ul>
-            <?php if ($allChecksOk): ?>
-                <a href="index.php?route=install&step=2" class="btn btn-primary" style="width:100%;justify-content:center;">Volgende stap →</a>
-            <?php else: ?>
-                <p class="muted" style="color:var(--danger);">Los bovenstaande fouten op en vernieuw de pagina.</p>
-            <?php endif; ?>
+            <div class="btn-group" style="margin-top:1rem;">
+                <button type="button" id="recheckPrereqsBtn" class="btn">🔄 Opnieuw controleren</button>
+                <a href="index.php?route=install&step=2" id="nextStepBtn" class="btn btn-primary <?= $allChecksOk ? '' : 'hidden' ?>" style="flex:1;justify-content:center;">Volgende stap →</a>
+            </div>
+            <p id="prereqErrorHint" class="muted <?= $allChecksOk ? 'hidden' : '' ?>" style="color:var(--danger);margin-top:0.75rem;">Los bovenstaande fouten op en klik op "Opnieuw controleren".</p>
+            <script type="module" src="assets/js/pages/InstallerPage.js"></script>
 
         <?php elseif ($step === 2): ?>
             <form method="post" action="index.php?route=install&step=2" class="stack-form">

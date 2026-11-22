@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.0] - 2026-11-22
+### Toegevoegd
+- Uitgebreide prerequisite-diagnostiek in de Web Installer (`InstallerService::checkPrerequisites()`) met kopieerbare QNAP/Linux herstelcommando's en asynchrone "Opnieuw controleren" knop (`?route=install&step=recheck`).
+
 ## [1.0.0] - 2026-11-22
 ### Toegevoegd
 - Volledige OOP backend in PHP 8.2+ (`src/Config`, `src/Database`, `src/Security`, `src/Repositories`, `src/Services`).

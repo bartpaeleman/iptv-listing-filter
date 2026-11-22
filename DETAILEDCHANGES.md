@@ -10,3 +10,6 @@
   - `M3uParserService`: streaming `fopen`/`fgets` + `stream_hash` upsert zodat handmatige kanaalnamen, nummers en EPG-koppelingen behouden blijven.
   - `EpgParserService`: streaming `XMLReader` (ondersteunt `.xml` en `.xml.gz`), importeert alle `<channel>` tags en enkel `<programme>` records voor actief gekoppelde kanalen.
   - `PlaylistExporterService` & `EpgExporterService`: leveren schone, gefilterde feeds aan LAN-clients.
+- **Installer Diagnostiek (`InstallerService`, `InstallController`, `InstallerPage.js`):**
+  - `checkPrerequisites()` retourneert nu `id`, `label`, `passed`, `current_value`, `fix_title` en `fix_command` met gedetecteerde webserver-user en octale rechten.
+  - `?route=install&step=recheck` biedt een asynchrone JSON-hercontrole zonder paginarefresh.

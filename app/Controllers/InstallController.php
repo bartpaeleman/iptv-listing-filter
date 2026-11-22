@@ -92,8 +92,8 @@ final class InstallController extends BaseController
             }
         }
 
-        $checks = $installer->getSystemChecks();
-        $allChecksOk = !in_array(false, array_column($checks, 'ok'), true);
+        $checks = $installer->checkPrerequisites();
+        $allChecksOk = !in_array(false, array_column($checks, 'passed'), true);
         $defaultAppUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http')
             . '://' . ($_SERVER['HTTP_HOST'] ?? 'nas.local')
             . rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
