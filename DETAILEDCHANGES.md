@@ -37,3 +37,6 @@
 - **Runtime MEDIUMTEXT Migratie & Pre-Insert Guard (`SchemaMigrator`, `M3uParserService`, `EpgParserService`, `ChannelRepository`):**
   - `SchemaMigrator::ensureSchemaUpToDate()` bevraagt `INFORMATION_SCHEMA.COLUMNS` vóór elke M3U/EPG-sync en voert direct `ALTER TABLE ... MODIFY COLUMN ... MEDIUMTEXT NULL` uit indien nodig.
   - `iconv('UTF-8', 'UTF-8//IGNORE', ...)` + 16MB/250-char guards voorkomen `SQLSTATE[22001]` definitief.
+- **Real-Time Sync Voortgang & Non-Blocking Polling (`SyncProgressService`, `DashboardController`, `DashboardPage.js`):**
+  - `SyncProgressService` schrijft atomisch naar `storage/cache/sync_progress.json`; `DashboardController::sync()` en `syncStatus()` roepen `session_write_close()` aan voor parallelle `800ms` polling.
+  - `UNIQUE KEY uq_epg_programmes (epg_id, start_utc)` + `INSERT IGNORE` voorkomt dubbele EPG-programma's.

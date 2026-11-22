@@ -117,11 +117,26 @@ export class DashboardPage extends BaseComponent {
 
         this.container.querySelectorAll('[data-sync]').forEach(btn => {
             btn.addEventListener('click', async () => {
+                const panel = document.getElementById('sync-progress-panel');
+                const msgEl = document.getElementById('syncProgressMsg');
+                const fillEl = document.getElementById('syncProgressFill');
+                const consoleEl = document.getElementById('syncLiveConsole');
                 const banner = document.getElementById('syncStatusBanner');
-                if (banner) {
-                    banner.textContent = '⏳ Synchronisatie bezig... Dit kan enkele minuten duren.';
-                    banner.classList.remove('hidden');
-                }
+                panel?.classList.remove('hidden');
+                banner?.classList.add('hidden');
+                if (fillEl) fillEl.style.width = '5%';
+
+                const poller = setInterval(async () => {
+                    try {
+                        const st = await this.props.api.get('sync_status');
+                        const p = st.progress || {};
+                        if (msgEl) msgEl.textContent = p.message || 'Bezig...';
+                        if (fillEl) fillEl.style.width = `${p.percent || 0}%`;
+                        if (consoleEl) consoleEl.textContent = (p.live_lines || []).join('\n');
+                        if (st.logs) this.renderSyncLogs(st.logs);
+                    } catch { /* ignore transient poll errors */ }
+                }, 800);
+
                 try {
                     await this.props.api.post('sync', {
                         mode: btn.dataset.sync,
@@ -132,7 +147,10 @@ export class DashboardPage extends BaseComponent {
                 } catch (e) {
                     if (banner) {
                         banner.textContent = `✗ Fout: ${e.message} (Tip: reeds gedownloade bestanden blijven bewaard in storage/cache/ voor herimport.)`;
+                        banner.classList.remove('hidden');
                     }
+                } finally {
+                    clearInterval(poller);
                 }
             });
         });
@@ -146,11 +164,21 @@ export class DashboardPage extends BaseComponent {
         document.getElementById('btn-clear-sync-logs')?.addEventListener('click', async () => {
             if (!confirm('Weet je zeker dat je alle sync-logs wilt verwijderen?')) return;
             const res = await this.props.api.post('clear_sync_logs');
-            const tbody = document.getElementById('syncLogsBody');
-            if (tbody) {
-                tbody.innerHTML = '<tr><td colspan="4" class="muted">Nog geen sync-logs aanwezig</td></tr>';
-            }
+            this.renderSyncLogs([]);
             this.props.toast.show(res?.message || 'Sync log is leeggemaakt');
         });
+    }
+
+    renderSyncLogs(logs) {
+        const tbody = document.getElementById('syncLogsBody');
+        if (!tbody) return;
+        tbody.innerHTML = (logs || []).length > 0 ? logs.map(l => `
+            <tr>
+                <td>${this.escapeHtml(l.created_at)}</td>
+                <td>${this.escapeHtml(String(l.sync_type).toUpperCase())}</td>
+                <td><span class="badge ${l.status === 'success' ? 'badge-success' : 'badge-warning'}">${this.escapeHtml(l.status)}</span></td>
+                <td>${this.escapeHtml(l.message)}</td>
+            </tr>
+        `).join('') : '<tr><td colspan="4" class="muted">Nog geen sync-logs aanwezig</td></tr>';
     }
 }

@@ -1,15 +1,11 @@
 -- IPTV & EPG Manager - Latest-Only Delta Migration
--- Bevat uitsluitend de SQL-statements van de laatste schema-wijziging.
+-- Deduplicatie + Unique Constraints op epg_programmes
 
 SET NAMES utf8mb4;
 
-ALTER TABLE `channels` MODIFY COLUMN `tvg_logo` MEDIUMTEXT NULL;
-ALTER TABLE `channels` MODIFY COLUMN `stream_url` TEXT NOT NULL;
-ALTER TABLE `channels`
-    MODIFY COLUMN `tvg_id` VARCHAR(255) NULL,
-    MODIFY COLUMN `tvg_name` VARCHAR(255) NOT NULL DEFAULT '',
-    MODIFY COLUMN `custom_name` VARCHAR(255) NULL,
-    MODIFY COLUMN `epg_channel_id` VARCHAR(255) NULL;
-ALTER TABLE `epg_channels`
-    MODIFY COLUMN `icon_url` MEDIUMTEXT NULL,
-    MODIFY COLUMN `display_name` VARCHAR(255) NOT NULL DEFAULT '';
+DELETE p1 FROM `epg_programmes` p1
+INNER JOIN `epg_programmes` p2
+    ON p1.epg_id = p2.epg_id AND p1.start_utc = p2.start_utc AND p1.id > p2.id;
+
+ALTER TABLE `epg_programmes`
+    ADD UNIQUE KEY `uq_epg_programmes` (`epg_id`, `start_utc`);

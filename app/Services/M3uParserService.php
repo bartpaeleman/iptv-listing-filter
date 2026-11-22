@@ -56,6 +56,10 @@ final class M3uParserService
             $sourceFile = $cache->storeFromTempFile('m3u', $tmpFile);
         }
 
+        $progress = new SyncProgressService();
+        $totalBytes = max(1, (int) (@filesize($sourceFile) ?: 1));
+        $progress->update('running', 'parse_m3u', 15, 'M3U bestand parsen...', ['inserted' => 0, 'updated' => 0, 'total' => 0], 'Start M3U import');
+
         $handle = fopen($sourceFile, 'rb');
         if ($handle === false) {
             throw new RuntimeException('Kan M3U bestand niet openen.');
@@ -162,6 +166,19 @@ final class M3uParserService
                 }
 
                 $pendingMeta = null;
+                $processed = $channelsAdded + $channelsUpdated;
+                if ($processed > 0 && $processed % 250 === 0) {
+                    $pos = ftell($handle) ?: 0;
+                    $pct = min(85, 15 + (int) floor(($pos / $totalBytes) * 70));
+                    $progress->update(
+                        'running',
+                        'parse_m3u',
+                        $pct,
+                        "M3U parsen: {$processed} kanalen verwerkt ({$channelsAdded} nieuw, {$channelsUpdated} bijgewerkt)...",
+                        ['inserted' => $channelsAdded, 'updated' => $channelsUpdated, 'total' => $processed],
+                        "M3U: {$processed} kanalen verwerkt"
+                    );
+                }
             }
 
             $this->pdo->commit();

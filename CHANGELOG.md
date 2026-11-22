@@ -9,6 +9,7 @@
 - **Lokale Bestandscaching (`FeedCacheService`):** Slaat gedownloade M3U/EPG bestanden lokaal op in `storage/cache/` (`cache_ttl_minutes`, default 360 min) met UI- en CLI-opties (`--use-cache`) voor snelle herimport zonder provider-download.
 - **Sync Log Leegmaken:** Knop **"Log leegmaken"** (`#btn-clear-sync-logs`) op het dashboard gekoppeld aan `?route=api&endpoint=clear_sync_logs`.
 - **Latest-Only Delta Migratiebeleid (`SchemaMigrator`):** `database/update.sql` bevat voortaan uitsluitend de laatste schema-wijziging; `SchemaMigrator` voert deze automatisch uit bij een gewijzigde SHA-256 hash (`last_update_sql_hash`).
+- **Real-Time Sync Voortgang & Deduplicatie (`SyncProgressService`):** Atomische voortgangsrapportage (`sync_progress.json`), non-blocking `?route=api&endpoint=sync_status` polling (`session_write_close()`), live console-output en `UNIQUE KEY uq_epg_programmes`.
 ### Opgelost
 - Cross-device `ClipboardHelper` met iPadOS/Safari HTTP-fallback (`execCommand('copy')` op tijdelijk `<textarea>` zonder auto-zoom) voor alle kopieerknoppen.
 - `SQLSTATE[22001]` bij lange `tvg_logo` / `icon_url` URL's opgelost door kolommen te verruimen naar `TEXT NULL` en M3U/EPG metadata veilig af te kappen (`sanitizeString()` / `sanitizeText()`).

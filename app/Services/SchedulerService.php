@@ -42,10 +42,13 @@ final class SchedulerService
             }
         }
 
+        $progress = new SyncProgressService();
+        $progress->reset();
         $result = ['ran' => true];
 
         try {
             if ($mode === 'all' || $mode === 'epg') {
+                $progress->update('running', 'parse_epg', 10, 'EPG bronnen synchroniseren...', [], 'Start EPG synchronisatie');
                 $epgStats = (new EpgParserService($this->pdo, $this->settings))->sync(null, $cacheMode);
                 $result['epg'] = $epgStats;
                 $this->logs->addLog('epg', 'success', 'EPG synchronisatie voltooid.', $epgStats);
@@ -58,7 +61,10 @@ final class SchedulerService
                 $this->logs->addLog('m3u', 'success', 'M3U synchronisatie voltooid.', $m3uStats);
                 $this->writeFileLog('m3u', 'success', 'M3U synchronisatie voltooid.', $m3uStats);
             }
+
+            $progress->update('completed', 'done', 100, 'Synchronisatie voltooid!', [], 'Synchronisatie voltooid');
         } catch (\Throwable $e) {
+            $progress->update('error', 'done', 100, 'Fout: ' . $e->getMessage(), [], 'Fout: ' . $e->getMessage());
             $this->logs->addLog($mode, 'error', $e->getMessage(), []);
             $this->writeFileLog($mode, 'error', $e->getMessage(), []);
             throw $e;

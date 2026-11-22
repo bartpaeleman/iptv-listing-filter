@@ -147,7 +147,7 @@ final class EpgParserService
              ON DUPLICATE KEY UPDATE display_name = VALUES(display_name), icon_url = VALUES(icon_url)'
         );
         $insertProgStmt = $this->pdo->prepare(
-            'INSERT INTO epg_programmes (epg_id, start_utc, stop_utc, title, description, category)
+            'INSERT IGNORE INTO epg_programmes (epg_id, start_utc, stop_utc, title, description, category)
              VALUES (:epg_id, :start, :stop, :title, :desc, :cat)'
         );
 

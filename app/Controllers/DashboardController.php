@@ -60,6 +60,7 @@ final class DashboardController extends BaseController
         $this->requireAuth();
         $input = $this->getJsonInput();
         $this->verifyCsrf($input);
+        session_write_close();
 
         $mode = in_array($input['mode'] ?? 'all', ['all', 'm3u', 'epg'], true) ? (string) $input['mode'] : 'all';
         $cacheMode = in_array($input['cache_mode'] ?? 'force_download', ['auto', 'cache_only', 'force_download'], true)
@@ -72,6 +73,19 @@ final class DashboardController extends BaseController
         } catch (\Throwable $e) {
             $this->jsonError($e->getMessage(), 500);
         }
+    }
+
+    public function syncStatus(): void
+    {
+        $this->requireAuth();
+        session_write_close();
+
+        $progress = (new \App\Services\SyncProgressService())->getState();
+        $logs = (new SyncLogRepository())->recent(15);
+        $this->jsonSuccess([
+            'progress' => $progress,
+            'logs' => $logs,
+        ]);
     }
 
     public function clearCache(): void

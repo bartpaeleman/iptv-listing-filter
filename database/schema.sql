@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS `epg_programmes` (
     `description` TEXT NULL,
     `category` VARCHAR(255) NULL,
     PRIMARY KEY (`id`),
-    KEY `idx_epg_prog_epg_start` (`epg_id`, `start_utc`),
+    UNIQUE KEY `uq_epg_programmes` (`epg_id`, `start_utc`),
     KEY `idx_epg_prog_start` (`start_utc`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

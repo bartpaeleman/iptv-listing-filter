@@ -60,6 +60,19 @@ final class SchemaMigrator
                 );
             }
         }
+
+        $idxStmt = $pdo->query(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'epg_programmes' AND INDEX_NAME = 'uq_epg_programmes'"
+        );
+        if ((int) $idxStmt->fetchColumn() === 0) {
+            try {
+                $pdo->exec('DELETE p1 FROM `epg_programmes` p1 INNER JOIN `epg_programmes` p2 ON p1.epg_id = p2.epg_id AND p1.start_utc = p2.start_utc AND p1.id > p2.id');
+                $pdo->exec('ALTER TABLE `epg_programmes` ADD UNIQUE KEY `uq_epg_programmes` (`epg_id`, `start_utc`)');
+            } catch (\Throwable) {
+                // Ignore if already exists or insufficient privileges
+            }
+        }
     }
 
     public function migrateIfNeeded(): bool
