@@ -4,7 +4,10 @@
 - **`views/dashboard.php` & `assets/js/pages/DashboardPage.js`:**
   - `Cachebeheer` tabknop uit de topbar verwijderd; `DashboardPage` toont nu naast `🔄 Alles Downloaden & Sync` enkel `⚡ Laad Cache` (`cache_mode=cache_only`) en `💾 Beheer Cache` (`#openCacheManagerBtn`).
   - `#sync-progress-panel` toegevoegd met `#syncProgressMsg`, `#syncProgressPercent`, `#syncProgressEta`, `#syncProgressFill` en `#syncLiveConsole`.
-- **`assets/js/components/SyncProgressPanel.js`, `DashboardPage.js` & `CacheManagerPage.js`:**
+- **`app/Core/FlagRegistry.php` & `assets/js/core/FlagRegistry.js`:**
+  - Centrale ISO-landcodes + IPTV-aliassen (`UK` -> `🇬🇧`, `EN` -> `🇬🇧`, `USA` -> `🇺🇸`, enz.) en `formatTagPrefix()` helper voor visuele weergave in `GroupList.js` en `ChannelTable.js`.
+- **`assets/js/components/ChannelTable.js` & `assets/css/components.css`:**
+  - `.toggle-switch` voor de `Aan`-kolom en `.row-selected` rij-highlight voor bulk-selectie.
   - `SyncProgressPanel` biedt een gedeelde voortgangs-UI (`startPolling()`, `stopPolling()`, `checkActive()`, ETA-formattering) voor zowel het Dashboard als Cachebeheer.
   - `CacheManagerPage` blokkeert conflicterende knoppen via `setActionsDisabled()` zolang `sync_status` actief is.
   - Slaat `started_at` op in `sync_progress.json` en berekent `eta_seconds` op basis van verstreken tijd en actueel voortgangspercentage.

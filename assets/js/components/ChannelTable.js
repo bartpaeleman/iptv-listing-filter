@@ -1,24 +1,47 @@
 import { BaseComponent } from '../core/BaseComponent.js';
+import { formatTagPrefix } from '../core/FlagRegistry.js';
 
 export class ChannelTable extends BaseComponent {
     render() {
-        const { channels = [] } = this.state;
-        this.container.innerHTML = channels.map(c => `
+        const { channels = [], countryTags = [] } = this.state;
+        this.container.innerHTML = channels.map(c => {
+            const rawName = c.custom_name || c.tvg_name;
+            const chParsed = formatTagPrefix(rawName, countryTags);
+            const grpParsed = formatTagPrefix(c.group_name, countryTags);
+            const grpDisplay = grpParsed.icon ? `${grpParsed.icon} ${grpParsed.cleanName}` : grpParsed.cleanName;
+
+            return `
             <tr data-cid="${c.id}">
-                <td><input type="checkbox" class="ch-select"></td>
-                <td><input type="checkbox" class="ch-enable" ${c.is_enabled ? 'checked' : ''}></td>
+                <td><input type="checkbox" class="ch-select" title="Selecteer kanaal voor bulkactie"></td>
+                <td>
+                    <label class="toggle-switch" title="Kanaal opnemen in actieve M3U-playlist">
+                        <input type="checkbox" class="ch-enable" ${c.is_enabled ? 'checked' : ''}>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </td>
                 <td><input type="number" class="ch-num" value="${c.channel_number ?? ''}" style="width:76px;"></td>
-                <td><input type="text" class="ch-name" value="${this.escapeHtml(c.custom_name || c.tvg_name)}"></td>
-                <td class="muted">${this.escapeHtml(c.group_name)}</td>
+                <td>
+                    <div style="display:flex;align-items:center;gap:0.4rem;">
+                        ${chParsed.icon ? `<span title="Originele tag: ${this.escapeHtml(chParsed.rawTag)}" style="font-size:1.1rem;cursor:help;">${chParsed.icon}</span>` : ''}
+                        <input type="text" class="ch-name" value="${this.escapeHtml(rawName)}">
+                    </div>
+                </td>
+                <td class="muted" title="${this.escapeHtml(c.group_name)}">${this.escapeHtml(grpDisplay)}</td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
 
         this.bindEvents();
+        this.props.onSelectionChange?.(0);
     }
 
     bindEvents() {
         this.container.querySelectorAll('tr').forEach(tr => {
             const id = Number(tr.dataset.cid);
+            tr.querySelector('.ch-select')?.addEventListener('change', ev => {
+                tr.classList.toggle('row-selected', ev.target.checked);
+                this.props.onSelectionChange?.(this.getSelectedIds().length);
+            });
             tr.querySelector('.ch-enable')?.addEventListener('change', ev => {
                 this.props.onUpdate?.(id, { is_enabled: ev.target.checked ? 1 : 0 });
             });

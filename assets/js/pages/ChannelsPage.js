@@ -23,7 +23,7 @@ export class ChannelsPage extends BaseComponent {
         ]);
         this.countryTags = tags || [];
         this.populateCountryFilter();
-        this.groupList.setState({ groups, selectedGroupId: this.selectedGroupId });
+        this.groupList.setState({ groups, selectedGroupId: this.selectedGroupId, countryTags: this.countryTags });
         await this.loadChannels();
     }
 
@@ -46,7 +46,7 @@ export class ChannelsPage extends BaseComponent {
         };
         if (this.selectedGroupId) params.group_id = this.selectedGroupId;
         const data = await this.props.api.get('channels', params);
-        this.channelTable.setState({ channels: data.items });
+        this.channelTable.setState({ channels: data.items, countryTags: this.countryTags || [] });
     }
 
     renderShell() {
@@ -90,7 +90,12 @@ export class ChannelsPage extends BaseComponent {
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th><input type="checkbox" id="selectAllChannels"></th>
+                                    <th title="Selecteer/deselecteer alle zichtbare kanalen voor bulkacties" style="white-space:nowrap;">
+                                        <label style="display:inline-flex;align-items:center;gap:0.25rem;cursor:pointer;">
+                                            <input type="checkbox" id="selectAllChannels" title="Selecteer/deselecteer alle zichtbare kanalen voor bulkacties">
+                                            <span style="font-size:0.8rem;">☑️</span>
+                                        </label>
+                                    </th>
                                     <th>Aan</th>
                                     <th>#</th>
                                     <th>Naam (Origineel / Custom)</th>
@@ -145,7 +150,12 @@ export class ChannelsPage extends BaseComponent {
         });
 
         document.getElementById('selectAllChannels')?.addEventListener('change', ev => {
-            document.querySelectorAll('.ch-select').forEach(cb => { cb.checked = ev.target.checked; });
+            document.querySelectorAll('#channelsTableRoot tr').forEach(tr => {
+                const cb = tr.querySelector('.ch-select');
+                if (cb) cb.checked = ev.target.checked;
+                tr.classList.toggle('row-selected', ev.target.checked);
+            });
+            this.updateBulkButtons(this.channelTable?.getSelectedIds().length || 0);
         });
 
         const bulkChannels = async enable => {

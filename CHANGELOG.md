@@ -9,7 +9,10 @@
 - **Bronnen & Cron: Xtream Codes & Bronselectie (`SettingsPage.js`, `SettingsController.php`, `XtreamUrlBuilder.php`, `SchedulerService.php`):**
   - Radio-selector toegevoegd voor bronmodus: **Xtream Codes API** (`xtream` met `Server URL`, `Gebruikersnaam`, `Wachtwoord`, optionele output-parameters en keuze tussen standaard `/xmltv.php` of een eigen aangepaste EPG-URL) of **Aparte M3U & EPG links** (`separate_urls`).
   - `SchedulerService::run()` valideert vooraf of de actieve bronmodus volledig is geconfigureerd (of dat lokale cachebestanden aanwezig zijn bij `cache_only`) en genereert automatisch beide Xtream-URL's.
-- **Herbruikbare Voortgangscomponent & Cache Manager (`SyncProgressPanel.js`, `DashboardPage.js`, `CacheManagerPage.js`):**
+- **Groepen & Kanalen UI & Centrale Vlaggen-Registry (`FlagRegistry.php`, `FlagRegistry.js`, `ChannelTable.js`, `GroupList.js`, `ChannelsPage.js`):**
+  - Centrale ISO 3166-1 alpha-2 + IPTV-aliassen registry (`FlagRegistry`) aangemaakt voor zowel backend als frontend.
+  - Land-/prefix-tags (`|BE|`, `NL|`, `|VIP|`, enz.) worden in de groepen- en kanaallijst visueel omgezet naar vlag-emoji's of `🏷️` zonder de databasedata te wijzigen.
+  - Kolom `Aan` vervangen door een visuele toggle-switch, en bulk-selectie voorzien van rij-highlight en duidelijke tooltip/label (`☑️`).
   - Voortgangsbalk, actuele actie en ETA-berekening geëxtraheerd naar `SyncProgressPanel.js` en geïntegreerd op zowel het Dashboard als **Beheer Cache** (`CacheManagerPage`).
   - **Beheer Cache** controleert bij het openen direct `sync_status`, hervat lopende achtergrond-syncs naadloos en blokkeert conflicterende actieknoppen tot de sync/import is afgerond.
   - `DashboardController::sync()` gebruikt `ignore_user_abort(true)` en `set_time_limit(0)` zodat synchronisaties doorlopen bij paginawissel; `DashboardPage::load()` herstelt automatisch de voortgangs-UI bij terugkeer.
