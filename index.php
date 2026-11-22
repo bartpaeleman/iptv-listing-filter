@@ -18,6 +18,7 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+use App\Controllers\CacheController;
 use App\Controllers\ChannelController;
 use App\Controllers\DashboardController;
 use App\Controllers\EpgController;

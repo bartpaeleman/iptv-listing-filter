@@ -27,7 +27,11 @@ final class Router
         }
 
         [$class, $method] = $this->apiRoutes[$endpoint];
-        $controller = new $class();
+        $fqcn = str_contains($class, '\\') ? $class : 'App\\Controllers\\' . $class;
+        if (!class_exists($fqcn)) {
+            throw new \RuntimeException("Controller '{$fqcn}' niet gevonden.");
+        }
+        $controller = new $fqcn();
         $controller->$method();
     }
 }

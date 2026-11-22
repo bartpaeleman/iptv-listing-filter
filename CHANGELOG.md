@@ -26,6 +26,7 @@
 - Safari `"Load failed"` opgelost via snelle `schema_integrity_v2` check in `SchemaMigrator` (geen zware DDL bij elke API-call), SQL-comment stripping en een fatal-error JSON shutdown handler in `index.php`.
 - Globale `error` / `unhandledrejection` toast-melding toegevoegd in `App.js` en 250-kanalen batch-transacties + `512M`/`set_time_limit(0)` limieten in `M3uParserService` & `EpgParserService` voor grote (98+ MB) bestanden.
 - `EpgParserService::sync()` valt automatisch terug op `XtreamUrlBuilder` bij lege `epg_sources` (en gooit expliciete fout bij 0 bronnen); `CacheManagerPage` uitgebreid met centrale actie-toolbar.
+- `Class "CacheController" not found` opgelost via `use App\Controllers\CacheController;` in `index.php` en namespace-safe FQCN-resolving in `Router.php`.
 
 ## [1.0.0] - 2026-11-22
 ### Toegevoegd
