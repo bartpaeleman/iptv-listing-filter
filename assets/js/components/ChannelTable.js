@@ -7,7 +7,7 @@ export class ChannelTable extends BaseComponent {
             const rawName = c.custom_name || c.tvg_name;
             const cleanName = c.clean_name || rawName;
             const emojiPrefix = c.emoji_prefix || '';
-            const grpDisplay = c.group_display_name || c.group_name;
+            const hasCustomName = Boolean(c.custom_name && String(c.custom_name).trim() !== '');
             const isEnabled = Boolean(Number(c.is_enabled));
 
             return `
@@ -27,9 +27,10 @@ export class ChannelTable extends BaseComponent {
                     <div style="display:flex;align-items:center;gap:0.4rem;">
                         ${emojiPrefix ? `<span class="ch-emoji-prefix" title="${this.escapeHtml(c.tvg_name || '')}">${this.escapeHtml(emojiPrefix)}</span>` : ''}
                         <input type="text" class="ch-name" value="${this.escapeHtml(cleanName)}" title="Origineel: ${this.escapeHtml(c.tvg_name || '')}">
+                        <button type="button" class="btn btn-sm ch-use-original ${!hasCustomName ? 'btn-primary' : ''}" title="Originele naam gebruiken" style="min-height:44px;min-width:44px;flex-shrink:0;">↩️</button>
+                        <button type="button" class="btn btn-sm ch-use-custom ${hasCustomName ? 'btn-primary' : ''}" data-emoji="${this.escapeHtml(emojiPrefix)}" title="Custom naam incl. vlag/symbool gebruiken" style="min-height:44px;min-width:44px;flex-shrink:0;">${this.escapeHtml(emojiPrefix || '✏️')}</button>
                     </div>
                 </td>
-                ${isAllChannelsView ? '' : `<td class="muted" title="${this.escapeHtml(c.group_name)}">${this.escapeHtml(grpDisplay)}</td>`}
             </tr>
         `;
         }).join('');
@@ -37,9 +38,19 @@ export class ChannelTable extends BaseComponent {
         this.bindEvents();
     }
 
+    getSelectedIds() {
+        return [...this.container.querySelectorAll('tr[data-cid]')]
+            .filter(tr => tr.querySelector('.ch-select')?.checked)
+            .map(tr => Number(tr.dataset.cid));
+    }
+
     bindEvents() {
         this.container.querySelectorAll('tr').forEach(tr => {
             const id = Number(tr.dataset.cid);
+            tr.querySelector('.ch-select')?.addEventListener('change', ev => {
+                tr.classList.toggle('row-selected', ev.target.checked);
+                this.props.onSelectionChange?.(this.getSelectedIds().length);
+            });
             tr.querySelector('.ch-enable')?.addEventListener('change', ev => {
                 this.props.onUpdate?.(id, { is_enabled: ev.target.checked ? 1 : 0 });
             });
@@ -48,6 +59,19 @@ export class ChannelTable extends BaseComponent {
             });
             tr.querySelector('.ch-name')?.addEventListener('change', ev => {
                 this.props.onUpdate?.(id, { custom_name: ev.target.value });
+            });
+            tr.querySelector('.ch-use-original')?.addEventListener('click', () => {
+                this.props.onUpdate?.(id, { custom_name: '' });
+            });
+            tr.querySelector('.ch-use-custom')?.addEventListener('click', () => {
+                const nameInput = tr.querySelector('.ch-name');
+                const customBtn = tr.querySelector('.ch-use-custom');
+                const emojiPrefix = customBtn?.dataset.emoji || '';
+                const val = (nameInput?.value || '').trim();
+                const finalName = (emojiPrefix && !val.startsWith(emojiPrefix))
+                    ? `${emojiPrefix} ${val}`.trim()
+                    : val;
+                this.props.onUpdate?.(id, { custom_name: finalName });
             });
         });
     }

@@ -91,6 +91,7 @@ final class ChannelRepository extends BaseRepository
         $sql = "SELECT c.id, c.tvg_id, c.tvg_name, c.tvg_logo, c.group_id, c.custom_name,
                        c.channel_number, c.epg_channel_id, c.epg_match_type, c.is_enabled, c.sort_order,
                        COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS group_name,
+                       g.category AS group_category,
                        ec.display_name AS epg_display_name, ec.icon_url AS epg_icon_url
                 FROM channels c
                 INNER JOIN m3u_groups g ON g.id = c.group_id

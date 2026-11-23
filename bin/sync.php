@@ -3,6 +3,8 @@
 
 declare(strict_types=1);
 
+date_default_timezone_set($_ENV['APP_TIMEZONE'] ?? 'Europe/Brussels');
+
 if (PHP_SAPI !== 'cli') {
     fwrite(STDERR, "Dit script mag enkel via PHP-CLI uitgevoerd worden.\n");
     exit(1);

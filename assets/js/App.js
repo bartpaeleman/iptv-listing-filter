@@ -117,6 +117,54 @@ class App {
                         loadLogs();
                     });
                     document.getElementById('logRefreshBtn')?.addEventListener('click', loadLogs);
+                    document.getElementById('logCopyBtn')?.addEventListener('click', async e => {
+                        const btn = e.currentTarget;
+                        const box = document.getElementById('appLogBox');
+                        const text = (box?.innerText || box?.textContent || '').trim();
+                        if (!text || text === '(Logbestand is leeg of bestaat nog niet)') {
+                            this.toast.show('Geen logregels om te kopiëren');
+                            return;
+                        }
+                        let copied = false;
+                        if (navigator.clipboard?.writeText && window.isSecureContext) {
+                            try {
+                                await navigator.clipboard.writeText(text);
+                                copied = true;
+                            } catch {
+                                copied = false;
+                            }
+                        }
+                        if (!copied) {
+                            const ta = document.createElement('textarea');
+                            ta.value = text;
+                            ta.setAttribute('readonly', '');
+                            ta.style.position = 'fixed';
+                            ta.style.left = '-9999px';
+                            ta.style.top = '0';
+                            ta.style.fontSize = '16px';
+                            document.body.appendChild(ta);
+                            ta.focus();
+                            ta.select();
+                            ta.setSelectionRange(0, text.length);
+                            try {
+                                copied = document.execCommand('copy');
+                            } catch {
+                                copied = false;
+                            }
+                            document.body.removeChild(ta);
+                        }
+                        if (copied) {
+                            this.toast.show('Applicatie log gekopieerd naar klembord!');
+                            if (btn) {
+                                btn.textContent = '✅ Gekopieerd';
+                                setTimeout(() => {
+                                    btn.textContent = '📋 Log kopiëren';
+                                }, 1500);
+                            }
+                        } else {
+                            this.toast.show('Kopiëren naar klembord mislukt');
+                        }
+                    });
                     document.getElementById('logClearBtn')?.addEventListener('click', async () => {
                         if (!confirm('Weet je zeker dat je storage/logs/app.log wilt wissen?')) return;
                         await this.api.post('clear_app_logs');

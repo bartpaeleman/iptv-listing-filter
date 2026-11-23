@@ -271,8 +271,8 @@ export class ChannelsPage extends BaseComponent {
                             <button type="button" class="btn btn-sm hidden" id="adoptGroupNameBtn" title="Huidige weergavenaam (incl. vlag/emoji) opslaan als custom naam">❐</button>
                             <button type="button" class="btn btn-sm hidden" id="editGroupNameBtn" title="Groepsnaam aanpassen">✏️</button>
                             <button class="btn btn-sm" id="manageCountryTagsBtn">🏷️ Landen & Tags Beheren</button>
-                            <button class="btn btn-sm" id="bulkEnableChannelsBtn">Alles Aan</button>
-                            <button class="btn btn-sm" id="bulkDisableChannelsBtn">Alles Uit</button>
+                            <button class="btn btn-sm" id="bulkEnableChannelsBtn">Selectie Aan</button>
+                            <button class="btn btn-sm" id="bulkDisableChannelsBtn">Selectie Uit</button>
                         </div>
                     </div>
                     <div class="toolbar" style="flex-wrap:wrap;">
@@ -297,7 +297,6 @@ export class ChannelsPage extends BaseComponent {
                                     <th>Aan</th>
                                     <th id="sortChannelsByNum" style="cursor:pointer;user-select:none;" title="Sorteer op kanaalnummer">#</th>
                                     <th id="sortChannelsByName" style="cursor:pointer;user-select:none;" title="Klik om te sorteren: A-Z / Z-A / Import">Naam (Origineel / Custom) <span id="channelNameSortBadge" class="muted" style="font-size:0.8rem;font-weight:normal;"></span></th>
-                                    <th>Groep</th>
                                 </tr>
                             </thead>
                             <tbody id="channelsTableRoot"></tbody>
@@ -341,8 +340,8 @@ export class ChannelsPage extends BaseComponent {
                     api: this.props.api,
                     toast: this.props.toast,
                     groupId: id,
-                    onUpdated: (res) => {
-                        this.channelTable.setState({ items: res.items || [], total: res.total || 0 });
+                    onUpdated: async () => {
+                        await this.loadChannels();
                     },
                 });
                 toolsBar.render();
@@ -366,8 +365,12 @@ export class ChannelsPage extends BaseComponent {
             onSelectionChange: count => {
                 const enableBtn = document.getElementById('bulkEnableChannelsBtn');
                 const disableBtn = document.getElementById('bulkDisableChannelsBtn');
+                const adoptBtn = document.getElementById('bulkAdoptNamesBtn');
+                const resetBtn = document.getElementById('bulkResetNamesBtn');
                 if (enableBtn) enableBtn.textContent = count > 0 ? `Selectie Aan (${count})` : 'Selectie Aan';
                 if (disableBtn) disableBtn.textContent = count > 0 ? `Selectie Uit (${count})` : 'Selectie Uit';
+                if (adoptBtn) adoptBtn.textContent = count > 0 ? `🏷️ Selectie Custom (${count})` : '🏷️ Selectie Custom';
+                if (resetBtn) resetBtn.textContent = count > 0 ? `↩️ Selectie Origineel (${count})` : '↩️ Selectie Origineel';
             }
         });
 
@@ -602,10 +605,53 @@ export class ChannelsPage extends BaseComponent {
                     <th style="width:40px;"><input type="checkbox" id="selectAllChannelsCheckbox" title="Selecteer alle zichtbare kanalen"></th>
                     <th style="width:72px;">Aan/Uit</th>
                     <th class="ch-sort-th" data-sort="number" style="width:90px;cursor:pointer;user-select:none;${numColor}"># <span style="font-size:0.75rem;">${numIcon}</span></th>
-                    <th class="ch-sort-th" data-sort="name" style="cursor:pointer;user-select:none;${nameColor}">Naam van het kanaal <span style="font-size:0.75rem;">${nameIcon}</span></th>
-                    <th>Groep</th>
+                    <th class="ch-sort-th" data-sort="name" style="cursor:pointer;user-select:none;${nameColor}">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">
+                            <span>Naam van het kanaal <span style="font-size:0.75rem;">${nameIcon}</span></span>
+                            <span style="display:inline-flex;gap:0.35rem;flex-wrap:wrap;">
+                                <button type="button" class="btn btn-sm" id="bulkAdoptNamesBtn" title="Actieve kanalen in deze groep omzetten naar custom naam incl. vlag" style="min-height:44px;">🏷️ Actieve Custom</button>
+                                <button type="button" class="btn btn-sm" id="bulkResetNamesBtn" title="Actieve kanalen in deze groep herstellen naar originele naam" style="min-height:44px;">↩️ Actieve Origineel</button>
+                            </span>
+                        </div>
+                    </th>
                 </tr>`;
         }
+
+        document.getElementById('selectAllChannelsCheckbox')?.addEventListener('change', e => {
+            const checked = e.target.checked;
+            document.querySelectorAll('#channelsTableRoot tr[data-cid]').forEach(tr => {
+                const cb = tr.querySelector('.ch-select');
+                if (cb) {
+                    cb.checked = checked;
+                    tr.classList.toggle('row-selected', checked);
+                }
+            });
+            this.channelTable?.props?.onSelectionChange?.(this.channelTable?.getSelectedIds().length || 0);
+        });
+
+        document.getElementById('bulkAdoptNamesBtn')?.addEventListener('click', async e => {
+            e.stopPropagation();
+            if (!this.selectedGroupId) return;
+            await this.props.api.post('group_channel_tools', {
+                group_id: this.selectedGroupId,
+                mode: 'adopt_all_display_names',
+            });
+            this.props.toast?.show('Actieve kanaalnamen omgezet naar custom');
+            await this.loadChannels();
+            this.channelTable?.props?.onSelectionChange?.(0);
+        });
+
+        document.getElementById('bulkResetNamesBtn')?.addEventListener('click', async e => {
+            e.stopPropagation();
+            if (!this.selectedGroupId) return;
+            await this.props.api.post('group_channel_tools', {
+                group_id: this.selectedGroupId,
+                mode: 'reset_all_custom_names',
+            });
+            this.props.toast?.show('Actieve kanaalnamen hersteld naar origineel');
+            await this.loadChannels();
+            this.channelTable?.props?.onSelectionChange?.(0);
+        });
 
         thead.querySelectorAll('.ch-sort-th').forEach(th => {
             th.addEventListener('click', async () => {
