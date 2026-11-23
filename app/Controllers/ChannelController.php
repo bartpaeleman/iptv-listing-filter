@@ -653,6 +653,26 @@ final class ChannelController extends BaseController
         ]);
     }
 
+    public function searchCompatibleChannels(): void
+    {
+        $this->requireAuth();
+        $customGroupId = (int) ($_GET['custom_group_id'] ?? 0);
+        if ($customGroupId <= 0) {
+            $this->jsonError('Ongeldige custom groep.', 400);
+        }
+
+        $q = (string) ($_GET['q'] ?? '');
+        $sourceGroupId = isset($_GET['source_group_id']) && $_GET['source_group_id'] !== ''
+            ? (int) $_GET['source_group_id']
+            : null;
+        $limit = (int) ($_GET['limit'] ?? 50);
+        $offset = (int) ($_GET['offset'] ?? 0);
+
+        $repo = new ChannelRepository();
+        $result = $repo->searchCompatibleChannels($customGroupId, $q, $sourceGroupId, $limit, $offset);
+        $this->jsonSuccess($result);
+    }
+
     /**
      * @return array<int, string>
      */

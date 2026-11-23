@@ -3,6 +3,7 @@ import { debounce } from '../core/Debounce.js';
 import { GroupList } from '../components/GroupList.js';
 import { ChannelTable } from '../components/ChannelTable.js';
 import { CustomGroupSyncBanner } from '../components/CustomGroupSyncBanner.js';
+import { CustomGroupChannelPicker } from '../components/CustomGroupChannelPicker.js';
 import { GroupChannelToolsBar } from '../components/GroupChannelToolsBar.js';
 
 export class ChannelsPage extends BaseComponent {
@@ -117,7 +118,7 @@ export class ChannelsPage extends BaseComponent {
                     </select>
                 </td>
                 <td style="text-align:right;white-space:nowrap;">
-                    <button type="button" class="btn btn-sm group-preview-btn" data-action="preview-group" data-id="${g.id}" style="min-height:44px;margin-right:0.25rem;">👁️ Inhoud</button>
+                    <button type="button" class="btn btn-sm group-preview-btn" data-action="preview-group" data-id="${g.id}" data-ct="${this.escapeHtml(g.content_type || 'live')}" style="min-height:44px;margin-right:0.25rem;">👁️ Inhoud</button>
                     <button type="button" class="btn btn-sm ${enabled ? '' : 'btn-primary'} group-add-toggle-btn" data-id="${g.id}" data-enable="${enabled ? '0' : '1'}" style="min-height:44px;">
                         ${enabled ? 'Actief ✓' : '+ Activeer'}
                     </button>
@@ -259,6 +260,7 @@ export class ChannelsPage extends BaseComponent {
         resultsEl.querySelectorAll('.group-preview-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const id = Number(btn.dataset.id);
+                const groupCt = btn.dataset.ct || 'live';
                 const row = resultsEl.querySelector(`.group-preview-row[data-preview-for="${id}"]`);
                 const box = resultsEl.querySelector(`[data-preview-box="${id}"]`);
                 if (!row || !box) return;
@@ -274,11 +276,76 @@ export class ChannelsPage extends BaseComponent {
                     box.innerHTML = '<span class="muted">Geen kanalen in deze groep.</span>';
                     return;
                 }
-                box.innerHTML = chList.map(c => {
-                    const chName = this.escapeHtml(c.display_name || c.custom_name || c.tvg_name || '');
-                    const on = Number(c.is_enabled) === 1;
-                    return `<div style="display:flex;justify-content:space-between;padding:0.15rem 0;border-bottom:1px solid rgba(255,255,255,0.05);"><span>${chName}</span><span class="muted">${on ? '✅ Aan' : '⬜ Uit'}</span></div>`;
-                }).join('');
+
+                const allGroups = this.groupList?.state?.groups || [];
+                const compatibleCustom = allGroups.filter(
+                    g => Number(g.is_custom || 0) === 1 && (g.content_type || 'live') === groupCt
+                );
+
+                const renderPreviewRows = (memberIds = []) => {
+                    const memberSet = new Set(memberIds.map(Number));
+                    const targetBar = compatibleCustom.length > 0 ? `
+                        <div class="preview-target-bar">
+                            <label class="muted" style="font-size:0.85rem;">Doelgroep:</label>
+                            <select class="js-preview-target-group" style="min-height:44px;font-size:16px;">
+                                ${compatibleCustom.map(g => `<option value="${g.id}">${this.escapeHtml(g.custom_name || g.original_name || '')}</option>`).join('')}
+                            </select>
+                        </div>
+                    ` : '';
+
+                    const rowsHtml = chList.map(c => {
+                        const chName = this.escapeHtml(c.display_name || c.custom_name || c.tvg_name || '');
+                        const on = Number(c.is_enabled) === 1;
+                        const isMember = memberSet.has(Number(c.id));
+                        const actionHtml = compatibleCustom.length > 0
+                            ? (isMember
+                                ? `<button type="button" class="btn btn-sm badge-in-group" disabled>✓ In groep</button>`
+                                : `<button type="button" class="btn btn-sm btn-primary js-preview-add-ch" data-cid="${c.id}">+ Toevoegen</button>`)
+                            : '';
+                        return `<div class="preview-channel-row"><span>${chName}</span><div style="display:flex;align-items:center;gap:0.5rem;"><span class="muted">${on ? '✅ Aan' : '⬜ Uit'}</span>${actionHtml}</div></div>`;
+                    }).join('');
+
+                    box.innerHTML = targetBar + rowsHtml;
+
+                    const sel = box.querySelector('.js-preview-target-group');
+                    if (sel) {
+                        if (box.dataset.selectedTargetId) {
+                            sel.value = box.dataset.selectedTargetId;
+                        }
+                        sel.addEventListener('change', async () => {
+                            box.dataset.selectedTargetId = sel.value;
+                            const mRes = await this.props.api.get(`custom_group_member_ids&custom_group_id=${sel.value}`);
+                            renderPreviewRows(mRes?.member_ids || []);
+                        });
+                    }
+
+                    box.querySelectorAll('.js-preview-add-ch').forEach(addBtn => {
+                        addBtn.addEventListener('click', async () => {
+                            const targetId = Number(box.querySelector('.js-preview-target-group')?.value || compatibleCustom[0]?.id || 0);
+                            const cid = Number(addBtn.dataset.cid);
+                            if (!targetId || !cid) return;
+                            await this.props.api.post('custom_group_add_channels', {
+                                custom_group_id: targetId,
+                                channel_ids: [cid],
+                            });
+                            addBtn.textContent = '✓ In groep';
+                            addBtn.classList.remove('btn-primary');
+                            addBtn.classList.add('badge-in-group');
+                            addBtn.disabled = true;
+                            this.props.toast?.show('Kanaal toegevoegd aan custom groep');
+                            await this.loadGroupsOnly?.();
+                        });
+                    });
+                };
+
+                if (compatibleCustom.length > 0) {
+                    const firstTargetId = compatibleCustom[0].id;
+                    box.dataset.selectedTargetId = String(firstTargetId);
+                    const mRes = await this.props.api.get(`custom_group_member_ids&custom_group_id=${firstTargetId}`);
+                    renderPreviewRows(mRes?.member_ids || []);
+                } else {
+                    renderPreviewRows([]);
+                }
             });
         });
 
@@ -518,6 +585,14 @@ export class ChannelsPage extends BaseComponent {
                     remove_ids: removeIds,
                 });
                 this.props.toast.show('Sync-wijzigingen verwerkt');
+                await this.load();
+            }
+        });
+
+        this.channelPicker = new CustomGroupChannelPicker('#customGroupChannelPickerRoot', {
+            api: this.props.api,
+            toast: this.props.toast,
+            onAdded: async () => {
                 await this.load();
             }
         });
@@ -943,8 +1018,12 @@ export class ChannelsPage extends BaseComponent {
         const isCustom = selected && Number(selected.is_custom || 0) === 1;
 
         document.getElementById('convertToCustomBtn')?.classList.toggle('hidden', !selected || isCustom);
+        document.getElementById('openCustomChannelPickerBtn')?.classList.toggle('hidden', !isCustom);
         document.getElementById('deleteCustomGroupBtn')?.classList.toggle('hidden', !isCustom);
         document.getElementById('removeFromCustomGroupBtn')?.classList.toggle('hidden', !isCustom);
+        if (!isCustom) {
+            this.channelPicker?.close();
+        }
 
         if (isCustom && selected) {
             this.syncBanner?.setData(Number(selected.id), selected.sync_diff_json || null);

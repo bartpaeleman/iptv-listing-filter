@@ -113,6 +113,7 @@ switch ($route) {
         $router->addApiRoute('custom_group_remove_channels', ChannelController::class, 'customGroupRemoveChannels');
         $router->addApiRoute('custom_group_resolve_sync', ChannelController::class, 'customGroupResolveSync');
         $router->addApiRoute('custom_group_member_ids', ChannelController::class, 'customGroupMemberIds');
+        $router->addApiRoute('search_compatible_channels', ChannelController::class, 'searchCompatibleChannels');
         $router->addApiRoute('channels', ChannelController::class, 'channels');
         $router->addApiRoute('update_channel', ChannelController::class, 'updateChannel');
         $router->addApiRoute('bulk_channels', ChannelController::class, 'bulkChannels');

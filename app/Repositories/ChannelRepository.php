@@ -393,4 +393,100 @@ final class ChannelRepository extends BaseRepository
             throw $e;
         }
     }
+
+    /**
+     * @return array{items: array<int, array<string, mixed>>, has_more: bool, next_offset: int, compatible_groups: array<int, array<string, mixed>>}
+     */
+    public function searchCompatibleChannels(
+        int $customGroupId,
+        string $query = '',
+        ?int $sourceGroupId = null,
+        int $limit = 50,
+        int $offset = 0
+    ): array {
+        $grpStmt = $this->pdo->prepare('SELECT content_type FROM m3u_groups WHERE id = ? AND is_custom = 1 LIMIT 1');
+        $grpStmt->execute([$customGroupId]);
+        $targetContentType = $grpStmt->fetchColumn();
+        if ($targetContentType === false) {
+            return ['items' => [], 'has_more' => false, 'next_offset' => 0, 'compatible_groups' => []];
+        }
+        $targetContentType = (string) $targetContentType;
+
+        $limit = max(1, min(100, $limit));
+        $offset = max(0, $offset);
+
+        $where = [
+            'g.is_custom = 0',
+            'g.content_type = :ct',
+            'c.content_type = :cct',
+        ];
+        $params = [
+            ':cgid' => $customGroupId,
+            ':ct' => $targetContentType,
+            ':cct' => $targetContentType,
+        ];
+
+        if ($sourceGroupId !== null && $sourceGroupId > 0) {
+            $where[] = 'c.group_id = :sgid';
+            $params[':sgid'] = $sourceGroupId;
+        }
+
+        $cleanQuery = trim($query);
+        if ($cleanQuery !== '') {
+            $where[] = '(c.tvg_name LIKE :q1 OR c.custom_name LIKE :q2 OR g.original_name LIKE :q3)';
+            $like = '%' . $cleanQuery . '%';
+            $params[':q1'] = $like;
+            $params[':q2'] = $like;
+            $params[':q3'] = $like;
+        }
+
+        $whereSql = implode(' AND ', $where);
+        $fetchLimit = $limit + 1;
+
+        $sql = "SELECT c.id, c.tvg_name, c.custom_name, c.group_id, c.epg_channel_id,
+                       COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) AS display_name,
+                       COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS group_display_name,
+                       CASE WHEN cgc.id IS NOT NULL AND cgc.is_ignored = 0 THEN 1 ELSE 0 END AS already_in_custom
+                FROM channels c
+                INNER JOIN m3u_groups g ON g.id = c.group_id
+                LEFT JOIN custom_group_channels cgc ON cgc.channel_id = c.id AND cgc.custom_group_id = :cgid
+                WHERE {$whereSql}
+                ORDER BY g.original_name ASC, COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC
+                LIMIT {$fetchLimit} OFFSET {$offset}";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        $hasMore = count($rows) > $limit;
+        if ($hasMore) {
+            array_pop($rows);
+        }
+
+        foreach ($rows as &$row) {
+            $row['id'] = (int) $row['id'];
+            $row['group_id'] = (int) $row['group_id'];
+            $row['already_in_custom'] = ((int) $row['already_in_custom']) === 1;
+        }
+        unset($row);
+
+        $compatibleGroups = [];
+        if ($offset === 0) {
+            $cgStmt = $this->pdo->prepare(
+                'SELECT id, COALESCE(NULLIF(custom_name, \'\'), original_name) AS name
+                 FROM m3u_groups
+                 WHERE is_custom = 0 AND content_type = ?
+                 ORDER BY name ASC'
+            );
+            $cgStmt->execute([$targetContentType]);
+            $compatibleGroups = $cgStmt->fetchAll();
+        }
+
+        return [
+            'items' => $rows,
+            'has_more' => $hasMore,
+            'next_offset' => $offset + count($rows),
+            'compatible_groups' => $compatibleGroups,
+        ];
+    }
 }
