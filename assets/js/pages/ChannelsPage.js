@@ -231,7 +231,7 @@ export class ChannelsPage extends BaseComponent {
     }
 
     async loadChannels() {
-        if (!this.hasLoadedData || this.selectedContentTypes.size === 0) {
+        if (!this.hasLoadedData) {
             return;
         }
         if (!this.selectedGroupId && !this.channelSearch.trim()) {
@@ -244,7 +244,6 @@ export class ChannelsPage extends BaseComponent {
             status: document.getElementById('channelStatusFilter')?.value || 'all',
             has_epg: document.getElementById('channelEpgFilter')?.value || 'all',
             sort_by: this.channelSortBy,
-            content_types: Array.from(this.selectedContentTypes).join(','),
             limit: 150,
         };
         if (this.selectedGroupId) params.group_id = this.selectedGroupId;
@@ -450,28 +449,6 @@ export class ChannelsPage extends BaseComponent {
         document.getElementById('bulkDisableChannelsBtn')?.addEventListener('click', () => bulkChannels(false));
         document.getElementById('manageCountryTagsBtn')?.addEventListener('click', () => this.openCountryModal());
 
-        document.querySelectorAll('#contentTypeFilterBar .content-type-toggle').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const type = btn.dataset.type;
-                if (!type) return;
-                if (this.selectedContentTypes.has(type)) {
-                    this.selectedContentTypes.delete(type);
-                    btn.classList.remove('active');
-                } else {
-                    this.selectedContentTypes.add(type);
-                    btn.classList.add('active');
-                }
-                this.updateActiveScopeBadge();
-                this.selectedGroupId = null;
-                const loaded = await this.tryAutoLoadFromCache();
-                if (!loaded) {
-                    this.groups = [];
-                    this.groupList?.setState({ groups: [], selectedGroupId: null, countryTags: this.countryTags || [] });
-                    this.renderPreloadPrompt();
-                }
-            });
-        });
-
         document.getElementById('loadSourceToggleBtn')?.addEventListener('click', e => {
             this.loadFromDb = !this.loadFromDb;
             const btn = e.currentTarget;
@@ -605,25 +582,7 @@ export class ChannelsPage extends BaseComponent {
         this.props.switchTab('emoji-rules');
     }
 
-    updateContentTypeFilterUi() {
-        const labels = { live: 'Live TV', movie: 'Films', series: 'Series' };
-        this.container.querySelectorAll('.content-type-toggle').forEach(btn => {
-            const type = btn.dataset.type;
-            const active = Boolean(type && this.selectedContentTypes.has(type));
-            btn.classList.toggle('is-active', active);
-            btn.classList.toggle('active', active);
-            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-            const baseLabel = btn.dataset.label || btn.textContent.replace(/^✓\s*/, '');
-            btn.textContent = (active ? '✓ ' : '') + baseLabel;
-        });
-        const statusEl = document.getElementById('contentTypeStatusText');
-        if (statusEl) {
-            const activeNames = Array.from(this.selectedContentTypes).map(t => labels[t] || t);
-            statusEl.textContent = activeNames.length > 0
-                ? `Actief: ${activeNames.join(', ')}`
-                : 'Actief: Geen (selecteer minstens 1)';
-        }
-    }
+
 
     updateChannelsTableHeader() {
         const thead = document.getElementById('channelsTableHead');

@@ -13,6 +13,7 @@
   - `GroupList` markeert de geselecteerde groep met `.is-selected`; `ChannelsPage` start zonder geselecteerde groep (lege kanaalstaat), reset `selectedGroupId` bij uitschakelen en biedt per groep een inklapbare `👁️ Inhoud` kanaal-preview (`.group-preview-box`).
   - Oude scope- en `Filter & Laad`-bovenbalk verwijderd; rechter groepsselectiepaneel uitgebreid met 7 togglebare categorie-filterknoppen (`Live TV`, `Sport`, `Animatie`, `TV Series`, `Film`, `Muziek`, `Adult`), aparte categorie-kolom en inline `✏️` edit-knop met vaste `<select>`-dropdown (44px touch-target).
   - `EmojiRulesPage` uitgebreid met sectie **Groep-categorie Regels** met vaste `<select>`-dropdown voor alle 7 categorieën.
+  - Resterende `selectedContentTypes`-referenties en `content_types`-parameters opgeschoond uit `ChannelsPage.js`.
 
 ## Load Performance, View-Cache & EPG/Channel UX (`feature/rearchitecting-cached`)
 - **`app/Services/ViewCacheService.php`:**
