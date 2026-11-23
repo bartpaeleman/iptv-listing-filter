@@ -457,9 +457,11 @@ final class ChannelController extends BaseController
             $affected = $repo->bulkReplaceNameInGroup($groupId, $search, $replace, $caseSensitive);
         } elseif ($mode === 'adopt_all_display_names') {
             $channels = $repo->filter($groupId, '', '', false, 5000, 0, '', 'all', 'number')['items'];
+            $emojiService = new \App\Services\EmojiTagService();
+            $emojiService->seedDefaultsIfEmpty();
             foreach ($channels as $ch) {
                 $tvgName = (string) ($ch['tvg_name'] ?? '');
-                $parsed = \App\Services\EmojiTagService::parseName($tvgName, false);
+                $parsed = $emojiService->parseName($tvgName, false);
                 $displayName = trim((string) ($parsed['display_name'] ?? ''));
                 $emoji = (string) ($parsed['emoji_prefix'] ?? '');
                 if ($displayName !== '' && $displayName !== $tvgName) {
