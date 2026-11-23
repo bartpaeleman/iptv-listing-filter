@@ -21,6 +21,12 @@ export class ChannelsPage extends BaseComponent {
         this.hasLoadedData = false;
         this.groupList = null;
         this.channelTable = null;
+        this.groupSearchOffset = 0;
+        this.groupSearchHasMore = false;
+        this.groupSearchLoading = false;
+        this.groupSearchItems = new Map();
+        this.groupSearchRequestId = 0;
+        this.groupAddObserver = null;
     }
 
     async load() {
@@ -91,66 +97,163 @@ export class ChannelsPage extends BaseComponent {
         });
     }
 
-    async searchAndRenderAddGroups() {
+    renderGroupAddRow(g) {
+        const catOptions = ['Live TV', 'Sport', 'Animatie', 'TV Series', 'Film', 'Muziek', 'Adult'];
+        const displayRaw = String(g.display_name || g.custom_name || g.original_name || '');
+        const origRaw = String(g.original_name || '');
+        const name = this.escapeHtml(displayRaw);
+        const showOrig = origRaw !== '' && origRaw !== displayRaw;
+        const enabled = Number(g.is_enabled) === 1;
+        return `
+            <tr>
+                <td>
+                    <div>${name}</div>
+                    ${showOrig ? `<div class="group-add-original-name">${this.escapeHtml(origRaw)}</div>` : ''}
+                </td>
+                <td>
+                    <select class="category-tag-select" data-group-id="${g.id}">
+                        ${catOptions.map(c => `<option value="${c}" ${c === (g.category || 'Live TV') ? 'selected' : ''}>${c}</option>`).join('')}
+                    </select>
+                </td>
+                <td style="text-align:right;white-space:nowrap;">
+                    <button type="button" class="btn btn-sm group-preview-btn" data-action="preview-group" data-id="${g.id}" style="min-height:44px;margin-right:0.25rem;">👁️ Inhoud</button>
+                    <button type="button" class="btn btn-sm ${enabled ? '' : 'btn-primary'} group-add-toggle-btn" data-id="${g.id}" data-enable="${enabled ? '0' : '1'}" style="min-height:44px;">
+                        ${enabled ? 'Actief ✓' : '+ Activeer'}
+                    </button>
+                </td>
+            </tr>
+            <tr class="group-preview-row hidden" data-preview-for="${g.id}">
+                <td colspan="3">
+                    <div class="group-preview-box" data-preview-box="${g.id}">Laden...</div>
+                </td>
+            </tr>
+        `;
+    }
+
+    updateGroupAddSentinel() {
+        const sentinel = document.getElementById('groupAddLoadSentinel');
+        if (!sentinel) return;
+        if (this.groupSearchLoading) {
+            sentinel.textContent = 'Meer groepen laden...';
+        } else if (this.groupSearchHasMore) {
+            sentinel.textContent = '';
+        } else if (this.groupSearchItems.size > 0) {
+            sentinel.textContent = `Alle ${this.groupSearchItems.size} groepen geladen`;
+        } else {
+            sentinel.textContent = '';
+        }
+    }
+
+    setupGroupAddInfiniteScroll(resultsEl) {
+        if (this.groupAddObserver) {
+            this.groupAddObserver.disconnect();
+            this.groupAddObserver = null;
+        }
+        const sentinel = document.getElementById('groupAddLoadSentinel');
+        if (!sentinel || !resultsEl) return;
+
+        if ('IntersectionObserver' in window) {
+            this.groupAddObserver = new IntersectionObserver((entries) => {
+                for (const entry of entries) {
+                    if (entry.isIntersecting && this.groupSearchHasMore && !this.groupSearchLoading) {
+                        this.searchAndRenderAddGroups(true);
+                    }
+                }
+            }, {
+                root: resultsEl,
+                rootMargin: '120px 0px',
+                threshold: 0.01,
+            });
+            this.groupAddObserver.observe(sentinel);
+        }
+
+        if (!resultsEl.dataset.scrollBound) {
+            resultsEl.dataset.scrollBound = '1';
+            resultsEl.addEventListener('scroll', () => {
+                if (!this.groupSearchHasMore || this.groupSearchLoading) return;
+                const nearBottom = resultsEl.scrollTop + resultsEl.clientHeight >= resultsEl.scrollHeight - 120;
+                if (nearBottom) {
+                    this.searchAndRenderAddGroups(true);
+                }
+            });
+        }
+    }
+
+    async searchAndRenderAddGroups(append = false) {
         const resultsEl = document.getElementById('groupAddResults');
         if (!resultsEl) return;
         const q = (document.getElementById('groupAddSearchInput')?.value || '').trim();
         const status = document.getElementById('groupAddStatusFilter')?.value || 'disabled';
         const categories = Array.from(this.selectedGroupCategories).join(',');
 
-        resultsEl.innerHTML = `<div class="muted" style="padding:0.5rem;">Zoeken...</div>`;
-        const items = await this.props.api.get('groups_search', {
+        if (!append) {
+            this.groupSearchOffset = 0;
+            this.groupSearchHasMore = false;
+            this.groupSearchItems.clear();
+            this.groupSearchLoading = true;
+            resultsEl.innerHTML = `<div class="muted" style="padding:0.5rem;">Zoeken...</div>`;
+        } else {
+            if (!this.groupSearchHasMore || this.groupSearchLoading) return;
+            this.groupSearchLoading = true;
+            this.updateGroupAddSentinel();
+        }
+
+        const reqId = ++this.groupSearchRequestId;
+        const res = await this.props.api.get('groups_search', {
             q,
             status,
             categories,
             limit: 100,
+            offset: this.groupSearchOffset,
         });
 
-        if (!Array.isArray(items) || items.length === 0) {
-            resultsEl.innerHTML = `<div class="muted" style="padding:0.5rem;">Geen groepen gevonden.</div>`;
-            return;
+        if (reqId !== this.groupSearchRequestId) return;
+        this.groupSearchLoading = false;
+
+        const items = Array.isArray(res?.items) ? res.items : (Array.isArray(res) ? res : []);
+        this.groupSearchHasMore = Boolean(res?.has_more);
+        this.groupSearchOffset = Number.isFinite(res?.next_offset)
+            ? res.next_offset
+            : (this.groupSearchOffset + items.length);
+
+        const newItems = [];
+        for (const g of items) {
+            const key = String(g.id);
+            if (!this.groupSearchItems.has(key)) {
+                this.groupSearchItems.set(key, g);
+                newItems.push(g);
+            }
         }
 
-        const catOptions = ['Live TV', 'Sport', 'Animatie', 'TV Series', 'Film', 'Muziek', 'Adult'];
-        resultsEl.innerHTML = `
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Groep</th>
-                        <th style="width:170px;">Categorie</th>
-                        <th style="width:120px;text-align:right;">Actie</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${items.map(g => {
-                        const name = this.escapeHtml(g.display_name || g.custom_name || g.original_name || '');
-                        const enabled = Number(g.is_enabled) === 1;
-                        const cat = this.escapeHtml(g.category || 'Live TV');
-                        return `
-                            <tr>
-                                <td>${name}</td>
-                                <td>
-                                    <select class="category-tag-select" data-group-id="${g.id}">
-                                        ${catOptions.map(c => `<option value="${c}" ${c === (g.category || 'Live TV') ? 'selected' : ''}>${c}</option>`).join('')}
-                                    </select>
-                                </td>
-                                <td style="text-align:right;white-space:nowrap;">
-                                    <button type="button" class="btn btn-sm group-preview-btn" data-action="preview-group" data-id="${g.id}" style="min-height:44px;margin-right:0.25rem;">👁️ Inhoud</button>
-                                    <button type="button" class="btn btn-sm ${enabled ? '' : 'btn-primary'} group-add-toggle-btn" data-id="${g.id}" data-enable="${enabled ? '0' : '1'}" style="min-height:44px;">
-                                        ${enabled ? 'Actief ✓' : '+ Activeer'}
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr class="group-preview-row hidden" data-preview-for="${g.id}">
-                                <td colspan="3">
-                                    <div class="group-preview-box" data-preview-box="${g.id}">Laden...</div>
-                                </td>
-                            </tr>
-                        `;
-                    }).join('')}
-                </tbody>
-            </table>
-        `;
+        if (!append) {
+            if (this.groupSearchItems.size === 0) {
+                resultsEl.innerHTML = `<div class="muted" style="padding:0.5rem;">Geen groepen gevonden.</div>`;
+                return;
+            }
+            resultsEl.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Groep</th>
+                            <th style="width:170px;">Categorie</th>
+                            <th style="width:120px;text-align:right;">Actie</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${newItems.map(g => this.renderGroupAddRow(g)).join('')}
+                    </tbody>
+                </table>
+                <div id="groupAddLoadSentinel" class="group-add-sentinel"></div>
+            `;
+            this.setupGroupAddInfiniteScroll(resultsEl);
+        } else if (newItems.length > 0) {
+            const tbody = resultsEl.querySelector('tbody');
+            if (tbody) {
+                tbody.insertAdjacentHTML('beforeend', newItems.map(g => this.renderGroupAddRow(g)).join(''));
+            }
+        }
+
+        this.updateGroupAddSentinel();
 
         resultsEl.querySelectorAll('.group-preview-btn').forEach(btn => {
             btn.addEventListener('click', async () => {

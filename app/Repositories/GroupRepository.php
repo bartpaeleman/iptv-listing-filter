@@ -89,9 +89,9 @@ final class GroupRepository extends BaseRepository
     /**
      * @param array<int, string> $contentTypes
      * @param array<int, string> $categories
-     * @return array<int, array<string, mixed>>
+     * @return array{items: array<int, array<string, mixed>>, has_more: bool, next_offset: int}
      */
-    public function searchGroups(string $query, array $contentTypes = [], string $status = 'disabled', int $limit = 500, array $categories = []): array
+    public function searchGroups(string $query, array $contentTypes = [], string $status = 'disabled', int $limit = 100, int $offset = 0, array $categories = []): array
     {
         $where = ['1=1'];
         $params = [];
@@ -145,7 +145,9 @@ final class GroupRepository extends BaseRepository
             $where[] = 'g.category IN (' . implode(', ', $catPh) . ')';
         }
 
-        $safeLimit = max(1, min(100, $limit));
+        $safeLimit = max(1, min(200, $limit));
+        $safeOffset = max(0, $offset);
+        $limitPlusOne = $safeLimit + 1;
         $whereSql = implode(' AND ', $where);
         $stmt = $this->pdo->prepare(
             "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type,
@@ -153,10 +155,24 @@ final class GroupRepository extends BaseRepository
              FROM m3u_groups g
              WHERE {$whereSql}
              ORDER BY g.original_name ASC, g.id ASC
-             LIMIT {$safeLimit}"
+             LIMIT :limitPlusOne OFFSET :offset"
         );
-        $stmt->execute($params);
-        return $stmt->fetchAll();
+        foreach ($params as $key => $val) {
+            $stmt->bindValue($key, $val);
+        }
+        $stmt->bindValue(':limitPlusOne', $limitPlusOne, \PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $safeOffset, \PDO::PARAM_INT);
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll();
+        $hasMore = count($rows) > $safeLimit;
+        $items = array_slice($rows, 0, $safeLimit);
+
+        return [
+            'items' => $items,
+            'has_more' => $hasMore,
+            'next_offset' => $safeOffset + count($items),
+        ];
     }
 
     public function updateCategory(int $groupId, string $category, bool $lock = true): void
