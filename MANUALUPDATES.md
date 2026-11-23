@@ -11,3 +11,7 @@ Dit document beschrijft handmatige acties die beheerders op de QNAP NAS moeten u
 
 ## Update naar Groepssortering & Dynamische Kanaalhernummering
 - `SchemaMigrator::ensureSchemaUpToDate()` voert de migratie (`m3u_groups.import_order` en `settings.group_sort_mode`) automatisch uit bij het openen van het dashboard. Indien de database-gebruiker geen `ALTER TABLE`-rechten heeft, voer dan handmatig `database/update.sql` uit als DB-admin.
+
+## Update naar Load Performance & View-Cache (`feature/rearchitecting-cached`)
+- Geen database-migratie of `.env`-wijziging vereist.
+- Zorg dat `storage/cache/` schrijfbaar is voor PHP (voor de automatische aanmaak van `storage/cache/view/`).

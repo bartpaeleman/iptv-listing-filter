@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased] - feature/rearchitecting-cached
+### Toegevoegd
+- **View-Cache (`ViewCacheService.php`):** Lichtgewicht JSON view-cache in `storage/cache/view/` voor dashboard-statistieken, actieve groepen per `content_types`-combinatie en kanalen per `group_id`, met gerichte invalidatie bij mutaties.
+- **On-demand Groepszoeker (`+ Groep toevoegen`):** Visuele tussenstap in `ChannelsPage.js` gekoppeld aan `groups_search` (`GroupRepository::searchGroups`), inclusief tag-zoeksyntaxis met `(...)`, `[...]` of `|...|` (bijv. `[BE]`, `(NL)`).
+- **Bron-toggle & Laadvoortgang (`ChannelsPage.js`):** Toggle-knop `Bron: ⚡ Cache` / `Bron: 🗄️ Database` naast **Filter & Laad**, dynamische scope-badge (`#activeScopeBadge`) en voortgangsbalk met verstreken tijd.
+- **EPG Editor Verbeteringen (`EpgMappingPage.js`):** Actieve groepen-filter (`#epgGroupFilter`), 1-rij inline filters, max 10 rijen per pagina met paginatie en sorteerbare kolomheaders (ASC/DESC met chevron).
+- **Kanaalsortering met Volgnummer-persistentie:** Klikbare `#` en `Naam van het kanaal` headers met chevron (`reorder_group_channels`), die actieve kanalen atomisch hernummeren (`1..N`) in de database; bij groepswissel wordt sortering gereset naar `number` (ASC).
+### Gewijzigd
+- **Groepen altijd alfabetisch ASC:** Groepssorteerknop en `Alles Aan`/`Alles Uit` verwijderd; actieve groepen en zoekresultaten sorteren altijd op `original_name ASC`.
+- **Emoji-limiet (`EmojiTagService.php`):** Maximaal 1 keyword-emoji per naam (totaal max 2 tags incl. landvlag), en geen extra keyword-emoji als een naam al met een emoji begint.
+
 ## [Unreleased] - feature/sorting-and-numbering
 ### Toegevoegd
 - **Stap 2 — Custom Groep- & Kanaalnamen + Bulk-UI (`ChannelsPage.js`, `ChannelTable.js`, `ChannelController.php`):**

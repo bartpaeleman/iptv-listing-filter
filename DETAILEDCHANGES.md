@@ -1,5 +1,23 @@
 # Detailed Changes
 
+## Load Performance, View-Cache & EPG/Channel UX (`feature/rearchitecting-cached`)
+- **`app/Services/ViewCacheService.php`:**
+  - Nieuwe file-based JSON view-cache in `storage/cache/view/` voor `dashboard_stats.json`, `active_groups_*.json` en `group_channels_{id}.json` met `invalidateDashboardStats()`, `invalidateGroupsCache()`, `invalidateGroupChannels()` en `invalidateAll()`.
+- **`app/Repositories/GroupRepository.php` & `app/Repositories/ChannelRepository.php`:**
+  - `GroupRepository::activeWithCounts()` haalt uitsluitend actieve groepen (`is_enabled = 1`) op, altijd gesorteerd op `g.original_name ASC, g.id ASC`.
+  - `GroupRepository::searchGroups()` zoekt direct op `m3u_groups` (limiet 50-100, zonder `JOIN channels`) en ondersteunt `(...)`, `[...]` en `|...|` tag-syntaxis.
+  - `ChannelRepository::filter()` ondersteunt extra `sort_by`-waarden (`number_desc`, `epg_status_asc|desc`, `epg_name_asc|desc`).
+  - `ChannelRepository::reorderGroupBySort()` hernummert actieve kanalen van een groep atomisch (`1..N`) volgens de gekozen sortering.
+- **`app/Controllers/ChannelController.php`, `app/Controllers/DashboardController.php` & `index.php`:**
+  - `DashboardController::index()` gebruikt `ViewCacheService` voor de 6 `COUNT(*)`-statistieken.
+  - `ChannelController::groups()` ondersteunt `scope=active|all`, `cache_only=1` en `refresh=1`.
+  - Nieuwe endpoints `groups_search` (`ChannelController::searchGroups()`) en `reorder_group_channels` (`ChannelController::reorderGroupChannels()`), plus `ChannelController::setGroupSort()`.
+- **`app/Services/EmojiTagService.php`:**
+  - `parseName()` stopt na de eerste keyword-match (`break`) en slaat keyword-emoji's over als `clean_name` al met een emoji begint.
+- **`assets/js/pages/ChannelsPage.js` & `assets/js/pages/EpgMappingPage.js`:**
+  - `ChannelsPage`: auto-load uit view-cache bij openen en bij klikken op scope-toggles, `Bron: ⚡ Cache` / `Bron: 🗄️ Database` toggle, `#activeScopeBadge`, `#channelsLoadProgressWrap`, `+ Groep toevoegen` zoekpaneel, en klikbare `#` / `Naam van het kanaal` headers met `reorder_group_channels`.
+  - `EpgMappingPage`: 1-rij toolbar met `#epgGroupFilter`, 10 rijen per pagina met paginatie, en sorteerbare kolomheaders met chevrons.
+
 ## Groepen & Kanalen — Stap 2 & 3: Custom Namen, Groepssortering & Dynamische Hernummering (`feature/sorting-and-numbering`)
 - **`database/schema.sql`, `database/update.sql` & `app/Core/SchemaMigrator.php`:**
   - Kolom `import_order INT UNSIGNED NOT NULL DEFAULT 0` toegevoegd aan `m3u_groups` en `group_sort_mode` (`import`) toegevoegd aan `settings`.
