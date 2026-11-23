@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased] - feature/xtream-export
+### Toegevoegd
+- **Uitgaande Xtream Codes API Server (`XtreamServerService.php`, `XtreamServerController.php`):** Volledige ondersteuning voor `player_api.php` (auth, `get_live_categories`, `get_live_streams`, `get_short_epg`, `get_simple_data_table`), `get.php`, `xmltv.php` en `/live/{user}/{pass}/{id}.{ts|m3u8}` redirects.
+- **Dashboard Xtream Codes Client Login (`DashboardPage.js`, `DashboardController.php`):** Dedicated kaart met Server URL, Gebruikersnaam, Wachtwoord (gemaskeerd + toggle) en kopieerknoppen.
+- **Instellingen Uitgaande Xtream Credentials (`SettingsPage.js`, `SettingsController.php`):** Beheer van `xtream_out_enabled`, `xtream_out_username` en `xtream_out_password` (AES-256-GCM versleuteld) met 1-klik generator voor sterke inloggegevens.
+### Gewijzigd
+- **M3U & XMLTV EPG Matching voor IPTVX (`PlaylistExporterService.php`):** Absolute `url-tvg` en `x-tvg-url` in `#EXTM3U` header op basis van `HTTP_HOST`/scheme.
+
 ## [Unreleased] - feature/rearchitecting-cached
 ### Toegevoegd
 - **View-Cache (`ViewCacheService.php`):** Lichtgewicht JSON view-cache in `storage/cache/view/` voor dashboard-statistieken, actieve groepen per `content_types`-combinatie en kanalen per `group_id`, met gerichte invalidatie bij mutaties.

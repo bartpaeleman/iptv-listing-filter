@@ -25,6 +25,7 @@ use App\Controllers\EpgController;
 use App\Controllers\FeedController;
 use App\Controllers\InstallController;
 use App\Controllers\SettingsController;
+use App\Controllers\XtreamServerController;
 use App\Core\EnvLoader;
 use App\Core\Router;
 use App\Security\AuthService;
@@ -56,6 +57,22 @@ switch ($route) {
 
     case 'cron':
         (new FeedController())->cron();
+        break;
+
+    case 'xtream_api':
+        (new XtreamServerController())->playerApi();
+        break;
+
+    case 'xtream_get':
+        (new XtreamServerController())->getPlaylist();
+        break;
+
+    case 'xtream_xmltv':
+        (new XtreamServerController())->xmltv();
+        break;
+
+    case 'xtream_live':
+        (new XtreamServerController())->liveStream();
         break;
 
     case 'api':

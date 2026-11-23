@@ -32,6 +32,8 @@ final class SettingsController extends BaseController
         $xtreamUser = (string) $settings->get('xtream_username', '');
         $xtreamPass = (string) $settings->get('xtream_password', '');
         $xtreamCustomEpg = (string) $settings->get('xtream_custom_epg_url', '');
+        $xtreamOutUser = (string) $settings->get('xtream_out_username', '');
+        $xtreamOutPass = (string) $settings->get('xtream_out_password', '');
 
         $this->jsonSuccess([
             'source_mode' => $settings->get('source_mode', 'xtream'),
@@ -41,6 +43,9 @@ final class SettingsController extends BaseController
             'xtream_output_params' => $settings->get('xtream_output_params', 'type=m3u_plus&output=ts'),
             'xtream_epg_mode' => $settings->get('xtream_epg_mode', 'xtream_xmltv'),
             'xtream_custom_epg_url_masked' => $xtreamCustomEpg !== '' ? substr($xtreamCustomEpg, 0, 36) . (strlen($xtreamCustomEpg) > 36 ? '••••' : '') : '',
+            'xtream_out_enabled' => $settings->get('xtream_out_enabled', '0') === '1',
+            'xtream_out_username_masked' => $xtreamOutUser !== '' ? substr($xtreamOutUser, 0, 3) . '••••' : '',
+            'xtream_out_password_set' => $xtreamOutPass !== '',
             'm3u_source_url_masked' => $m3u !== '' ? substr($m3u, 0, 28) . '••••••' : '',
             'epg_source_url_masked' => $epg !== '' ? substr($epg, 0, 36) . (strlen($epg) > 36 ? '••••' : '') : '',
             'sync_interval_hours' => (int) $settings->get('sync_interval_hours', '72'),
@@ -128,6 +133,15 @@ final class SettingsController extends BaseController
         }
         if (isset($input['enforce_lan_ip'])) {
             $settings->set('enforce_lan_ip', $input['enforce_lan_ip'] ? '1' : '0', false);
+        }
+        if (isset($input['xtream_out_enabled'])) {
+            $settings->set('xtream_out_enabled', $input['xtream_out_enabled'] ? '1' : '0', false);
+        }
+        if (!empty($input['xtream_out_username'])) {
+            $settings->set('xtream_out_username', trim((string) $input['xtream_out_username']), true);
+        }
+        if (!empty($input['xtream_out_password'])) {
+            $settings->set('xtream_out_password', (string) $input['xtream_out_password'], true);
         }
 
         $this->jsonSuccess();

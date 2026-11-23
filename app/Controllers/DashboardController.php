@@ -48,6 +48,23 @@ final class DashboardController extends BaseController
 
         $cache = new \App\Services\FeedCacheService($settings);
 
+        $xtreamOutEnabled = $settings->get('xtream_out_enabled', '0') === '1';
+        $xtreamOutUser = '';
+        $xtreamOutPass = '';
+        try {
+            $crypto = new \App\Security\CryptoService();
+            $encUser = (string) $settings->get('xtream_out_username', '');
+            $encPass = (string) $settings->get('xtream_out_password', '');
+            if ($encUser !== '') {
+                $xtreamOutUser = $crypto->decrypt($encUser);
+            }
+            if ($encPass !== '') {
+                $xtreamOutPass = $crypto->decrypt($encPass);
+            }
+        } catch (\Throwable) {
+            // ignore decryption errors
+        }
+
         $this->jsonSuccess([
             'active_channels' => (int) ($stats['active_channels'] ?? 0),
             'total_channels' => (int) ($stats['total_channels'] ?? 0),
@@ -62,6 +79,9 @@ final class DashboardController extends BaseController
             'output_token' => $settings->get('output_token', ''),
             'source_mode' => $settings->get('source_mode', 'separate_urls'),
             'app_url' => rtrim((string) EnvLoader::get('APP_URL', ''), '/'),
+            'xtream_out_enabled' => $xtreamOutEnabled,
+            'xtream_out_username' => $xtreamOutUser,
+            'xtream_out_password' => $xtreamOutPass,
             'logs' => $logs->recent(15),
             'cache_status' => [
                 'm3u' => $cache->getCacheInfo('m3u'),

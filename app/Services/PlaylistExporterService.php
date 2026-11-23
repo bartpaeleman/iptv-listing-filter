@@ -22,7 +22,7 @@ final class PlaylistExporterService
 
     public function streamPlaylist(string $sortMode = 'import'): void
     {
-        $appUrl = rtrim((string) EnvLoader::get('APP_URL', ''), '/');
+        $appUrl = $this->resolveBaseUrl();
         $token = (string) $this->settings->get('output_token', '');
         $epgUrl = $appUrl . '/index.php?route=epg' . ($token !== '' ? '&token=' . urlencode($token) : '');
 
@@ -67,6 +67,22 @@ final class PlaylistExporterService
             echo '#EXTINF:-1 ' . implode(' ', $attrs) . ',' . $name . "\n";
             echo $row['stream_url'] . "\n";
         }
+    }
+
+    private function resolveBaseUrl(): string
+    {
+        if (!empty($_SERVER['HTTP_HOST'])) {
+            $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+            $scheme = $isHttps ? 'https' : 'http';
+            $scriptDir = rtrim(str_replace('\\', '/', dirname((string) ($_SERVER['SCRIPT_NAME'] ?? ''))), '/');
+            if ($scriptDir === '.') {
+                $scriptDir = '';
+            }
+            return $scheme . '://' . $_SERVER['HTTP_HOST'] . $scriptDir;
+        }
+
+        return rtrim((string) EnvLoader::get('APP_URL', ''), '/');
     }
 
     private function escapeAttr(string $value): string
