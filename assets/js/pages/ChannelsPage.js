@@ -297,7 +297,6 @@ export class ChannelsPage extends BaseComponent {
                                     <th>Aan</th>
                                     <th id="sortChannelsByNum" style="cursor:pointer;user-select:none;" title="Sorteer op kanaalnummer">#</th>
                                     <th id="sortChannelsByName" style="cursor:pointer;user-select:none;" title="Klik om te sorteren: A-Z / Z-A / Import">Naam (Origineel / Custom) <span id="channelNameSortBadge" class="muted" style="font-size:0.8rem;font-weight:normal;"></span></th>
-                                    <th>Groep</th>
                                 </tr>
                             </thead>
                             <tbody id="channelsTableRoot"></tbody>
@@ -603,7 +602,6 @@ export class ChannelsPage extends BaseComponent {
                     <th style="width:72px;">Aan/Uit</th>
                     <th class="ch-sort-th" data-sort="number" style="width:90px;cursor:pointer;user-select:none;${numColor}"># <span style="font-size:0.75rem;">${numIcon}</span></th>
                     <th class="ch-sort-th" data-sort="name" style="cursor:pointer;user-select:none;${nameColor}">Naam van het kanaal <span style="font-size:0.75rem;">${nameIcon}</span></th>
-                    <th>Groep</th>
                 </tr>`;
         }
 
