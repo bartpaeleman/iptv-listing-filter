@@ -126,6 +126,7 @@ final class XtreamServerController
         }
 
         header('Location: ' . $url, true, 302);
+        exit;
     }
 
     private function resolveProtocol(): string

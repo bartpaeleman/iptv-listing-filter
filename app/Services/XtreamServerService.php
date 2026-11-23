@@ -242,7 +242,7 @@ final class XtreamServerService
             default => 'g.import_order ASC, g.id ASC',
         };
 
-        $where = "g.is_enabled = 1 AND c.is_enabled = 1 AND g.category = 'Film'";
+        $where = "g.is_enabled = 1 AND c.is_enabled = 1 AND LOWER(TRIM(g.category)) = 'film'";
         $params = [];
         if ($categoryId !== null && $categoryId > 0) {
             $where .= ' AND c.group_id = ?';
@@ -293,7 +293,7 @@ final class XtreamServerService
             "SELECT c.id, c.group_id, c.tvg_name, c.tvg_logo, c.custom_name, c.stream_url
              FROM channels c
              INNER JOIN m3u_groups g ON g.id = c.group_id
-             WHERE c.id = ? AND g.is_enabled = 1 AND c.is_enabled = 1 AND g.category = 'Film'
+             WHERE c.id = ? AND g.is_enabled = 1 AND c.is_enabled = 1 AND LOWER(TRIM(g.category)) = 'film'
              LIMIT 1"
         );
         $stmt->execute([$vodId]);
@@ -306,12 +306,24 @@ final class XtreamServerService
         $name = ChannelNameCleanerService::stripQualityTags((string) ($row['custom_name'] ?: $row['tvg_name'] ?: 'Movie'));
         $added = (string) time();
         $ext = $this->detectExtension((string) ($row['stream_url'] ?? ''), 'mp4');
+        $logo = (string) ($row['tvg_logo'] ?? '');
 
         return [
             'info' => [
+                'movie_image' => $logo,
+                'cover_big' => $logo,
                 'name' => $name,
-                'movie_image' => (string) ($row['tvg_logo'] ?? ''),
                 'plot' => '',
+                'cast' => '',
+                'director' => '',
+                'genre' => '',
+                'releasedate' => '',
+                'rating' => '0',
+                'rating_5based' => 0,
+                'backdrop_path' => [],
+                'youtube_trailer' => '',
+                'duration' => '',
+                'duration_secs' => 0,
             ],
             'movie_data' => [
                 'stream_id' => (int) $row['id'],
@@ -409,7 +421,7 @@ final class XtreamServerService
         $stmt = $this->pdo->prepare(
             "SELECT id, COALESCE(NULLIF(custom_name, ''), original_name) AS display_name
              FROM m3u_groups
-             WHERE is_enabled = 1 AND category = ?
+             WHERE is_enabled = 1 AND LOWER(TRIM(category)) = LOWER(?)
              ORDER BY {$groupOrder}"
         );
         $stmt->execute([$category]);
