@@ -271,8 +271,8 @@ export class ChannelsPage extends BaseComponent {
                             <button type="button" class="btn btn-sm hidden" id="adoptGroupNameBtn" title="Huidige weergavenaam (incl. vlag/emoji) opslaan als custom naam">❐</button>
                             <button type="button" class="btn btn-sm hidden" id="editGroupNameBtn" title="Groepsnaam aanpassen">✏️</button>
                             <button class="btn btn-sm" id="manageCountryTagsBtn">🏷️ Landen & Tags Beheren</button>
-                            <button class="btn btn-sm" id="bulkEnableChannelsBtn">Alles Aan</button>
-                            <button class="btn btn-sm" id="bulkDisableChannelsBtn">Alles Uit</button>
+                            <button class="btn btn-sm" id="bulkEnableChannelsBtn">Selectie Aan</button>
+                            <button class="btn btn-sm" id="bulkDisableChannelsBtn">Selectie Uit</button>
                         </div>
                     </div>
                     <div class="toolbar" style="flex-wrap:wrap;">
@@ -365,8 +365,12 @@ export class ChannelsPage extends BaseComponent {
             onSelectionChange: count => {
                 const enableBtn = document.getElementById('bulkEnableChannelsBtn');
                 const disableBtn = document.getElementById('bulkDisableChannelsBtn');
+                const adoptBtn = document.getElementById('bulkAdoptNamesBtn');
+                const resetBtn = document.getElementById('bulkResetNamesBtn');
                 if (enableBtn) enableBtn.textContent = count > 0 ? `Selectie Aan (${count})` : 'Selectie Aan';
                 if (disableBtn) disableBtn.textContent = count > 0 ? `Selectie Uit (${count})` : 'Selectie Uit';
+                if (adoptBtn) adoptBtn.textContent = count > 0 ? `🏷️ Selectie Custom (${count})` : '🏷️ Selectie Custom';
+                if (resetBtn) resetBtn.textContent = count > 0 ? `↩️ Selectie Origineel (${count})` : '↩️ Selectie Origineel';
             }
         });
 
@@ -605,33 +609,57 @@ export class ChannelsPage extends BaseComponent {
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">
                             <span>Naam van het kanaal <span style="font-size:0.75rem;">${nameIcon}</span></span>
                             <span style="display:inline-flex;gap:0.35rem;flex-wrap:wrap;">
-                                <button type="button" class="btn btn-sm" id="bulkAdoptNamesBtn" title="Alle kanalen in deze groep omzetten naar custom naam incl. vlag" style="min-height:44px;">🏷️ Alles Custom</button>
-                                <button type="button" class="btn btn-sm" id="bulkResetNamesBtn" title="Alle kanalen in deze groep herstellen naar originele naam" style="min-height:44px;">↩️ Alles Origineel</button>
+                                <button type="button" class="btn btn-sm" id="bulkAdoptNamesBtn" title="Geselecteerde kanalen omzetten naar custom naam incl. vlag" style="min-height:44px;">🏷️ Selectie Custom</button>
+                                <button type="button" class="btn btn-sm" id="bulkResetNamesBtn" title="Geselecteerde kanalen herstellen naar originele naam" style="min-height:44px;">↩️ Selectie Origineel</button>
                             </span>
                         </div>
                     </th>
                 </tr>`;
         }
 
+        document.getElementById('selectAllChannelsCheckbox')?.addEventListener('change', e => {
+            const checked = e.target.checked;
+            document.querySelectorAll('#channelsTableRoot tr[data-cid]').forEach(tr => {
+                const cb = tr.querySelector('.ch-select');
+                if (cb) {
+                    cb.checked = checked;
+                    tr.classList.toggle('row-selected', checked);
+                }
+            });
+            this.channelTable?.props?.onSelectionChange?.(this.channelTable?.getSelectedIds().length || 0);
+        });
+
         document.getElementById('bulkAdoptNamesBtn')?.addEventListener('click', async e => {
             e.stopPropagation();
             if (!this.selectedGroupId) return;
+            const ids = this.channelTable?.getSelectedIds() || [];
+            if (ids.length === 0) {
+                this.props.toast?.show('Selecteer eerst één of meer kanalen');
+                return;
+            }
             await this.props.api.post('group_channel_tools', {
                 group_id: this.selectedGroupId,
                 mode: 'adopt_all_display_names',
+                ids,
             });
-            this.props.toast?.show('Alle kanaalnamen omgezet naar custom');
+            this.props.toast?.show('Geselecteerde kanaalnamen omgezet naar custom');
             await this.loadChannels();
         });
 
         document.getElementById('bulkResetNamesBtn')?.addEventListener('click', async e => {
             e.stopPropagation();
             if (!this.selectedGroupId) return;
+            const ids = this.channelTable?.getSelectedIds() || [];
+            if (ids.length === 0) {
+                this.props.toast?.show('Selecteer eerst één of meer kanalen');
+                return;
+            }
             await this.props.api.post('group_channel_tools', {
                 group_id: this.selectedGroupId,
                 mode: 'reset_all_custom_names',
+                ids,
             });
-            this.props.toast?.show('Alle kanaalnamen hersteld naar origineel');
+            this.props.toast?.show('Geselecteerde kanaalnamen hersteld naar origineel');
             await this.loadChannels();
         });
 
