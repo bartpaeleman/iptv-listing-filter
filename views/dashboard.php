@@ -11,6 +11,7 @@ ob_start();
     <nav class="tabs" role="tablist">
         <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
         <button class="tab-btn" data-tab="channels">Groepen & Kanalen</button>
+        <button class="tab-btn" data-tab="emoji-rules">🏷️ Landen &amp; Tags</button>
         <button class="tab-btn" data-tab="epg">EPG Koppeling</button>
         <button class="tab-btn" data-tab="settings">Bronnen & Cron</button>
     </nav>
