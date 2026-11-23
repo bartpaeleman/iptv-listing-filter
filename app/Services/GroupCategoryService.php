@@ -9,7 +9,7 @@ use PDO;
 
 final class GroupCategoryService
 {
-    public const CATEGORIES = ['Live TV', 'Sport', 'Animatie', 'TV Series', 'Film'];
+    public const CATEGORIES = ['Live TV', 'Sport', 'Animatie', 'TV Series', 'Film', 'Muziek', 'Adult'];
 
     /**
      * @param array<int, array{pattern: string, category: string}> $customRules
@@ -30,6 +30,12 @@ final class GroupCategoryService
         }
 
         $lower = mb_strtolower($name, 'UTF-8');
+        if (preg_match('/\b(adult|xxx|18\+|erotic|erotiek|porn|playboy|hustler|brazzers|vivid|dorcel|private|sex|nsfw)\b/u', $lower) || str_contains($lower, '18+')) {
+            return 'Adult';
+        }
+        if (preg_match('/\b(muziek|music|concert|concerten|radio|mtv|hits|dj|schlager|klassiek|classical)\b/u', $lower)) {
+            return 'Muziek';
+        }
         if (preg_match('/\b(sport|sports|voetbal|football|soccer|f1|formula|motorsport|tennis|golf|ufc|boxing|dazn|espn|viaplay)\b/u', $lower)) {
             return 'Sport';
         }

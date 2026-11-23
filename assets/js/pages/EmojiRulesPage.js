@@ -133,6 +133,8 @@ export class EmojiRulesPage extends BaseComponent {
                         <option value="Animatie">Animatie</option>
                         <option value="TV Series">TV Series</option>
                         <option value="Film">Film</option>
+                        <option value="Muziek">Muziek</option>
+                        <option value="Adult">Adult</option>
                     </select>
                     <button type="submit" class="btn btn-primary" style="min-height:44px;">+ Regel toevoegen</button>
                 </form>

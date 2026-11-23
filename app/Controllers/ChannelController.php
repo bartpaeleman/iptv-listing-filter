@@ -104,10 +104,11 @@ final class ChannelController extends BaseController
         $this->verifyCsrf($input);
 
         $id = (int) ($input['id'] ?? 0);
-        $category = trim((string) ($input['category'] ?? 'Live TV'));
+        $category = trim((string) ($input['category'] ?? ''));
         $lock = array_key_exists('lock', $input) ? (bool) $input['lock'] : true;
         if (!in_array($category, \App\Services\GroupCategoryService::CATEGORIES, true)) {
-            $category = 'Live TV';
+            $this->jsonError('Ongeldige categorie.', 400);
+            return;
         }
         if ($id > 0) {
             (new GroupRepository())->updateCategory($id, $category, $lock);

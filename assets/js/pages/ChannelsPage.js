@@ -110,7 +110,7 @@ export class ChannelsPage extends BaseComponent {
             return;
         }
 
-        const catOptions = ['Live TV', 'Sport', 'Animatie', 'TV Series', 'Film'];
+        const catOptions = ['Live TV', 'Sport', 'Animatie', 'TV Series', 'Film', 'Muziek', 'Adult'];
         resultsEl.innerHTML = `
             <table class="data-table">
                 <thead>
@@ -131,10 +131,10 @@ export class ChannelsPage extends BaseComponent {
                                 <td>
                                     <div class="cat-cell-display" data-id="${g.id}" style="display:flex;align-items:center;gap:0.35rem;">
                                         <span class="cat-badge">${cat}</span>
-                                        <button type="button" class="btn btn-sm cat-edit-btn" data-id="${g.id}" title="Categorie wijzigen" style="min-height:36px;min-width:36px;">✏️</button>
+                                        <button type="button" class="btn btn-sm cat-edit-btn" data-id="${g.id}" title="Categorie wijzigen" style="min-height:44px;min-width:44px;">✏️</button>
                                     </div>
                                     <div class="cat-cell-edit hidden" data-id="${g.id}" style="display:flex;align-items:center;gap:0.25rem;">
-                                        <select class="cat-select" data-id="${g.id}" style="font-size:16px;min-height:36px;">
+                                        <select class="cat-select" data-id="${g.id}" style="font-size:16px;min-height:44px;">
                                             ${catOptions.map(c => `<option value="${c}" ${c === (g.category || 'Live TV') ? 'selected' : ''}>${c}</option>`).join('')}
                                         </select>
                                     </div>
@@ -295,6 +295,8 @@ export class ChannelsPage extends BaseComponent {
                             <button type="button" class="cat-filter-btn" data-cat="Animatie">Animatie</button>
                             <button type="button" class="cat-filter-btn" data-cat="TV Series">TV Series</button>
                             <button type="button" class="cat-filter-btn" data-cat="Film">Film</button>
+                            <button type="button" class="cat-filter-btn" data-cat="Muziek">Muziek</button>
+                            <button type="button" class="cat-filter-btn" data-cat="Adult">Adult</button>
                         </div>
                         <div class="toolbar" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.75rem;">
                             <input type="search" id="groupAddSearchInput" placeholder="Zoek groep (bv. BE, NL, [UK], Sport)..." style="flex:1;min-width:180px;font-size:16px;min-height:44px;">
