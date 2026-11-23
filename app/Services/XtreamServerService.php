@@ -136,7 +136,7 @@ final class XtreamServerService
         $num = 1;
         while ($row = $stmt->fetch()) {
             $epgId = (string) ($row['epg_channel_id'] ?: $row['tvg_id'] ?: '');
-            $name = (string) ($row['custom_name'] ?: $row['tvg_name'] ?: 'Channel');
+            $name = ChannelNameCleanerService::stripQualityTags((string) ($row['custom_name'] ?: $row['tvg_name'] ?: 'Channel'));
             $streamId = (int) $row['id'];
 
             $streams[] = [

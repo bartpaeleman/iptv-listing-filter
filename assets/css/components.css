@@ -373,3 +373,100 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; }
     background-repeat: no-repeat;
     background-position: right 0.7rem center;
 }
+
+/* Collapsible Card Sections */
+.collapsible-card {
+    background: var(--card-bg, #1a1f29);
+    border: 1px solid var(--border-color, #2a2f3a);
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+
+.collapsible-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    font-weight: 600;
+    font-size: 1.05rem;
+}
+
+.collapsible-card__header::-webkit-details-marker {
+    display: none;
+}
+
+.collapsible-card__chevron {
+    transition: transform 0.2s ease;
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.collapsible-card[open] .collapsible-card__chevron {
+    transform: rotate(180deg);
+}
+
+.collapsible-card__body {
+    padding: 1rem;
+    border-top: 1px solid var(--border-color, #2a2f3a);
+}
+
+/* Pagination, Sortable Headers & Badges */
+.table-pagination-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding-top: 0.75rem;
+    margin-top: 0.5rem;
+    border-top: 1px solid var(--border-color, #2a2f3a);
+}
+
+.table-pagination-bar .btn {
+    min-height: 44px;
+}
+
+.sortable-th {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.sortable-th:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.emoji-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 0.9rem;
+}
+
+.category-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: rgba(59, 130, 246, 0.18);
+    color: #93c5fd;
+}
+
+/* Compact Collapsible Form Card */
+.compact-form-card .collapsible-card__header {
+    padding: 0.5rem 0.85rem;
+    font-size: 0.95rem;
+}
+
+.compact-form-card .collapsible-card__body {
+    padding: 0.75rem 0.85rem;
+}

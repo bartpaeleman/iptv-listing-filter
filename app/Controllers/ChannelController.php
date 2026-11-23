@@ -401,6 +401,73 @@ final class ChannelController extends BaseController
         $this->jsonSuccess($res);
     }
 
+    public function groupChannelTools(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $groupId = (int) ($input['group_id'] ?? 0);
+        $mode = (string) ($input['mode'] ?? '');
+        if ($groupId <= 0) {
+            $this->jsonError('Ongeldige groep.', 400);
+        }
+
+        $repo = new ChannelRepository();
+        $affected = 0;
+
+        if ($mode === 'quality') {
+            $quality = strtoupper(trim((string) ($input['quality'] ?? '')));
+            $allowedQualities = ['SD', 'HD', 'FHD', 'UHD', '4K', 'HEVC', 'RAW'];
+            if (!in_array($quality, $allowedQualities, true)) {
+                $this->jsonError('Ongeldige kwaliteit.', 400);
+            }
+            $enabled = ((int) ($input['enabled'] ?? 0)) === 1 ? 1 : 0;
+            $channels = $repo->filter($groupId, '', '', false, 5000, 0, '', 'all', 'number')['items'];
+            $matchingIds = [];
+            foreach ($channels as $ch) {
+                $effectiveName = ($ch['custom_name'] !== null && $ch['custom_name'] !== '')
+                    ? (string) $ch['custom_name']
+                    : (string) ($ch['tvg_name'] ?? '');
+                if (\App\Services\ChannelNameCleanerService::matchesQuality($effectiveName, $quality)) {
+                    $matchingIds[] = (int) $ch['id'];
+                }
+            }
+            $affected = $repo->bulkSetEnabledByIds($groupId, $matchingIds, $enabled);
+        } elseif ($mode === 'disable_comments') {
+            $channels = $repo->filter($groupId, '', '', false, 5000, 0, '', 'all', 'number')['items'];
+            $matchingIds = [];
+            foreach ($channels as $ch) {
+                $effectiveName = ($ch['custom_name'] !== null && $ch['custom_name'] !== '')
+                    ? (string) $ch['custom_name']
+                    : (string) ($ch['tvg_name'] ?? '');
+                if (\App\Services\ChannelNameCleanerService::isCommentLine($effectiveName)) {
+                    $matchingIds[] = (int) $ch['id'];
+                }
+            }
+            $affected = $repo->bulkSetEnabledByIds($groupId, $matchingIds, 0);
+        } elseif ($mode === 'search_replace') {
+            $search = (string) ($input['search'] ?? '');
+            if ($search === '') {
+                $this->jsonError('Zoektekst mag niet leeg zijn.', 400);
+            }
+            $replace = (string) ($input['replace'] ?? '');
+            $caseSensitive = ((int) ($input['case_sensitive'] ?? 0)) === 1;
+            $affected = $repo->bulkReplaceNameInGroup($groupId, $search, $replace, $caseSensitive);
+        } else {
+            $this->jsonError('Ongeldige modus.', 400);
+        }
+
+        (new \App\Services\ViewCacheService())->invalidateGroupChannels($groupId);
+
+        $refreshed = $repo->filter($groupId, '', '', false, 200, 0, '', 'all', 'number');
+        $this->jsonSuccess([
+            'affected' => $affected,
+            'items' => $refreshed['items'],
+            'total' => $refreshed['total'],
+        ]);
+    }
+
     /**
      * @return array<int, string>
      */

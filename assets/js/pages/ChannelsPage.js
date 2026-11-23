@@ -2,6 +2,7 @@ import { BaseComponent } from '../core/BaseComponent.js';
 import { debounce } from '../core/Debounce.js';
 import { GroupList } from '../components/GroupList.js';
 import { ChannelTable } from '../components/ChannelTable.js';
+import { GroupChannelToolsBar } from '../components/GroupChannelToolsBar.js';
 
 export class ChannelsPage extends BaseComponent {
     constructor(container, props) {
@@ -288,6 +289,7 @@ export class ChannelsPage extends BaseComponent {
                             <option value="no">Zonder EPG</option>
                         </select>
                     </div>
+                    <div id="groupChannelToolsMount"></div>
                     <div class="table-wrap">
                         <table class="data-table">
                             <thead id="channelsTableHead">
@@ -335,6 +337,15 @@ export class ChannelsPage extends BaseComponent {
                 this.channelSortBy = 'number';
                 this.updateGroupHeader(name);
                 this.groupList.setState({ selectedGroupId: id });
+                const toolsBar = new GroupChannelToolsBar('#groupChannelToolsMount', {
+                    api: this.props.api,
+                    toast: this.props.toast,
+                    groupId: id,
+                    onUpdated: (res) => {
+                        this.channelTable.setState({ items: res.items || [], total: res.total || 0 });
+                    },
+                });
+                toolsBar.render();
                 this.loadChannels();
             },
             onToggle: async (id, checked) => {

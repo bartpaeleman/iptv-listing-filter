@@ -98,6 +98,7 @@ switch ($route) {
         $router->addApiRoute('update_channel', ChannelController::class, 'updateChannel');
         $router->addApiRoute('bulk_channels', ChannelController::class, 'bulkChannels');
         $router->addApiRoute('reorder_group_channels', ChannelController::class, 'reorderGroupChannels');
+        $router->addApiRoute('group_channel_tools', ChannelController::class, 'groupChannelTools');
         $router->addApiRoute('country_tags', ChannelController::class, 'countryTags');
         $router->addApiRoute('save_country_tag', ChannelController::class, 'saveCountryTag');
         $router->addApiRoute('delete_country_tag', ChannelController::class, 'deleteCountryTag');
