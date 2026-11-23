@@ -63,24 +63,31 @@ final class ChannelController extends BaseController
         $status = in_array($_GET['status'] ?? 'disabled', ['disabled', 'enabled', 'all'], true)
             ? (string) $_GET['status']
             : 'disabled';
-        $limit = min(100, max(10, (int) ($_GET['limit'] ?? 50)));
+        $limit = min(200, max(1, (int) ($_GET['limit'] ?? 100)));
+        $offset = max(0, (int) ($_GET['offset'] ?? 0));
         $rawCats = trim((string) ($_GET['categories'] ?? ''));
         $categories = $rawCats !== '' ? array_values(array_intersect(
             array_map('trim', explode(',', $rawCats)),
             \App\Services\GroupCategoryService::CATEGORIES
         )) : [];
 
-        $groups = (new GroupRepository())->searchGroups($query, $contentTypes, $status, $limit, $categories);
+        $result = (new GroupRepository())->searchGroups($query, $contentTypes, $status, $limit, $offset, $categories);
         $emojiService = new EmojiTagService();
         $emojiService->seedDefaultsIfEmpty();
 
-        foreach ($groups as &$g) {
+        foreach ($result['items'] as &$g) {
             $rawName = (string) (($g['custom_name'] ?? '') !== '' ? $g['custom_name'] : ($g['original_name'] ?? ''));
-            $g['display_name'] = $emojiService->parseName($rawName, true)['display_name'];
+            $parsed = $emojiService->parseName($rawName, true);
+            $g['display_name'] = $parsed['display_name'];
+            $g['emoji_prefix'] = $parsed['emoji_prefix'] ?? '';
         }
         unset($g);
 
-        $this->jsonSuccess($groups);
+        $this->jsonSuccess([
+            'items' => $result['items'],
+            'has_more' => $result['has_more'],
+            'next_offset' => $result['next_offset'],
+        ]);
     }
 
     public function setGroupSort(): void

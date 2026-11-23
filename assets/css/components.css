@@ -493,3 +493,19 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; }
     color: #f87171;
     font-weight: 600;
 }
+
+.group-add-original-name {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.75rem;
+    color: var(--text-muted, #94a3b8);
+    margin-top: 0.15rem;
+    word-break: break-word;
+}
+
+.group-add-sentinel {
+    padding: 0.75rem 0.5rem;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-muted, #94a3b8);
+    min-height: 2.25rem;
+}
