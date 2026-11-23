@@ -14,6 +14,8 @@ export class CustomGroupChannelPicker extends BaseComponent {
         this.selectedIds = new Set();
         this.query = '';
         this.sourceGroupId = '';
+        this.category = '';
+        this.status = 'all';
         this.offset = 0;
         this.hasMore = false;
         this.isOpen = false;
@@ -27,6 +29,8 @@ export class CustomGroupChannelPicker extends BaseComponent {
         this.selectedIds.clear();
         this.query = '';
         this.sourceGroupId = '';
+        this.category = '';
+        this.status = 'all';
         this.offset = 0;
         this.hasMore = false;
         this.isOpen = true;
@@ -53,11 +57,15 @@ export class CustomGroupChannelPicker extends BaseComponent {
         const params = {
             custom_group_id: this.customGroupId,
             q: this.query,
+            status: this.status,
             limit: 50,
             offset: this.offset,
         };
         if (this.sourceGroupId !== '') {
             params.source_group_id = this.sourceGroupId;
+        }
+        if (this.category !== '') {
+            params.category = this.category;
         }
 
         try {
@@ -189,6 +197,22 @@ export class CustomGroupChannelPicker extends BaseComponent {
         this.container.querySelector('.js-picker-group-filter')?.addEventListener('change', e => {
             this.sourceGroupId = e.target.value;
             this.fetchChannels(true);
+        });
+
+        this.container.querySelector('.js-picker-status-filter')?.addEventListener('change', e => {
+            this.status = e.target.value;
+            this.fetchChannels(true);
+        });
+
+        this.container.querySelectorAll('.js-picker-cat-bar .cat-filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const cat = btn.dataset.cat || '';
+                this.category = this.category === cat ? '' : cat;
+                this.container.querySelectorAll('.js-picker-cat-bar .cat-filter-btn').forEach(b => {
+                    b.classList.toggle('active', b.dataset.cat === this.category);
+                });
+                this.fetchChannels(true);
+            });
         });
 
         this.container.querySelector('.js-picker-add-selected')?.addEventListener('click', async () => {

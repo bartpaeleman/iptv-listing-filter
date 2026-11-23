@@ -402,7 +402,9 @@ final class ChannelRepository extends BaseRepository
         string $query = '',
         ?int $sourceGroupId = null,
         int $limit = 50,
-        int $offset = 0
+        int $offset = 0,
+        string $category = '',
+        string $status = 'all'
     ): array {
         $grpStmt = $this->pdo->prepare('SELECT content_type FROM m3u_groups WHERE id = ? AND is_custom = 1 LIMIT 1');
         $grpStmt->execute([$customGroupId]);
@@ -429,6 +431,18 @@ final class ChannelRepository extends BaseRepository
         if ($sourceGroupId !== null && $sourceGroupId > 0) {
             $where[] = 'c.group_id = :sgid';
             $params[':sgid'] = $sourceGroupId;
+        }
+
+        $cleanCategory = trim($category);
+        if ($cleanCategory !== '') {
+            $where[] = 'g.category = :cat';
+            $params[':cat'] = $cleanCategory;
+        }
+
+        if ($status === 'enabled') {
+            $where[] = 'c.is_enabled = 1';
+        } elseif ($status === 'disabled') {
+            $where[] = 'c.is_enabled = 0';
         }
 
         $cleanQuery = trim($query);

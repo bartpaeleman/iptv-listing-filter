@@ -667,9 +667,11 @@ final class ChannelController extends BaseController
             : null;
         $limit = (int) ($_GET['limit'] ?? 50);
         $offset = (int) ($_GET['offset'] ?? 0);
+        $category = (string) ($_GET['category'] ?? '');
+        $status = (string) ($_GET['status'] ?? 'all');
 
         $repo = new ChannelRepository();
-        $result = $repo->searchCompatibleChannels($customGroupId, $q, $sourceGroupId, $limit, $offset);
+        $result = $repo->searchCompatibleChannels($customGroupId, $q, $sourceGroupId, $limit, $offset, $category, $status);
         $this->jsonSuccess($result);
     }
 
