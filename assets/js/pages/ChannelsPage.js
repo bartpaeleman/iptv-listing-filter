@@ -314,7 +314,7 @@ export class ChannelsPage extends BaseComponent {
                         }
                         sel.addEventListener('change', async () => {
                             box.dataset.selectedTargetId = sel.value;
-                            const mRes = await this.props.api.get(`custom_group_member_ids&custom_group_id=${sel.value}`);
+                            const mRes = await this.props.api.get('custom_group_member_ids', { custom_group_id: sel.value });
                             renderPreviewRows(mRes?.member_ids || []);
                         });
                     }
@@ -1071,7 +1071,7 @@ export class ChannelsPage extends BaseComponent {
             return;
         }
         const targetName = targetSelect?.options[targetSelect.selectedIndex]?.textContent || '';
-        const res = await this.props.api.get(`custom_group_member_ids&custom_group_id=${targetId}`);
+        const res = await this.props.api.get('custom_group_member_ids', { custom_group_id: targetId });
         this.channelTable?.setState({
             targetMemberIds: res?.member_ids || [],
             targetGroupName: targetName,
