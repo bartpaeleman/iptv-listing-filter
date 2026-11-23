@@ -63,8 +63,11 @@ export class DashboardPage extends BaseComponent {
             </div>
 
             <div class="card">
-                <h2>LAN Client M3U &amp; EPG Links</h2>
-                <p class="muted" style="font-size:0.85rem;margin:-0.25rem 0 0.75rem 0;">vb: (IPTVX / Kodi / VLC)</p>
+                <div class="card-header">
+                    <h2>XTream, M3U &amp; EPG Links</h2>
+                    ${!d.xtream_out_enabled || !d.xtream_out_username ? `<button type="button" class="btn btn-sm" id="goToXtreamSettingsBtn">⚙️ XTream Instellen</button>` : ''}
+                </div>
+                <p class="muted" style="font-size:0.85rem;margin:-0.25rem 0 0.75rem 0;">vb: (IPTVX / TiviMate / Kodi / VLC)</p>
                 <div class="grid-2">
                     <div class="endpoint-row">
                         <label>M3U Playlist URL</label>
@@ -81,13 +84,9 @@ export class DashboardPage extends BaseComponent {
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <h2>Xtream Codes Client Login (IPTVX / TiviMate)</h2>
-                    ${!d.xtream_out_enabled || !d.xtream_out_username ? `<button type="button" class="btn btn-sm" id="goToXtreamSettingsBtn">⚙️ Instellen</button>` : ''}
-                </div>
+                <hr style="border:none;border-top:1px solid var(--border-color, #2a2f3a);margin:1rem 0;">
+                <h3 style="margin:0 0 0.5rem 0;font-size:1rem;">Xtream Codes Login (IPTVX / TiviMate)</h3>
                 ${d.xtream_out_enabled && d.xtream_out_username && d.xtream_out_password ? `
                 <div class="grid-2">
                     <div class="endpoint-row" style="grid-column: 1 / -1;">
@@ -114,7 +113,7 @@ export class DashboardPage extends BaseComponent {
                     </div>
                 </div>
                 ` : `
-                <p class="muted" style="margin:0;">Uitgaande Xtream Codes server is nog niet geactiveerd of geconfigureerd. Ga naar <strong>Instellingen</strong> om inloggegevens aan te maken.</p>
+                <p class="muted" style="margin:0;">Uitgaande Xtream Codes server is nog niet geactiveerd of geconfigureerd. Klik op <strong>⚙️ XTream Instellen</strong> om inloggegevens aan te maken.</p>
                 `}
             </div>
 
