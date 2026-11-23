@@ -60,19 +60,27 @@ switch ($route) {
         break;
 
     case 'xtream_api':
-        (new XtreamServerController())->playerApi();
-        break;
-
     case 'xtream_get':
-        (new XtreamServerController())->getPlaylist();
-        break;
-
     case 'xtream_xmltv':
-        (new XtreamServerController())->xmltv();
-        break;
-
     case 'xtream_live':
-        (new XtreamServerController())->liveStream();
+    case 'xtream_stream':
+        try {
+            $ctrl = new XtreamServerController();
+            match ($route) {
+                'xtream_api' => $ctrl->playerApi(),
+                'xtream_get' => $ctrl->getPlaylist(),
+                'xtream_xmltv' => $ctrl->xmltv(),
+                default => $ctrl->liveStream(),
+            };
+        } catch (\Throwable $e) {
+            $logLine = sprintf("[%s] [XTREAM ERROR] %s in %s:%d\n%s\n", date('Y-m-d H:i:s'), $e->getMessage(), $e->getFile(), $e->getLine(), $e->getTraceAsString());
+            @file_put_contents(__DIR__ . '/storage/logs/app.log', $logLine, FILE_APPEND);
+            if (!headers_sent()) {
+                http_response_code(500);
+                header('Content-Type: application/json; charset=utf-8');
+            }
+            echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        }
         break;
 
     case 'api':
@@ -84,6 +92,8 @@ switch ($route) {
         $router->addApiRoute('clear_cache', DashboardController::class, 'clearCache');
         $router->addApiRoute('clear_sync_logs', DashboardController::class, 'clearSyncLogs');
         $router->addApiRoute('run_update_sql', DashboardController::class, 'runUpdateSql');
+        $router->addApiRoute('app_logs', DashboardController::class, 'appLogs');
+        $router->addApiRoute('clear_app_logs', DashboardController::class, 'clearAppLogs');
         $router->addApiRoute('logout', DashboardController::class, 'logout');
         $router->addApiRoute('groups', ChannelController::class, 'groups');
         $router->addApiRoute('groups_search', ChannelController::class, 'searchGroups');

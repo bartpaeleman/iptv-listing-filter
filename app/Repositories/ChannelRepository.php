@@ -66,6 +66,9 @@ final class ChannelRepository extends BaseRepository
             }
             $where[] = 'c.content_type IN (' . implode(', ', $ctPlaceholders) . ')';
         }
+        if ($liveOnly) {
+            $where[] = "c.is_enabled = 1 AND g.is_enabled = 1 AND COALESCE(g.category, 'Live TV') NOT IN ('Film', 'TV Series')";
+        }
 
         $whereSql = implode(' AND ', $where);
         $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM channels c INNER JOIN m3u_groups g ON g.id = c.group_id WHERE {$whereSql}");

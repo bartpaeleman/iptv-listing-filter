@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased] - feature/xtream-vod-series
+### Toegevoegd
+- **Xtream VOD & Series Routing (`XtreamServerService.php`, `XtreamServerController.php`, `index.php`, `.htaccess`):** Groepen met categorie `Film` worden gerouteerd naar Xtream VOD (`get_vod_categories`, `get_vod_streams`, `get_vod_info`, `/movie/...`) en groepen met categorie `TV Series` naar Xtream Series (`get_series_categories`, `get_series`, `get_series_info`, `/series/...`) met automatische seizoen/aflevering-groepering, en uitgesloten van `Live TV`.
+- **Applicatie Log Viewer (`DashboardController.php`, `index.php`, `App.js`, `components.css`):** Interactieve `storage/logs/app.log` viewer onder de `⚙️` Admin & Database Tools knop, met `GET app_logs` (tail 5–500 regels, standaard 10) en `POST clear_app_logs` (CSRF-beveiligd).
+- **EPG Koppeling alleen Live TV (`EpgMappingPage.js`, `ChannelController.php`, `ChannelRepository.php`):** `Film` en `TV Series` groepen en kanalen worden uitgesloten van de EPG Koppeling pagina en de groepen-dropdown (`live_only=1`).
+
 ## [Unreleased] - feature/channel-tools-and-clean-export
 ### Toegevoegd
 - **Groep Kanaal-tools (`GroupChannelToolsBar.js`, `ChannelController::groupChannelTools()`, `ChannelRepository`):** Zoek & Vervang op kanaalnamen binnen een geselecteerde groep.

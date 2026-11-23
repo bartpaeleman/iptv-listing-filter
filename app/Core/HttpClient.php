@@ -8,6 +8,25 @@ use RuntimeException;
 
 final class HttpClient
 {
+    public function get(string $url, int $timeoutSeconds = 60): string
+    {
+        $tmpFile = tempnam(sys_get_temp_dir(), 'iptv_http_');
+        if ($tmpFile === false) {
+            throw new RuntimeException('Kan tijdelijk bestand niet aanmaken voor HTTP-verzoek.');
+        }
+
+        try {
+            $this->downloadToFile($url, $tmpFile, $timeoutSeconds, false);
+            $content = file_get_contents($tmpFile);
+            if ($content === false) {
+                throw new RuntimeException('Kan gedownload bestand niet lezen.');
+            }
+            return $content;
+        } finally {
+            @unlink($tmpFile);
+        }
+    }
+
     public function downloadToFile(string $url, string $destPath, int $timeoutSeconds = 300, bool $gunzipIfGz = false): void
     {
         if (is_file($url) && is_readable($url)) {

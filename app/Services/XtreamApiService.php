@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Core\Database;
+use App\Core\HttpClient;
 use App\Repositories\SettingsRepository;
 use App\Security\CryptoService;
 use PDO;
@@ -250,8 +251,8 @@ final class XtreamApiService
         foreach ($batch as $i => $row) {
             $placeholders[] = "(:sh_{$i}, :tid_{$i}, :tname_{$i}, :tlogo_{$i}, :gid_{$i}, :ct_{$i}, :url_{$i}, :seen_{$i})";
             $params[":sh_{$i}"] = $row['stream_hash'];
-            $params[":tid_{$i}"] = $row['tvg_id'];
-            $params[":tname_{$i}"] = $row['tvg_name'];
+            $params[":tid_{$i}"] = mb_substr((string) $row['tvg_id'], 0, 255, 'UTF-8');
+            $params[":tname_{$i}"] = mb_substr((string) $row['tvg_name'], 0, 255, 'UTF-8');
             $params[":tlogo_{$i}"] = $row['tvg_logo'];
             $params[":gid_{$i}"] = $row['group_id'];
             $params[":ct_{$i}"] = $row['content_type'];

@@ -91,7 +91,7 @@ final class GroupRepository extends BaseRepository
      * @param array<int, string> $categories
      * @return array<int, array<string, mixed>>
      */
-    public function searchGroups(string $query, array $contentTypes = [], string $status = 'disabled', int $limit = 50, array $categories = []): array
+    public function searchGroups(string $query, array $contentTypes = [], string $status = 'disabled', int $limit = 500, array $categories = []): array
     {
         $where = ['1=1'];
         $params = [];
