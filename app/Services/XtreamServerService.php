@@ -35,19 +35,8 @@ final class XtreamServerService
             return false;
         }
 
-        $encUser = (string) $this->settings->get('xtream_out_username', '');
-        $encPass = (string) $this->settings->get('xtream_out_password', '');
-
-        if ($encUser === '' || $encPass === '') {
-            return false;
-        }
-
-        try {
-            $expectedUser = $this->crypto->decrypt($encUser);
-            $expectedPass = $this->crypto->decrypt($encPass);
-        } catch (\Throwable) {
-            return false;
-        }
+        $expectedUser = (string) $this->settings->get('xtream_out_username', '');
+        $expectedPass = (string) $this->settings->get('xtream_out_password', '');
 
         if ($expectedUser === '' || $expectedPass === '') {
             return false;

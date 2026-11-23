@@ -49,21 +49,8 @@ final class DashboardController extends BaseController
         $cache = new \App\Services\FeedCacheService($settings);
 
         $xtreamOutEnabled = $settings->get('xtream_out_enabled', '0') === '1';
-        $xtreamOutUser = '';
-        $xtreamOutPass = '';
-        try {
-            $crypto = new \App\Security\CryptoService();
-            $encUser = (string) $settings->get('xtream_out_username', '');
-            $encPass = (string) $settings->get('xtream_out_password', '');
-            if ($encUser !== '') {
-                $xtreamOutUser = $crypto->decrypt($encUser);
-            }
-            if ($encPass !== '') {
-                $xtreamOutPass = $crypto->decrypt($encPass);
-            }
-        } catch (\Throwable) {
-            // ignore decryption errors
-        }
+        $xtreamOutUser = (string) $settings->get('xtream_out_username', '');
+        $xtreamOutPass = (string) $settings->get('xtream_out_password', '');
 
         $this->jsonSuccess([
             'active_channels' => (int) ($stats['active_channels'] ?? 0),
