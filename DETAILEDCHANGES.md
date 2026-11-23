@@ -5,7 +5,7 @@
   - Kolommen `category` (`VARCHAR(32)`) en `category_locked` (`TINYINT(1)`) toegevoegd aan `m3u_groups`, plus tabel `group_category_rules` (`schema_integrity_v7`).
 - **`app/Services/GroupCategoryService.php` & `app/Services/M3uParserService.php`:**
   - `GroupCategoryService::classify()` classificeert groepen op basis van eigen `group_category_rules` en ingebouwde trefwoorden (`Sport`, `Animatie`, `TV Series`, `Film`, `Muziek`, `Adult`, fallback `Live TV`).
-  - `M3uParserService::sync()` zet nieuwe groepen en kanalen standaard op `is_enabled = 0`, laat bestaande `is_enabled`-statussen ongemoeid, en voert `SchemaMigrator::ensureSchemaUpToDate()`, `classifyUnlockedGroups()` en `ViewCacheService::invalidateAll()` uit na elke M3U-import.
+  - `M3uParserService::sync()` zet nieuwe groepen en kanalen standaard op `is_enabled = 0`, laat bestaande `is_enabled`-statussen en handmatig vergrendelde groepstags (`category_locked = 1`) ongemoeid, rapporteert conditioneel `$groupTagsUpdated` aan `SyncProgressService` (alleen bij `> 0`), en voert `SchemaMigrator::ensureSchemaUpToDate()`, `classifyUnlockedGroups()` en `ViewCacheService::invalidateAll()` uit na elke M3U-import.
 - **`app/Repositories/GroupRepository.php`, `app/Controllers/ChannelController.php` & `index.php`:**
   - `GroupRepository` ondersteunt `categories`-filter in `searchGroups()` en `updateCategory()`.
   - Nieuwe endpoints `update_group_category` (strikte whitelist-validatie met HTTP 400), `group_category_rules`, `save_group_category_rule` en `delete_group_category_rule`.

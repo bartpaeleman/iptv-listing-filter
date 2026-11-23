@@ -228,11 +228,15 @@ final class M3uParserService
         $cache->updateItemCount($sourceFile, $channelsAdded + $channelsUpdated + $channelsUnchanged);
         $this->settings->set('last_m3u_sync', $now, false);
         \App\Core\SchemaMigrator::ensureSchemaUpToDate($this->pdo);
-        (new GroupCategoryService())->classifyUnlockedGroups($this->pdo);
+        $groupTagsUpdated = (new GroupCategoryService())->classifyUnlockedGroups($this->pdo);
+        if ($groupTagsUpdated > 0 && $progress !== null) {
+            $progress->update('m3u', 'Classificeren', 98, "{$groupTagsUpdated} groep-tag(s) nieuw/bijgewerkt");
+        }
         (new ViewCacheService())->invalidateAll();
 
         return [
             'groups_added' => $groupsAdded,
+            'group_tags_updated' => $groupTagsUpdated,
             'channels_added' => $channelsAdded,
             'channels_updated' => $channelsUpdated,
             'channels_deleted' => $channelsDeleted,
