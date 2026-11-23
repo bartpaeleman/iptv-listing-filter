@@ -11,7 +11,7 @@
   - Nieuwe endpoints `update_group_category` (strikte whitelist-validatie met HTTP 400), `group_category_rules`, `save_group_category_rule` en `delete_group_category_rule`.
 - **`assets/js/components/GroupList.js`, `assets/js/pages/ChannelsPage.js`, `assets/js/pages/EmojiRulesPage.js` & `assets/css/components.css`:**
   - `GroupList` markeert de geselecteerde groep met `.is-selected`; `ChannelsPage` start zonder geselecteerde groep (lege kanaalstaat), reset `selectedGroupId` bij uitschakelen en biedt per groep een inklapbare `👁️ Inhoud` kanaal-preview (`.group-preview-box`).
-  - Oude scope- en `Filter & Laad`-bovenbalk verwijderd; rechter groepsselectiepaneel uitgebreid met 7 togglebare categorie-filterknoppen (`Live TV`, `Sport`, `Animatie`, `TV Series`, `Film`, `Muziek`, `Adult`), aparte categorie-kolom en inline `✏️` edit-knop met vaste `<select>`-dropdown (44px touch-target).
+  - Oude scope- en `Filter & Laad`-bovenbalk verwijderd; rechter groepsselectiepaneel uitgebreid met 7 togglebare categorie-filterknoppen (`Live TV`, `Sport`, `Animatie`, `TV Series`, `Film`, `Muziek`, `Adult`), aparte categorie-kolom met direct klikbare tag-dropdown (`.category-tag-select` met chevron-down, 44px touch-target) zonder losse edit-knop.
   - `EmojiRulesPage` uitgebreid met sectie **Groep-categorie Regels** met vaste `<select>`-dropdown voor alle 7 categorieën.
   - Resterende `selectedContentTypes`-referenties en `content_types`-parameters opgeschoond uit `ChannelsPage.js`.
 

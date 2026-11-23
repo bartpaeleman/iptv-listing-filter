@@ -129,15 +129,9 @@ export class ChannelsPage extends BaseComponent {
                             <tr>
                                 <td>${name}</td>
                                 <td>
-                                    <div class="cat-cell-display" data-id="${g.id}" style="display:flex;align-items:center;gap:0.35rem;">
-                                        <span class="cat-badge">${cat}</span>
-                                        <button type="button" class="btn btn-sm cat-edit-btn" data-id="${g.id}" title="Categorie wijzigen" style="min-height:44px;min-width:44px;">✏️</button>
-                                    </div>
-                                    <div class="cat-cell-edit hidden" data-id="${g.id}" style="display:flex;align-items:center;gap:0.25rem;">
-                                        <select class="cat-select" data-id="${g.id}" style="font-size:16px;min-height:44px;">
-                                            ${catOptions.map(c => `<option value="${c}" ${c === (g.category || 'Live TV') ? 'selected' : ''}>${c}</option>`).join('')}
-                                        </select>
-                                    </div>
+                                    <select class="category-tag-select" data-group-id="${g.id}">
+                                        ${catOptions.map(c => `<option value="${c}" ${c === (g.category || 'Live TV') ? 'selected' : ''}>${c}</option>`).join('')}
+                                    </select>
                                 </td>
                                 <td style="text-align:right;white-space:nowrap;">
                                     <button type="button" class="btn btn-sm group-preview-btn" data-action="preview-group" data-id="${g.id}" style="min-height:44px;margin-right:0.25rem;">👁️ Inhoud</button>
@@ -183,17 +177,9 @@ export class ChannelsPage extends BaseComponent {
             });
         });
 
-        resultsEl.querySelectorAll('.cat-edit-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const id = btn.dataset.id;
-                resultsEl.querySelector(`.cat-cell-display[data-id="${id}"]`)?.classList.add('hidden');
-                resultsEl.querySelector(`.cat-cell-edit[data-id="${id}"]`)?.classList.remove('hidden');
-            });
-        });
-
-        resultsEl.querySelectorAll('.cat-select').forEach(sel => {
+        resultsEl.querySelectorAll('.category-tag-select').forEach(sel => {
             sel.addEventListener('change', async () => {
-                const id = Number(sel.dataset.id);
+                const id = Number(sel.dataset.groupId);
                 const category = sel.value;
                 await this.props.api.post('update_group_category', { id, category, lock: true });
                 this.props.toast?.show(`Categorie gewijzigd naar ${category}`);
