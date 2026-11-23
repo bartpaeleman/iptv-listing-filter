@@ -15,7 +15,7 @@ export class GroupList extends BaseComponent {
             const display = g.display_name || rawName;
             const tooltip = g.original_name || rawName;
             return `
-            <div class="group-item ${selectedGroupId === g.id ? 'active' : ''}" data-gid="${g.id}">
+            <div class="group-item ${Number(selectedGroupId) === Number(g.id) ? 'active is-selected' : ''}" data-gid="${g.id}">
                 <input type="checkbox" class="group-toggle" ${g.is_enabled ? 'checked' : ''} title="Groep in-/uitschakelen">
                 <span class="group-item-name" title="${this.escapeHtml(tooltip)}">${this.escapeHtml(display)}</span>
                 <span class="muted" style="font-size:0.8rem;">${g.active_channel_count}/${g.channel_count}</span>

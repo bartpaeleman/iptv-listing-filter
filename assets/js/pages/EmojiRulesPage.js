@@ -16,8 +16,12 @@ export class EmojiRulesPage extends BaseComponent {
     }
 
     async load() {
-        const res = await this.props.api.get('emoji_rules');
+        const [res, catRes] = await Promise.all([
+            this.props.api.get('emoji_rules'),
+            this.props.api.get('group_category_rules').catch(() => []),
+        ]);
         this.rules = Array.isArray(res) ? res : (res?.data || []);
+        this.groupCategoryRules = Array.isArray(catRes) ? catRes : (catRes?.data || []);
         this.render();
     }
 
@@ -111,6 +115,42 @@ export class EmojiRulesPage extends BaseComponent {
                                     </td>
                                 </tr>
                             `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top:1rem;">
+                <div class="card-header">
+                    <h2>📂 Groep-categorie Regels</h2>
+                    <span class="muted">${(this.groupCategoryRules || []).length} eigen regels</span>
+                </div>
+                <form id="groupCategoryRuleForm" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;margin-bottom:0.75rem;">
+                    <input type="text" id="groupCatPatternInput" placeholder="Trefwoord/tag in groepsnaam (bv. VIAP, JEUGD)..." required style="flex:1;min-width:180px;font-size:16px;min-height:44px;">
+                    <select id="groupCatSelectInput" style="font-size:16px;min-height:44px;">
+                        <option value="Live TV">Live TV</option>
+                        <option value="Sport">Sport</option>
+                        <option value="Animatie">Animatie</option>
+                        <option value="TV Series">TV Series</option>
+                        <option value="Film">Film</option>
+                        <option value="Muziek">Muziek</option>
+                        <option value="Adult">Adult</option>
+                    </select>
+                    <button type="submit" class="btn btn-primary" style="min-height:44px;">+ Regel toevoegen</button>
+                </form>
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead><tr><th>Trefwoord / Tag</th><th>Categorie</th><th style="width:90px;">Actie</th></tr></thead>
+                        <tbody>
+                            ${(this.groupCategoryRules || []).length === 0
+                                ? `<tr><td colspan="3" class="muted" style="text-align:center;">Nog geen eigen groeps-categorie regels.</td></tr>`
+                                : (this.groupCategoryRules || []).map(r => `
+                                    <tr>
+                                        <td><code>${this.escapeHtml(r.pattern)}</code></td>
+                                        <td><span class="cat-badge">${this.escapeHtml(r.category)}</span></td>
+                                        <td><button type="button" class="btn btn-sm delete-group-cat-rule-btn" data-id="${r.id}" style="min-height:40px;">🗑️</button></td>
+                                    </tr>
+                                `).join('')}
                         </tbody>
                     </table>
                 </div>
@@ -218,6 +258,25 @@ export class EmojiRulesPage extends BaseComponent {
                 if (this.editingId === id) {
                     this.editingId = null;
                 }
+                await this.load();
+            });
+        });
+
+        document.getElementById('groupCategoryRuleForm')?.addEventListener('submit', async e => {
+            e.preventDefault();
+            const pattern = document.getElementById('groupCatPatternInput')?.value.trim() || '';
+            const category = document.getElementById('groupCatSelectInput')?.value || 'Live TV';
+            if (!pattern) return;
+            await this.props.api.post('save_group_category_rule', { pattern, category });
+            this.props.toast.show('Groep-categorie regel opgeslagen en toegepast.');
+            await this.load();
+        });
+
+        this.container.querySelectorAll('.delete-group-cat-rule-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = Number(btn.dataset.id);
+                await this.props.api.post('delete_group_category_rule', { id });
+                this.props.toast.show('Groep-categorie regel verwijderd.');
                 await this.load();
             });
         });

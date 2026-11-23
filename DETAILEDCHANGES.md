@@ -1,5 +1,20 @@
 # Detailed Changes
 
+## Automatische Groepscategorieën & Beheer (`feature/groep-tags`)
+- **`database/schema.sql`, `database/update.sql` & `app/Core/SchemaMigrator.php`:**
+  - Kolommen `category` (`VARCHAR(32)`) en `category_locked` (`TINYINT(1)`) toegevoegd aan `m3u_groups`, plus tabel `group_category_rules` (`schema_integrity_v7`).
+- **`app/Services/GroupCategoryService.php` & `app/Services/M3uParserService.php`:**
+  - `GroupCategoryService::classify()` classificeert groepen op basis van eigen `group_category_rules` en ingebouwde trefwoorden (`Sport`, `Animatie`, `TV Series`, `Film`, `Muziek`, `Adult`, fallback `Live TV`).
+  - `M3uParserService::sync()` zet nieuwe groepen en kanalen standaard op `is_enabled = 0`, laat bestaande `is_enabled`-statussen en handmatig vergrendelde groepstags (`category_locked = 1`) ongemoeid, rapporteert conditioneel `$groupTagsUpdated` aan `SyncProgressService` (alleen bij `> 0`), en voert `SchemaMigrator::ensureSchemaUpToDate()`, `classifyUnlockedGroups()` en `ViewCacheService::invalidateAll()` uit na elke M3U-import.
+- **`app/Repositories/GroupRepository.php`, `app/Controllers/ChannelController.php` & `index.php`:**
+  - `GroupRepository` ondersteunt `categories`-filter in `searchGroups()` en `updateCategory()`.
+  - Nieuwe endpoints `update_group_category` (strikte whitelist-validatie met HTTP 400), `group_category_rules`, `save_group_category_rule` en `delete_group_category_rule`.
+- **`assets/js/components/GroupList.js`, `assets/js/pages/ChannelsPage.js`, `assets/js/pages/EmojiRulesPage.js` & `assets/css/components.css`:**
+  - `GroupList` markeert de geselecteerde groep met `.is-selected`; `ChannelsPage` start zonder geselecteerde groep (lege kanaalstaat), reset `selectedGroupId` bij uitschakelen en biedt per groep een inklapbare `👁️ Inhoud` kanaal-preview (`.group-preview-box`).
+  - Oude scope- en `Filter & Laad`-bovenbalk verwijderd; rechter groepsselectiepaneel uitgebreid met 7 togglebare categorie-filterknoppen (`Live TV`, `Sport`, `Animatie`, `TV Series`, `Film`, `Muziek`, `Adult`), aparte categorie-kolom met direct klikbare tag-dropdown (`.category-tag-select` met chevron-down, 44px touch-target) zonder losse edit-knop.
+  - `EmojiRulesPage` uitgebreid met sectie **Groep-categorie Regels** met vaste `<select>`-dropdown voor alle 7 categorieën.
+  - Resterende `selectedContentTypes`-referenties en `content_types`-parameters opgeschoond uit `ChannelsPage.js`.
+
 ## Load Performance, View-Cache & EPG/Channel UX (`feature/rearchitecting-cached`)
 - **`app/Services/ViewCacheService.php`:**
   - Nieuwe file-based JSON view-cache in `storage/cache/view/` voor `dashboard_stats.json`, `active_groups_*.json` en `group_channels_{id}.json` met `invalidateDashboardStats()`, `invalidateGroupsCache()`, `invalidateGroupChannels()` en `invalidateAll()`.

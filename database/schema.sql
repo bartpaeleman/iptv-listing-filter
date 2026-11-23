@@ -28,10 +28,22 @@ CREATE TABLE IF NOT EXISTS `m3u_groups` (
     `sort_order` INT NOT NULL DEFAULT 0,
     `import_order` INT UNSIGNED NOT NULL DEFAULT 0,
     `content_type` ENUM('live','movie','series') NOT NULL DEFAULT 'live',
+    `category` VARCHAR(32) NOT NULL DEFAULT 'Live TV',
+    `category_locked` TINYINT(1) NOT NULL DEFAULT 0,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_m3u_groups_original_name` (`original_name`),
     KEY `idx_m3u_groups_enabled_sort` (`is_enabled`, `sort_order`),
-    KEY `idx_groups_content_type` (`content_type`)
+    KEY `idx_groups_content_type` (`content_type`),
+    KEY `idx_groups_category` (`category`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `group_category_rules` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `pattern` VARCHAR(100) NOT NULL,
+    `category` VARCHAR(32) NOT NULL DEFAULT 'Live TV',
+    `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_group_cat_pattern` (`pattern`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `channels` (

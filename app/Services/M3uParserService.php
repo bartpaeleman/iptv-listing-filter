@@ -83,13 +83,13 @@ final class M3uParserService
         $now = gmdate('Y-m-d H:i:s');
         $touchIds = [];
 
-        $insertGroupStmt = $this->pdo->prepare('INSERT INTO m3u_groups (original_name, content_type, is_enabled, sort_order) VALUES (:name, :ct, 1, :sort)');
+        $insertGroupStmt = $this->pdo->prepare('INSERT INTO m3u_groups (original_name, content_type, is_enabled, sort_order) VALUES (:name, :ct, 0, :sort)');
         $selectChannelStmt = $this->pdo->prepare(
             'SELECT id, tvg_id, tvg_name, tvg_logo, group_id, stream_url, epg_channel_id, epg_match_type FROM channels WHERE stream_hash = :hash LIMIT 1'
         );
         $insertChannelStmt = $this->pdo->prepare(
             'INSERT INTO channels (stream_hash, tvg_id, tvg_name, tvg_logo, group_id, content_type, stream_url, epg_channel_id, epg_match_type, is_enabled, sort_order, last_seen_at)
-             VALUES (:hash, :tvg_id, :tvg_name, :tvg_logo, :group_id, :ct, :stream_url, :epg_id, :match_type, 1, :sort, :seen)
+             VALUES (:hash, :tvg_id, :tvg_name, :tvg_logo, :group_id, :ct, :stream_url, :epg_id, :match_type, 0, :sort, :seen)
              ON DUPLICATE KEY UPDATE
                 tvg_id = VALUES(tvg_id),
                 tvg_name = VALUES(tvg_name),
@@ -227,9 +227,16 @@ final class M3uParserService
         fclose($handle);
         $cache->updateItemCount($sourceFile, $channelsAdded + $channelsUpdated + $channelsUnchanged);
         $this->settings->set('last_m3u_sync', $now, false);
+        \App\Core\SchemaMigrator::ensureSchemaUpToDate($this->pdo);
+        $groupTagsUpdated = (new GroupCategoryService())->classifyUnlockedGroups($this->pdo);
+        if ($groupTagsUpdated > 0 && $progress !== null) {
+            $progress->update('m3u', 'Classificeren', 98, "{$groupTagsUpdated} groep-tag(s) nieuw/bijgewerkt");
+        }
+        (new ViewCacheService())->invalidateAll();
 
         return [
             'groups_added' => $groupsAdded,
+            'group_tags_updated' => $groupTagsUpdated,
             'channels_added' => $channelsAdded,
             'channels_updated' => $channelsUpdated,
             'channels_deleted' => $channelsDeleted,

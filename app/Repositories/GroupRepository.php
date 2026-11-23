@@ -60,6 +60,7 @@ final class GroupRepository extends BaseRepository
             $placeholders = implode(', ', array_fill(0, count($contentTypes), '?'));
             $stmt = $this->pdo->prepare(
                 "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type,
+                        g.category, g.category_locked,
                         COUNT(c.id) AS channel_count,
                         SUM(CASE WHEN c.is_enabled = 1 THEN 1 ELSE 0 END) AS active_channel_count
                  FROM m3u_groups g
@@ -74,6 +75,7 @@ final class GroupRepository extends BaseRepository
 
         return $this->pdo->query(
             "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type,
+                    g.category, g.category_locked,
                     COUNT(c.id) AS channel_count,
                     SUM(CASE WHEN c.is_enabled = 1 THEN 1 ELSE 0 END) AS active_channel_count
              FROM m3u_groups g
@@ -86,9 +88,10 @@ final class GroupRepository extends BaseRepository
 
     /**
      * @param array<int, string> $contentTypes
+     * @param array<int, string> $categories
      * @return array<int, array<string, mixed>>
      */
-    public function searchGroups(string $query, array $contentTypes = [], string $status = 'disabled', int $limit = 50): array
+    public function searchGroups(string $query, array $contentTypes = [], string $status = 'disabled', int $limit = 50, array $categories = []): array
     {
         $where = ['1=1'];
         $params = [];
@@ -132,11 +135,21 @@ final class GroupRepository extends BaseRepository
             }
             $where[] = 'g.content_type IN (' . implode(', ', $ph) . ')';
         }
+        if ($categories !== []) {
+            $catPh = [];
+            foreach (array_values($categories) as $idx => $cat) {
+                $key = ":cat_{$idx}";
+                $catPh[] = $key;
+                $params[$key] = $cat;
+            }
+            $where[] = 'g.category IN (' . implode(', ', $catPh) . ')';
+        }
 
         $safeLimit = max(1, min(100, $limit));
         $whereSql = implode(' AND ', $where);
         $stmt = $this->pdo->prepare(
-            "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type
+            "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type,
+                    g.category, g.category_locked
              FROM m3u_groups g
              WHERE {$whereSql}
              ORDER BY g.original_name ASC, g.id ASC
@@ -144,6 +157,18 @@ final class GroupRepository extends BaseRepository
         );
         $stmt->execute($params);
         return $stmt->fetchAll();
+    }
+
+    public function updateCategory(int $groupId, string $category, bool $lock = true): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE m3u_groups SET category = :cat, category_locked = :locked WHERE id = :id'
+        );
+        $stmt->execute([
+            ':cat' => $category,
+            ':locked' => $lock ? 1 : 0,
+            ':id' => $groupId,
+        ]);
     }
 
     public function updateGroup(int $id, ?int $isEnabled, ?string $customName, ?int $sortOrder): void

@@ -8,16 +8,16 @@ export class ChannelsPage extends BaseComponent {
         super(container, props);
         this.selectedGroupId = null;
         this.channelSearch = '';
-        this.groupSortMode = 'import';
+        this.groupSortMode = 'asc';
         this.channelSortBy = 'number';
+        this.isAddGroupMode = false;
+        this.selectedGroupCategories = new Set();
         try {
             this.groupChannelSortMap = JSON.parse(localStorage.getItem('iptv_group_channel_sort') || '{}');
         } catch {
             this.groupChannelSortMap = {};
         }
-        this.selectedContentTypes = new Set(['live']);
         this.hasLoadedData = false;
-        this.loadFromDb = false;
         this.groupList = null;
         this.channelTable = null;
     }
@@ -27,131 +27,67 @@ export class ChannelsPage extends BaseComponent {
             this.renderShell();
             this.container.dataset.mounted = '1';
         }
-        if (!this.hasLoadedData) {
-            const loadedFromCache = await this.tryAutoLoadFromCache();
-            if (!loadedFromCache) {
-                this.renderPreloadPrompt();
-            }
-            return;
-        }
         await this.loadFilteredData();
     }
 
-    async tryAutoLoadFromCache() {
-        if (this.selectedContentTypes.size === 0) return false;
-        const contentTypes = Array.from(this.selectedContentTypes).join(',');
+    async loadFilteredData() {
         const [groupsRes, tags] = await Promise.all([
-            this.props.api.get('groups', { content_types: contentTypes, scope: 'active', cache_only: 1 }),
+            this.props.api.get('groups', { scope: 'active' }),
             this.props.api.get('country_tags'),
         ]);
-        const list = Array.isArray(groupsRes) ? groupsRes : (groupsRes?.items || []);
-        if (list.length === 0) {
-            return false;
-        }
         this.hasLoadedData = true;
-        this.groups = list;
+        this.groups = Array.isArray(groupsRes) ? groupsRes : (groupsRes?.items || []);
         this.countryTags = tags || [];
         this.populateCountryFilter();
-        this.updateGroupSortButton();
         this.groupList.setState({ groups: this.groups, selectedGroupId: this.selectedGroupId, countryTags: this.countryTags });
         this.updateGroupHeader();
-        this.renderSelectGroupPrompt();
-        return true;
+        if (this.selectedGroupId && !this.isAddGroupMode) {
+            await this.loadChannels();
+        } else if (!this.isAddGroupMode) {
+            this.renderSelectGroupPrompt();
+        }
     }
 
-    renderPreloadPrompt() {
-        const groupsRoot = document.getElementById('groupsListRoot');
-        if (groupsRoot) {
-            groupsRoot.innerHTML = `<div class="muted" style="padding:1rem;text-align:center;">Selecteer één of meerdere categorieën en klik op <strong>Filter &amp; Laad</strong>.</div>`;
-        }
+    renderSelectGroupPrompt() {
         const channelsRoot = document.getElementById('channelsTableRoot');
         if (channelsRoot) {
-            channelsRoot.innerHTML = `<tr><td colspan="4" class="muted" style="padding:2rem;text-align:center;">Selecteer één of meerdere categorieën (Live TV, Films, Series) en klik op <strong>Filter &amp; Laad</strong> om enkel die groepen en kanalen op te halen.</td></tr>`;
+            channelsRoot.innerHTML = `<tr><td colspan="4" class="muted" style="padding:2rem;text-align:center;">Selecteer een actieve groep links om de kanalen te laden, of klik op <strong>+ Groep toevoegen</strong> om extra groepen op te zoeken.</td></tr>`;
         }
     }
 
-    getScopeLabel() {
-        const labels = { live: 'Live TV', movie: 'Films', series: 'TV Series' };
-        const active = Array.from(this.selectedContentTypes).map(t => labels[t] || t);
-        return active.length > 0 ? active.join(' + ') : 'Geen selectie';
+    populateCountryFilter() {
+        const sel = document.getElementById('channelCountryFilter');
+        if (!sel) return;
+        const cur = sel.value;
+        sel.innerHTML = `<option value="">Alle landen/tags</option><option value="untagged">Zonder land-tag</option>`
+            + (this.countryTags || []).map(t => `<option value="${t.id}">${this.escapeHtml(t.flag_emoji)} ${this.escapeHtml(t.country_name)} (${this.escapeHtml(t.tag_pattern)})</option>`).join('');
+        sel.value = cur;
     }
 
-    updateActiveScopeBadge() {
-        const badge = document.getElementById('activeScopeBadge');
-        if (!badge) return;
-        const label = this.getScopeLabel();
-        badge.textContent = `Scope: ${label}`;
-        badge.style.opacity = this.selectedContentTypes.size > 0 ? '1' : '0.6';
-    }
-
-    startLoadProgress() {
-        const wrap = document.getElementById('channelsLoadProgressWrap');
-        const text = document.getElementById('channelsLoadProgressText');
-        const timeEl = document.getElementById('channelsLoadProgressTime');
-        const bar = document.getElementById('channelsLoadProgressBar');
-        if (!wrap || !text || !timeEl || !bar) return;
-
-        if (this._progressTimer) clearInterval(this._progressTimer);
-        const start = Date.now();
-        const sourceLabel = this.loadFromDb ? 'database' : 'view-cache';
-        text.textContent = `Laden uit ${sourceLabel} (${this.getScopeLabel()})...`;
-        timeEl.textContent = '0s verstreken';
-        bar.style.width = '12%';
-        wrap.classList.remove('hidden');
-
-        this._progressTimer = setInterval(() => {
-            const elapsed = Math.floor((Date.now() - start) / 1000);
-            const estTotal = this.loadFromDb ? Math.max(8, elapsed + 3) : 2;
-            const pct = Math.min(92, Math.round(12 + (elapsed / estTotal) * 80));
-            bar.style.width = `${pct}%`;
-            timeEl.textContent = this.loadFromDb
-                ? `${elapsed}s verstreken • even geduld`
-                : `${elapsed}s verstreken`;
-        }, 400);
-    }
-
-    stopLoadProgress() {
-        if (this._progressTimer) {
-            clearInterval(this._progressTimer);
-            this._progressTimer = null;
-        }
-        const wrap = document.getElementById('channelsLoadProgressWrap');
-        const text = document.getElementById('channelsLoadProgressText');
-        const bar = document.getElementById('channelsLoadProgressBar');
-        if (!wrap || !text || !bar) return;
-        bar.style.width = '100%';
-        text.textContent = `Geladen (${this.getScopeLabel()}) ✓`;
-        setTimeout(() => wrap.classList.add('hidden'), 900);
-    }
-
-    async loadFilteredData() {
-        if (this.selectedContentTypes.size === 0) {
-            this.props.toast?.show('Selecteer minstens één categorie (Live TV, Films of Series).', 'warning');
+    async loadChannels() {
+        if (!this.hasLoadedData) {
             return;
         }
-        this.startLoadProgress();
-        try {
-            const contentTypes = Array.from(this.selectedContentTypes).join(',');
-            const [groupsRes, tags] = await Promise.all([
-                this.props.api.get('groups', { content_types: contentTypes, scope: 'active', refresh: this.loadFromDb ? '1' : '0' }),
-                this.props.api.get('country_tags'),
-            ]);
-            this.hasLoadedData = true;
-            this.groups = Array.isArray(groupsRes) ? groupsRes : (groupsRes?.items || []);
-            this.groupSortMode = groupsRes?.group_sort_mode || this.groupSortMode || 'import';
-            this.countryTags = tags || [];
-            this.populateCountryFilter();
-            this.updateGroupSortButton();
-            this.groupList.setState({ groups: this.groups, selectedGroupId: this.selectedGroupId, countryTags: this.countryTags });
-            this.updateGroupHeader();
-            if (this.selectedGroupId) {
-                await this.loadChannels();
-            } else {
-                this.renderSelectGroupPrompt();
-            }
-        } finally {
-            this.stopLoadProgress();
+        if (!this.selectedGroupId && !this.channelSearch.trim()) {
+            this.renderSelectGroupPrompt();
+            return;
         }
+        const params = {
+            search: this.channelSearch,
+            country_tag_id: document.getElementById('channelCountryFilter')?.value || '',
+            status: document.getElementById('channelStatusFilter')?.value || 'all',
+            has_epg: document.getElementById('channelEpgFilter')?.value || 'all',
+            sort_by: this.channelSortBy,
+            limit: 150,
+        };
+        if (this.selectedGroupId) params.group_id = this.selectedGroupId;
+        const data = await this.props.api.get('channels', params);
+        this.updateChannelsTableHeader();
+        this.channelTable.setState({
+            channels: data.items,
+            countryTags: this.countryTags || [],
+            isAllChannelsView: !this.selectedGroupId,
+        });
     }
 
     async searchAndRenderAddGroups() {
@@ -159,14 +95,14 @@ export class ChannelsPage extends BaseComponent {
         if (!resultsEl) return;
         const q = (document.getElementById('groupAddSearchInput')?.value || '').trim();
         const status = document.getElementById('groupAddStatusFilter')?.value || 'disabled';
-        const contentTypes = Array.from(this.selectedContentTypes).join(',');
+        const categories = Array.from(this.selectedGroupCategories).join(',');
 
         resultsEl.innerHTML = `<div class="muted" style="padding:0.5rem;">Zoeken...</div>`;
         const items = await this.props.api.get('groups_search', {
             q,
             status,
-            content_types: contentTypes,
-            limit: 50,
+            categories,
+            limit: 100,
         });
 
         if (!Array.isArray(items) || items.length === 0) {
@@ -174,18 +110,83 @@ export class ChannelsPage extends BaseComponent {
             return;
         }
 
-        resultsEl.innerHTML = items.map(g => {
-            const name = this.escapeHtml(g.display_name || g.custom_name || g.original_name || '');
-            const enabled = Number(g.is_enabled) === 1;
-            return `
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;padding:0.35rem 0.25rem;border-bottom:1px solid rgba(255,255,255,0.06);">
-                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">${name}</span>
-                    <button type="button" class="btn btn-sm ${enabled ? '' : 'btn-primary'} group-add-toggle-btn" data-id="${g.id}" data-enable="${enabled ? '0' : '1'}" style="min-height:36px;flex-shrink:0;">
-                        ${enabled ? 'Actief ✓' : '+ Activeer'}
-                    </button>
-                </div>
-            `;
-        }).join('');
+        const catOptions = ['Live TV', 'Sport', 'Animatie', 'TV Series', 'Film', 'Muziek', 'Adult'];
+        resultsEl.innerHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Groep</th>
+                        <th style="width:170px;">Categorie</th>
+                        <th style="width:120px;text-align:right;">Actie</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${items.map(g => {
+                        const name = this.escapeHtml(g.display_name || g.custom_name || g.original_name || '');
+                        const enabled = Number(g.is_enabled) === 1;
+                        const cat = this.escapeHtml(g.category || 'Live TV');
+                        return `
+                            <tr>
+                                <td>${name}</td>
+                                <td>
+                                    <select class="category-tag-select" data-group-id="${g.id}">
+                                        ${catOptions.map(c => `<option value="${c}" ${c === (g.category || 'Live TV') ? 'selected' : ''}>${c}</option>`).join('')}
+                                    </select>
+                                </td>
+                                <td style="text-align:right;white-space:nowrap;">
+                                    <button type="button" class="btn btn-sm group-preview-btn" data-action="preview-group" data-id="${g.id}" style="min-height:44px;margin-right:0.25rem;">👁️ Inhoud</button>
+                                    <button type="button" class="btn btn-sm ${enabled ? '' : 'btn-primary'} group-add-toggle-btn" data-id="${g.id}" data-enable="${enabled ? '0' : '1'}" style="min-height:44px;">
+                                        ${enabled ? 'Actief ✓' : '+ Activeer'}
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="group-preview-row hidden" data-preview-for="${g.id}">
+                                <td colspan="3">
+                                    <div class="group-preview-box" data-preview-box="${g.id}">Laden...</div>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        `;
+
+        resultsEl.querySelectorAll('.group-preview-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = Number(btn.dataset.id);
+                const row = resultsEl.querySelector(`.group-preview-row[data-preview-for="${id}"]`);
+                const box = resultsEl.querySelector(`[data-preview-box="${id}"]`);
+                if (!row || !box) return;
+                if (!row.classList.contains('hidden')) {
+                    row.classList.add('hidden');
+                    return;
+                }
+                row.classList.remove('hidden');
+                box.innerHTML = '<span class="muted">Kanalen laden...</span>';
+                const data = await this.props.api.get('channels', { group_id: id, limit: 100 });
+                const chList = data?.items || [];
+                if (chList.length === 0) {
+                    box.innerHTML = '<span class="muted">Geen kanalen in deze groep.</span>';
+                    return;
+                }
+                box.innerHTML = chList.map(c => {
+                    const chName = this.escapeHtml(c.display_name || c.custom_name || c.tvg_name || '');
+                    const on = Number(c.is_enabled) === 1;
+                    return `<div style="display:flex;justify-content:space-between;padding:0.15rem 0;border-bottom:1px solid rgba(255,255,255,0.05);"><span>${chName}</span><span class="muted">${on ? '✅ Aan' : '⬜ Uit'}</span></div>`;
+                }).join('');
+            });
+        });
+
+        resultsEl.querySelectorAll('.category-tag-select').forEach(sel => {
+            sel.addEventListener('change', async () => {
+                const id = Number(sel.dataset.groupId);
+                const category = sel.value;
+                await this.props.api.post('update_group_category', { id, category, lock: true });
+                this.props.toast?.show(`Categorie gewijzigd naar ${category}`);
+                await this.loadFilteredData();
+                await this.searchAndRenderAddGroups();
+            });
+        });
 
         resultsEl.querySelectorAll('.group-add-toggle-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
@@ -216,7 +217,7 @@ export class ChannelsPage extends BaseComponent {
     }
 
     async loadChannels() {
-        if (!this.hasLoadedData || this.selectedContentTypes.size === 0) {
+        if (!this.hasLoadedData) {
             return;
         }
         if (!this.selectedGroupId && !this.channelSearch.trim()) {
@@ -229,7 +230,6 @@ export class ChannelsPage extends BaseComponent {
             status: document.getElementById('channelStatusFilter')?.value || 'all',
             has_epg: document.getElementById('channelEpgFilter')?.value || 'all',
             sort_by: this.channelSortBy,
-            content_types: Array.from(this.selectedContentTypes).join(','),
             limit: 150,
         };
         if (this.selectedGroupId) params.group_id = this.selectedGroupId;
@@ -244,27 +244,6 @@ export class ChannelsPage extends BaseComponent {
 
     renderShell() {
         this.container.innerHTML = `
-            <div id="contentTypeFilterBar" class="card" style="margin-bottom:1rem;padding:0.75rem 1rem;display:flex;flex-direction:column;gap:0.6rem;">
-                <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;width:100%;">
-                    <button type="button" class="btn content-type-toggle active" data-type="live" style="min-height:44px;padding:0 1rem;">📺 Live TV</button>
-                    <button type="button" class="btn content-type-toggle" data-type="movie" style="min-height:44px;padding:0 1rem;">🎬 Films</button>
-                    <button type="button" class="btn content-type-toggle" data-type="series" style="min-height:44px;padding:0 1rem;">🎞️ Series</button>
-                    <span id="activeScopeBadge" class="muted" style="font-size:0.88rem;padding:0.25rem 0.6rem;border-radius:6px;background:rgba(56,189,248,0.12);color:var(--accent,#38bdf8);">Scope: Live TV</span>
-                    <div style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                        <button type="button" class="btn" id="loadSourceToggleBtn" title="Toont welke bron de knop Filter & Laad gebruikt (klik om te wisselen)" style="min-height:44px;padding:0 0.9rem;">Bron: ⚡ Cache</button>
-                        <button type="button" class="btn btn-primary" id="applyContentTypeFilterBtn" style="min-height:44px;padding:0 1.25rem;">🔍 Filter &amp; Laad</button>
-                    </div>
-                </div>
-                <div id="channelsLoadProgressWrap" class="hidden" style="width:100%;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.85rem;margin-bottom:0.25rem;">
-                        <span id="channelsLoadProgressText">Laden...</span>
-                        <span id="channelsLoadProgressTime" class="muted">0s</span>
-                    </div>
-                    <div style="width:100%;height:6px;background:rgba(255,255,255,0.1);border-radius:999px;overflow:hidden;">
-                        <div id="channelsLoadProgressBar" style="width:0%;height:100%;background:var(--accent,#38bdf8);transition:width 0.25s ease;"></div>
-                    </div>
-                </div>
-            </div>
             <div class="split-view">
                 <aside class="card groups-pane">
                     <div class="card-header">
@@ -327,6 +306,15 @@ export class ChannelsPage extends BaseComponent {
                         <div class="card-header">
                             <h2>Groep toevoegen</h2>
                         </div>
+                        <div class="cat-filter-bar" id="groupCategoryFilterBar">
+                            <button type="button" class="cat-filter-btn" data-cat="Live TV">Live TV</button>
+                            <button type="button" class="cat-filter-btn" data-cat="Sport">Sport</button>
+                            <button type="button" class="cat-filter-btn" data-cat="Animatie">Animatie</button>
+                            <button type="button" class="cat-filter-btn" data-cat="TV Series">TV Series</button>
+                            <button type="button" class="cat-filter-btn" data-cat="Film">Film</button>
+                            <button type="button" class="cat-filter-btn" data-cat="Muziek">Muziek</button>
+                            <button type="button" class="cat-filter-btn" data-cat="Adult">Adult</button>
+                        </div>
                         <div class="toolbar" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.75rem;">
                             <input type="search" id="groupAddSearchInput" placeholder="Zoek groep (bv. BE, NL, [UK], Sport)..." style="flex:1;min-width:180px;font-size:16px;min-height:44px;">
                             <select id="groupAddStatusFilter" style="font-size:16px;min-height:44px;">
@@ -351,6 +339,9 @@ export class ChannelsPage extends BaseComponent {
             },
             onToggle: async (id, checked) => {
                 await this.props.api.post('update_group', { id, is_enabled: checked ? 1 : 0 });
+                if (!checked && Number(id) === Number(this.selectedGroupId)) {
+                    this.selectedGroupId = null;
+                }
                 this.props.toast.show('Groep bijgewerkt');
                 this.load();
             }
@@ -401,6 +392,21 @@ export class ChannelsPage extends BaseComponent {
             this.searchAndRenderAddGroups();
         });
 
+        document.querySelectorAll('#groupCategoryFilterBar .cat-filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const cat = btn.dataset.cat;
+                if (!cat) return;
+                if (this.selectedGroupCategories.has(cat)) {
+                    this.selectedGroupCategories.delete(cat);
+                    btn.classList.remove('active');
+                } else {
+                    this.selectedGroupCategories.add(cat);
+                    btn.classList.add('active');
+                }
+                this.searchAndRenderAddGroups();
+            });
+        });
+
         document.getElementById('channelSearchInput')?.addEventListener('input', debounce(e => {
             this.channelSearch = e.target.value;
             this.loadChannels();
@@ -428,28 +434,6 @@ export class ChannelsPage extends BaseComponent {
         document.getElementById('bulkEnableChannelsBtn')?.addEventListener('click', () => bulkChannels(true));
         document.getElementById('bulkDisableChannelsBtn')?.addEventListener('click', () => bulkChannels(false));
         document.getElementById('manageCountryTagsBtn')?.addEventListener('click', () => this.openCountryModal());
-
-        document.querySelectorAll('#contentTypeFilterBar .content-type-toggle').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const type = btn.dataset.type;
-                if (!type) return;
-                if (this.selectedContentTypes.has(type)) {
-                    this.selectedContentTypes.delete(type);
-                    btn.classList.remove('active');
-                } else {
-                    this.selectedContentTypes.add(type);
-                    btn.classList.add('active');
-                }
-                this.updateActiveScopeBadge();
-                this.selectedGroupId = null;
-                const loaded = await this.tryAutoLoadFromCache();
-                if (!loaded) {
-                    this.groups = [];
-                    this.groupList?.setState({ groups: [], selectedGroupId: null, countryTags: this.countryTags || [] });
-                    this.renderPreloadPrompt();
-                }
-            });
-        });
 
         document.getElementById('loadSourceToggleBtn')?.addEventListener('click', e => {
             this.loadFromDb = !this.loadFromDb;
@@ -584,25 +568,7 @@ export class ChannelsPage extends BaseComponent {
         this.props.switchTab('emoji-rules');
     }
 
-    updateContentTypeFilterUi() {
-        const labels = { live: 'Live TV', movie: 'Films', series: 'Series' };
-        this.container.querySelectorAll('.content-type-toggle').forEach(btn => {
-            const type = btn.dataset.type;
-            const active = Boolean(type && this.selectedContentTypes.has(type));
-            btn.classList.toggle('is-active', active);
-            btn.classList.toggle('active', active);
-            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-            const baseLabel = btn.dataset.label || btn.textContent.replace(/^✓\s*/, '');
-            btn.textContent = (active ? '✓ ' : '') + baseLabel;
-        });
-        const statusEl = document.getElementById('contentTypeStatusText');
-        if (statusEl) {
-            const activeNames = Array.from(this.selectedContentTypes).map(t => labels[t] || t);
-            statusEl.textContent = activeNames.length > 0
-                ? `Actief: ${activeNames.join(', ')}`
-                : 'Actief: Geen (selecteer minstens 1)';
-        }
-    }
+
 
     updateChannelsTableHeader() {
         const thead = document.getElementById('channelsTableHead');
