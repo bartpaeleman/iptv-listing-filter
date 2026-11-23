@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Core\Database;
+use App\Core\HttpClient;
 use App\Repositories\SettingsRepository;
 use App\Security\CryptoService;
 use PDO;
