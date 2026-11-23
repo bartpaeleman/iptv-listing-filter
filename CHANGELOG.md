@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased] - feature/channel-tools-and-clean-export
+### Toegevoegd
+- **Groep Kanaal-tools (`GroupChannelToolsBar.js`, `ChannelController::groupChannelTools()`, `ChannelRepository`):** Kwaliteitsfilter (Aan/Uit voor `SD`, `HD`, `FHD`, `UHD`, `4K`, `HEVC`, `RAW`), commentaarregels (`###`) uitschakelen en Zoek & Vervang op kanaalnamen binnen een geselecteerde groep.
+- **Kanaalnaam Opschoning (`ChannelNameCleanerService.php`):** Automatisch strippen van video-kwaliteitstags (`SD`, `HD`, `FHD`, `UHD`, `4K`, `8K`, `HEVC`, `H.265`, `RAW`) bij export in M3U (`PlaylistExporterService.php`) en Xtream (`XtreamServerService.php`), zonder de originele `tvg_name` in de database te wijzigen.
+
 ## [Unreleased] - feature/xtream-export
 ### Toegevoegd
 - **Uitgaande Xtream Codes API Server (`XtreamServerService.php`, `XtreamServerController.php`):** Volledige ondersteuning voor `player_api.php` (auth, `get_live_categories`, `get_live_streams`, `get_short_epg`, `get_simple_data_table`), `get.php`, `xmltv.php` en `/live/{user}/{pass}/{id}.{ts|m3u8}` redirects.

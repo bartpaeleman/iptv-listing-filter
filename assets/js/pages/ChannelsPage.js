@@ -288,6 +288,7 @@ export class ChannelsPage extends BaseComponent {
                             <option value="no">Zonder EPG</option>
                         </select>
                     </div>
+                    <div id="groupChannelToolsMount"></div>
                     <div class="table-wrap">
                         <table class="data-table">
                             <thead id="channelsTableHead">
@@ -335,6 +336,15 @@ export class ChannelsPage extends BaseComponent {
                 this.channelSortBy = 'number';
                 this.updateGroupHeader(name);
                 this.groupList.setState({ selectedGroupId: id });
+                const toolsBar = new GroupChannelToolsBar('#groupChannelToolsMount', {
+                    api: this.props.api,
+                    toast: this.props.toast,
+                    groupId: id,
+                    onUpdated: (res) => {
+                        this.channelTable.setState({ items: res.items || [], total: res.total || 0 });
+                    },
+                });
+                toolsBar.render();
                 this.loadChannels();
             },
             onToggle: async (id, checked) => {

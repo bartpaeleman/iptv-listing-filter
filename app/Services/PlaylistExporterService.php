@@ -47,7 +47,7 @@ final class PlaylistExporterService
         $stmt = $this->pdo->query($sql);
         while ($row = $stmt->fetch()) {
             $tvgId = (string) ($row['epg_channel_id'] ?: $row['tvg_id'] ?: '');
-            $name = (string) ($row['custom_name'] ?: $row['tvg_name'] ?: 'Channel');
+            $name = ChannelNameCleanerService::stripQualityTags((string) ($row['custom_name'] ?: $row['tvg_name'] ?: 'Channel'));
             $logo = (string) ($row['tvg_logo'] ?? '');
             $group = (string) ($row['group_name'] ?? 'Overig');
             $chno = $row['channel_number'] !== null ? (string) (int) $row['channel_number'] : '';

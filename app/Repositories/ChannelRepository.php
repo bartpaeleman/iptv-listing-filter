@@ -293,4 +293,81 @@ final class ChannelRepository extends BaseRepository
             throw $e;
         }
     }
+
+    /**
+     * @param int[] $channelIds
+     */
+    public function bulkSetEnabledByIds(int $groupId, array $channelIds, int $isEnabled): int
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $channelIds), static fn(int $id): bool => $id > 0)));
+        if ($ids === []) {
+            return 0;
+        }
+
+        $val = $isEnabled === 1 ? 1 : 0;
+        $this->pdo->beginTransaction();
+        try {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $this->pdo->prepare(
+                "UPDATE channels SET is_enabled = ? WHERE group_id = ? AND id IN ({$placeholders})"
+            );
+            $stmt->execute(array_merge([$val, $groupId], $ids));
+            $affected = $stmt->rowCount();
+            $this->pdo->commit();
+            return $affected;
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    public function bulkReplaceNameInGroup(int $groupId, string $search, string $replace, bool $caseSensitive = false): int
+    {
+        if ($search === '') {
+            return 0;
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare('SELECT id, tvg_name, custom_name FROM channels WHERE group_id = :gid');
+            $stmt->execute([':gid' => $groupId]);
+            $rows = $stmt->fetchAll();
+
+            $updStmt = $this->pdo->prepare('UPDATE channels SET custom_name = :cname WHERE id = :id');
+            $affected = 0;
+
+            foreach ($rows as $row) {
+                $tvgName = (string) ($row['tvg_name'] ?? '');
+                $current = ($row['custom_name'] !== null && $row['custom_name'] !== '')
+                    ? (string) $row['custom_name']
+                    : $tvgName;
+
+                $newName = $caseSensitive
+                    ? str_replace($search, $replace, $current)
+                    : str_ireplace($search, $replace, $current);
+                $newName = trim((string) preg_replace('/\s{2,}/u', ' ', $newName));
+
+                if ($newName === '' || $newName === $current) {
+                    continue;
+                }
+
+                $storedCustom = ($newName === $tvgName) ? null : $newName;
+                $updStmt->execute([
+                    ':cname' => $storedCustom,
+                    ':id' => (int) $row['id'],
+                ]);
+                $affected++;
+            }
+
+            $this->pdo->commit();
+            return $affected;
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
 }
