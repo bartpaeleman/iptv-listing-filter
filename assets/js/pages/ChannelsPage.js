@@ -609,8 +609,8 @@ export class ChannelsPage extends BaseComponent {
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">
                             <span>Naam van het kanaal <span style="font-size:0.75rem;">${nameIcon}</span></span>
                             <span style="display:inline-flex;gap:0.35rem;flex-wrap:wrap;">
-                                <button type="button" class="btn btn-sm" id="bulkAdoptNamesBtn" title="Geselecteerde kanalen omzetten naar custom naam incl. vlag" style="min-height:44px;">🏷️ Selectie Custom</button>
-                                <button type="button" class="btn btn-sm" id="bulkResetNamesBtn" title="Geselecteerde kanalen herstellen naar originele naam" style="min-height:44px;">↩️ Selectie Origineel</button>
+                                <button type="button" class="btn btn-sm" id="bulkAdoptNamesBtn" title="Actieve kanalen in deze groep omzetten naar custom naam incl. vlag" style="min-height:44px;">🏷️ Actieve Custom</button>
+                                <button type="button" class="btn btn-sm" id="bulkResetNamesBtn" title="Actieve kanalen in deze groep herstellen naar originele naam" style="min-height:44px;">↩️ Actieve Origineel</button>
                             </span>
                         </div>
                     </th>
@@ -632,34 +632,22 @@ export class ChannelsPage extends BaseComponent {
         document.getElementById('bulkAdoptNamesBtn')?.addEventListener('click', async e => {
             e.stopPropagation();
             if (!this.selectedGroupId) return;
-            const ids = this.channelTable?.getSelectedIds() || [];
-            if (ids.length === 0) {
-                this.props.toast?.show('Selecteer eerst één of meer kanalen');
-                return;
-            }
             await this.props.api.post('group_channel_tools', {
                 group_id: this.selectedGroupId,
                 mode: 'adopt_all_display_names',
-                ids,
             });
-            this.props.toast?.show('Geselecteerde kanaalnamen omgezet naar custom');
+            this.props.toast?.show('Actieve kanaalnamen omgezet naar custom');
             await this.loadChannels();
         });
 
         document.getElementById('bulkResetNamesBtn')?.addEventListener('click', async e => {
             e.stopPropagation();
             if (!this.selectedGroupId) return;
-            const ids = this.channelTable?.getSelectedIds() || [];
-            if (ids.length === 0) {
-                this.props.toast?.show('Selecteer eerst één of meer kanalen');
-                return;
-            }
             await this.props.api.post('group_channel_tools', {
                 group_id: this.selectedGroupId,
                 mode: 'reset_all_custom_names',
-                ids,
             });
-            this.props.toast?.show('Geselecteerde kanaalnamen hersteld naar origineel');
+            this.props.toast?.show('Actieve kanaalnamen hersteld naar origineel');
             await this.loadChannels();
         });
 
