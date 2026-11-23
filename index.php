@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+date_default_timezone_set($_ENV['APP_TIMEZONE'] ?? 'Europe/Brussels');
+
 spl_autoload_register(static function (string $class): void {
     $prefix = 'App\\';
     $baseDir = __DIR__ . '/app/';
