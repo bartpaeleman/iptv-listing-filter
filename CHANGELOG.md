@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased] - feature/xtream-vod-series
+### Toegevoegd
+- **Xtream VOD & Series Routing (`XtreamServerService.php`, `XtreamServerController.php`, `index.php`, `.htaccess`):** Groepen met categorie `Film` worden gerouteerd naar Xtream VOD (`get_vod_categories`, `get_vod_streams`, `get_vod_info`, `/movie/...`) en groepen met categorie `TV Series` naar Xtream Series (`get_series_categories`, `get_series`, `get_series_info`, `/series/...`) met automatische seizoen/aflevering-groepering, en uitgesloten van `Live TV`.
+
 ## [Unreleased] - feature/channel-tools-and-clean-export
 ### Toegevoegd
 - **Groep Kanaal-tools (`GroupChannelToolsBar.js`, `ChannelController::groupChannelTools()`, `ChannelRepository`):** Zoek & Vervang op kanaalnamen binnen een geselecteerde groep.

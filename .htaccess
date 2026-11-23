@@ -23,4 +23,6 @@ RedirectMatch 403 ^/(app|database|storage|bin|views)/.*$
     RewriteRule ^get\.php$ index.php?route=xtream_get [QSA,L]
     RewriteRule ^xmltv\.php$ index.php?route=xtream_xmltv [QSA,L]
     RewriteRule ^live/([^/]+)/([^/]+)/([0-9]+)\.(ts|m3u8)$ index.php?route=xtream_live&username=$1&password=$2&stream_id=$3 [QSA,L]
+    RewriteRule ^movie/([^/]+)/([^/]+)/([0-9]+)\.(mp4|mkv|avi|ts|m3u8)$ index.php?route=xtream_stream&type=movie&username=$1&password=$2&stream_id=$3 [QSA,L]
+    RewriteRule ^series/([^/]+)/([^/]+)/([0-9]+)\.(mp4|mkv|avi|ts|m3u8)$ index.php?route=xtream_stream&type=series&username=$1&password=$2&stream_id=$3 [QSA,L]
 </IfModule>

@@ -49,10 +49,16 @@ final class XtreamServerController
             'get_live_streams' => $this->xtream->getLiveStreams(
                 isset($_REQUEST['category_id']) && $_REQUEST['category_id'] !== '' ? (int) $_REQUEST['category_id'] : null
             ),
-            'get_vod_categories',
-            'get_vod_streams',
-            'get_series_categories',
-            'get_series' => [],
+            'get_vod_categories' => $this->xtream->getVodCategories(),
+            'get_vod_streams' => $this->xtream->getVodStreams(
+                isset($_REQUEST['category_id']) && $_REQUEST['category_id'] !== '' ? (int) $_REQUEST['category_id'] : null
+            ),
+            'get_vod_info' => $this->xtream->getVodInfo((int) ($_REQUEST['vod_id'] ?? 0)),
+            'get_series_categories' => $this->xtream->getSeriesCategories(),
+            'get_series' => $this->xtream->getSeries(
+                isset($_REQUEST['category_id']) && $_REQUEST['category_id'] !== '' ? (int) $_REQUEST['category_id'] : null
+            ),
+            'get_series_info' => $this->xtream->getSeriesInfo((int) ($_REQUEST['series_id'] ?? 0)),
             'get_short_epg' => $this->xtream->getShortEpg(
                 (int) ($_REQUEST['stream_id'] ?? 0),
                 isset($_REQUEST['limit']) ? (int) $_REQUEST['limit'] : 4

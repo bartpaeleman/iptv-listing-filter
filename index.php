@@ -72,6 +72,7 @@ switch ($route) {
         break;
 
     case 'xtream_live':
+    case 'xtream_stream':
         (new XtreamServerController())->liveStream();
         break;
 
