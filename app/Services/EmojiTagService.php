@@ -116,13 +116,15 @@ final class EmojiTagService
         }
 
         $keywordEmojis = [];
-        if ($includeKeywords && $this->keywordRules !== null) {
+        $startsWithEmoji = (bool) preg_match('/^\s*[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}]/u', $cleanName);
+        if ($includeKeywords && $this->keywordRules !== null && !$startsWithEmoji) {
             $searchTarget = $cleanName !== '' ? $cleanName : $rawName;
             foreach ($this->keywordRules as $rule) {
                 if (mb_stripos($searchTarget, $rule['pattern'], 0, 'UTF-8') !== false) {
-                    if (!in_array($rule['emoji'], $keywordEmojis, true)) {
+                    if (!str_contains($cleanName, $rule['emoji'])) {
                         $keywordEmojis[] = $rule['emoji'];
                     }
+                    break;
                 }
             }
         }
