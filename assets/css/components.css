@@ -373,3 +373,44 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; }
     background-repeat: no-repeat;
     background-position: right 0.7rem center;
 }
+
+/* Collapsible Card Sections */
+.collapsible-card {
+    background: var(--card-bg, #1a1f29);
+    border: 1px solid var(--border-color, #2a2f3a);
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+
+.collapsible-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    font-weight: 600;
+    font-size: 1.05rem;
+}
+
+.collapsible-card__header::-webkit-details-marker {
+    display: none;
+}
+
+.collapsible-card__chevron {
+    transition: transform 0.2s ease;
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.collapsible-card[open] .collapsible-card__chevron {
+    transform: rotate(180deg);
+}
+
+.collapsible-card__body {
+    padding: 1rem;
+    border-top: 1px solid var(--border-color, #2a2f3a);
+}

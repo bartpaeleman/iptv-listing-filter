@@ -2,8 +2,9 @@
 
 ## [Unreleased] - feature/channel-tools-and-clean-export
 ### Toegevoegd
-- **Groep Kanaal-tools (`GroupChannelToolsBar.js`, `ChannelController::groupChannelTools()`, `ChannelRepository`):** Kwaliteitsfilter (Aan/Uit voor `SD`, `HD`, `FHD`, `UHD`, `4K`, `HEVC`, `RAW`), commentaarregels (`###`) uitschakelen en Zoek & Vervang op kanaalnamen binnen een geselecteerde groep.
+- **Groep Kanaal-tools (`GroupChannelToolsBar.js`, `ChannelController::groupChannelTools()`, `ChannelRepository`):** Zoek & Vervang op kanaalnamen binnen een geselecteerde groep.
 - **Kanaalnaam Opschoning (`ChannelNameCleanerService.php`):** Automatisch strippen van video-kwaliteitstags (`SD`, `HD`, `FHD`, `UHD`, `4K`, `8K`, `HEVC`, `H.265`, `RAW`) bij export in M3U (`PlaylistExporterService.php`) en Xtream (`XtreamServerService.php`), zonder de originele `tvg_name` in de database te wijzigen.
+- **Inklapbare Secties & Dynamische QNAP Crontab (`components.css`, `SettingsPage.js`, `DashboardPage.js`):** Alle secundaire secties op Dashboard en Instellingen zijn standaard ingeklapt (`<details class="collapsible-card">`) met chevron-indicator; Uitgaande Feeds + Xtream Server zijn gegroepeerd, en de QNAP Crontab-generator past zich live aan op basis van `Sync Interval (uren)` en `Voorkeursuur (0-23)`.
 
 ## [Unreleased] - feature/xtream-export
 ### Toegevoegd

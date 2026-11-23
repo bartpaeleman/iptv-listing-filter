@@ -62,82 +62,93 @@ export class DashboardPage extends BaseComponent {
                 <div id="syncStatusBanner" class="sync-banner hidden"></div>
             </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <h2>XTream, M3U &amp; EPG Links</h2>
-                    ${!d.xtream_out_enabled || !d.xtream_out_username ? `<button type="button" class="btn btn-sm" id="goToXtreamSettingsBtn">⚙️ XTream Instellen</button>` : ''}
-                </div>
-                <p class="muted" style="font-size:0.85rem;margin:-0.25rem 0 0.75rem 0;">vb: (IPTVX / TiviMate / Kodi / VLC)</p>
-                <div class="grid-2">
-                    <div class="endpoint-row">
-                        <label>M3U Playlist URL</label>
-                        <div class="copy-group">
-                            <input type="text" id="playlistUrlInput" value="${this.escapeHtml(playlistUrl)}" readonly>
-                            <button class="btn copy-btn" data-copy="playlistUrlInput">Kopieer</button>
+            <details class="collapsible-card">
+                <summary class="collapsible-card__header">
+                    <span>🔗 Uitgaande Client Koppelingen (M3U, EPG &amp; Xtream Server)</span>
+                    <span class="collapsible-card__chevron">▼</span>
+                </summary>
+                <div class="collapsible-card__body">
+                    <div class="card-header" style="margin-bottom:0.5rem;">
+                        <p class="muted" style="font-size:0.85rem;margin:0;">vb: (IPTVX / TiviMate / Kodi / VLC)</p>
+                        ${!d.xtream_out_enabled || !d.xtream_out_username ? `<button type="button" class="btn btn-sm" id="goToXtreamSettingsBtn">⚙️ XTream Instellen</button>` : ''}
+                    </div>
+                    <div class="grid-2">
+                        <div class="endpoint-row">
+                            <label>LAN Client Endpoint M3U Link</label>
+                            <div class="copy-group">
+                                <input type="text" id="playlistUrlInput" value="${this.escapeHtml(playlistUrl)}" readonly>
+                                <button class="btn copy-btn" data-copy="playlistUrlInput">Kopieer</button>
+                            </div>
+                        </div>
+                        <div class="endpoint-row">
+                            <label>XMLTV EPG Link</label>
+                            <div class="copy-group">
+                                <input type="text" id="epgUrlInput" value="${this.escapeHtml(epgUrl)}" readonly>
+                                <button class="btn copy-btn" data-copy="epgUrlInput">Kopieer</button>
+                            </div>
                         </div>
                     </div>
-                    <div class="endpoint-row">
-                        <label>XMLTV EPG URL</label>
-                        <div class="copy-group">
-                            <input type="text" id="epgUrlInput" value="${this.escapeHtml(epgUrl)}" readonly>
-                            <button class="btn copy-btn" data-copy="epgUrlInput">Kopieer</button>
-                        </div>
-                    </div>
-                </div>
 
-                <hr style="border:none;border-top:1px solid var(--border-color, #2a2f3a);margin:1rem 0;">
-                <h3 style="margin:0 0 0.5rem 0;font-size:1rem;">Xtream Codes Login (IPTVX / TiviMate)</h3>
-                ${d.xtream_out_enabled && d.xtream_out_username && d.xtream_out_password ? `
-                <div class="grid-2">
-                    <div class="endpoint-row" style="grid-column: 1 / -1;">
-                        <label>Server URL</label>
-                        <div class="copy-group">
-                            <input type="text" id="xtreamServerUrlInput" value="${this.escapeHtml(base.replace(/\/+$/, ''))}" readonly>
-                            <button class="btn copy-btn" data-copy="xtreamServerUrlInput">Kopieer</button>
+                    <hr style="border:none;border-top:1px solid var(--border-color, #2a2f3a);margin:1rem 0;">
+                    <h3 style="margin:0 0 0.5rem 0;font-size:1rem;">Xtream Codes Client Login (IPTVX / TiviMate)</h3>
+                    ${d.xtream_out_enabled && d.xtream_out_username && d.xtream_out_password ? `
+                    <div class="grid-2">
+                        <div class="endpoint-row" style="grid-column: 1 / -1;">
+                            <label>Server URL</label>
+                            <div class="copy-group">
+                                <input type="text" id="xtreamServerUrlInput" value="${this.escapeHtml(base.replace(/\/+$/, ''))}" readonly>
+                                <button class="btn copy-btn" data-copy="xtreamServerUrlInput">Kopieer</button>
+                            </div>
+                        </div>
+                        <div class="endpoint-row">
+                            <label>Gebruikersnaam</label>
+                            <div class="copy-group">
+                                <input type="text" id="xtreamUserInput" value="${this.escapeHtml(d.xtream_out_username)}" readonly>
+                                <button class="btn copy-btn" data-copy="xtreamUserInput">Kopieer</button>
+                            </div>
+                        </div>
+                        <div class="endpoint-row">
+                            <label>Wachtwoord</label>
+                            <div class="copy-group">
+                                <input type="password" id="xtreamPassInput" value="${this.escapeHtml(d.xtream_out_password)}" readonly>
+                                <button type="button" class="btn" id="toggleXtreamPassBtn" style="min-width:44px;">👁️</button>
+                                <button class="btn copy-btn" data-copy="xtreamPassInput">Kopieer</button>
+                            </div>
                         </div>
                     </div>
-                    <div class="endpoint-row">
-                        <label>Gebruikersnaam</label>
-                        <div class="copy-group">
-                            <input type="text" id="xtreamUserInput" value="${this.escapeHtml(d.xtream_out_username)}" readonly>
-                            <button class="btn copy-btn" data-copy="xtreamUserInput">Kopieer</button>
-                        </div>
-                    </div>
-                    <div class="endpoint-row">
-                        <label>Wachtwoord</label>
-                        <div class="copy-group">
-                            <input type="password" id="xtreamPassInput" value="${this.escapeHtml(d.xtream_out_password)}" readonly>
-                            <button type="button" class="btn" id="toggleXtreamPassBtn" style="min-width:44px;">👁️</button>
-                            <button class="btn copy-btn" data-copy="xtreamPassInput">Kopieer</button>
-                        </div>
-                    </div>
+                    ` : `
+                    <p class="muted" style="margin:0;">Uitgaande Xtream Codes server is nog niet geactiveerd of geconfigureerd. Klik op <strong>⚙️ XTream Instellen</strong> om inloggegevens aan te maken.</p>
+                    `}
                 </div>
-                ` : `
-                <p class="muted" style="margin:0;">Uitgaande Xtream Codes server is nog niet geactiveerd of geconfigureerd. Klik op <strong>⚙️ XTream Instellen</strong> om inloggegevens aan te maken.</p>
-                `}
-            </div>
+            </details>
 
-            <div class="card">
-                <div class="card-header">
-                    <h2>Recente Sync Logs</h2>
-                    <button type="button" id="btn-clear-sync-logs" class="btn btn-sm">🗑️ Log leegmaken</button>
+            <details class="collapsible-card">
+                <summary class="collapsible-card__header">
+                    <span>📋 Synchronisatie Logs &amp; Status</span>
+                    <span class="collapsible-card__chevron">▼</span>
+                </summary>
+                <div class="collapsible-card__body">
+                    <div class="card-header" style="margin-bottom:0.75rem;">
+                        <span class="muted" style="font-size:0.85rem;">Recente synchronisaties</span>
+                        <button type="button" id="btn-clear-sync-logs" class="btn btn-sm">🗑️ Log leegmaken</button>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="data-table">
+                            <thead><tr><th>Tijd</th><th>Type</th><th>Status</th><th>Bericht</th></tr></thead>
+                            <tbody id="syncLogsBody">
+                                ${(d.logs || []).length > 0 ? (d.logs || []).map(l => `
+                                    <tr>
+                                        <td>${this.escapeHtml(l.created_at)}</td>
+                                        <td>${this.escapeHtml(String(l.sync_type).toUpperCase())}</td>
+                                        <td><span class="badge ${l.status === 'success' ? 'badge-success' : 'badge-warning'}">${this.escapeHtml(l.status)}</span></td>
+                                        <td>${this.escapeHtml(l.message)}</td>
+                                    </tr>
+                                `).join('') : '<tr><td colspan="4" class="muted">Nog geen sync-logs aanwezig</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <div class="table-wrap">
-                    <table class="data-table">
-                        <thead><tr><th>Tijd</th><th>Type</th><th>Status</th><th>Bericht</th></tr></thead>
-                        <tbody id="syncLogsBody">
-                            ${(d.logs || []).length > 0 ? (d.logs || []).map(l => `
-                                <tr>
-                                    <td>${this.escapeHtml(l.created_at)}</td>
-                                    <td>${this.escapeHtml(String(l.sync_type).toUpperCase())}</td>
-                                    <td><span class="badge ${l.status === 'success' ? 'badge-success' : 'badge-warning'}">${this.escapeHtml(l.status)}</span></td>
-                                    <td>${this.escapeHtml(l.message)}</td>
-                                </tr>
-                            `).join('') : '<tr><td colspan="4" class="muted">Nog geen sync-logs aanwezig</td></tr>'}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            </details>
         `;
 
         this.bindEvents();
