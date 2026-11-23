@@ -249,7 +249,7 @@ final class XtreamServerService
             $params[] = $categoryId;
         }
 
-        $sql = "SELECT c.id, c.group_id, c.tvg_name, c.tvg_logo, c.custom_name, c.channel_number, c.stream_url, c.created_at
+        $sql = "SELECT c.id, c.group_id, c.tvg_name, c.tvg_logo, c.custom_name, c.channel_number, c.stream_url
                 FROM channels c
                 INNER JOIN m3u_groups g ON g.id = c.group_id
                 WHERE {$where}
@@ -262,9 +262,9 @@ final class XtreamServerService
 
         $streams = [];
         $num = 1;
+        $nowStr = (string) time();
         while ($row = $stmt->fetch()) {
             $name = ChannelNameCleanerService::stripQualityTags((string) ($row['custom_name'] ?: $row['tvg_name'] ?: 'Movie'));
-            $added = (string) (strtotime((string) ($row['created_at'] ?? 'now')) ?: time());
             $ext = $this->detectExtension((string) ($row['stream_url'] ?? ''), 'mp4');
 
             $streams[] = [
@@ -273,9 +273,9 @@ final class XtreamServerService
                 'stream_type' => 'movie',
                 'stream_id' => (int) $row['id'],
                 'stream_icon' => (string) ($row['tvg_logo'] ?? ''),
-                'rating' => '',
+                'rating' => '0',
                 'rating_5based' => 0,
-                'added' => $added,
+                'added' => $nowStr,
                 'category_id' => (string) $row['group_id'],
                 'container_extension' => $ext,
                 'custom_sid' => '',
