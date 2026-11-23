@@ -88,6 +88,25 @@ export class SettingsPage extends BaseComponent {
                         <input type="checkbox" id="settingEnforceLan" ${s.enforce_lan_ip ? 'checked' : ''}>
                         <span>Beperk uitgaande feeds tot lokale LAN-subnets</span>
                     </label>
+
+                    <hr style="border:none;border-top:1px solid var(--border-color, #2a2f3a);margin:0.5rem 0;">
+                    <h3 style="margin:0;font-size:1.05rem;">Uitgaande Xtream Codes Server (IPTVX / TiviMate)</h3>
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="settingXtreamOutEnabled" ${s.xtream_out_enabled ? 'checked' : ''}>
+                        <span>Activeer uitgaande Xtream Codes API server</span>
+                    </label>
+                    <div class="grid-2">
+                        <label>Uitgaande Gebruikersnaam
+                            <input type="text" id="settingXtreamOutUser" placeholder="${this.escapeHtml(s.xtream_out_username_masked || 'Gebruikersnaam (laat leeg om te behouden)')}">
+                        </label>
+                        <label>Uitgaand Wachtwoord
+                            <input type="password" id="settingXtreamOutPass" placeholder="${s.xtream_out_password_set ? '•••••••• (laat leeg om te behouden)' : 'Wachtwoord'}">
+                        </label>
+                    </div>
+                    <div>
+                        <button type="button" class="btn" id="genXtreamOutCredsBtn" style="min-height:44px;">🔑 Genereer Sterke Inloggegevens</button>
+                    </div>
+
                     <button type="submit" class="btn btn-primary">Instellingen Opslaan</button>
                 </form>
             </div>
@@ -156,9 +175,27 @@ export class SettingsPage extends BaseComponent {
                 sync_interval_hours: Number(document.getElementById('settingIntervalHours').value),
                 sync_preferred_hour: Number(document.getElementById('settingPreferredHour').value),
                 enforce_lan_ip: document.getElementById('settingEnforceLan').checked,
+                xtream_out_enabled: document.getElementById('settingXtreamOutEnabled')?.checked || false,
+                xtream_out_username: document.getElementById('settingXtreamOutUser')?.value || '',
+                xtream_out_password: document.getElementById('settingXtreamOutPass')?.value || '',
             });
             this.props.toast.show('Instellingen opgeslagen!');
             this.load();
+        });
+
+        document.getElementById('genXtreamOutCredsBtn')?.addEventListener('click', () => {
+            const randHex = bytes => Array.from(crypto.getRandomValues(new Uint8Array(bytes)))
+                .map(b => b.toString(16).padStart(2, '0')).join('');
+            const userEl = document.getElementById('settingXtreamOutUser');
+            const passEl = document.getElementById('settingXtreamOutPass');
+            const enabledEl = document.getElementById('settingXtreamOutEnabled');
+            if (userEl) userEl.value = 'iptv_' + randHex(4);
+            if (passEl) {
+                passEl.type = 'text';
+                passEl.value = randHex(12);
+            }
+            if (enabledEl) enabledEl.checked = true;
+            this.props.toast.show('Nieuwe inloggegevens ingevuld. Klik op Instellingen Opslaan om te bewaren.');
         });
 
         document.getElementById('regenTokenBtn')?.addEventListener('click', async () => {

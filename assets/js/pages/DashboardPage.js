@@ -63,8 +63,11 @@ export class DashboardPage extends BaseComponent {
             </div>
 
             <div class="card">
-                <h2>LAN Client M3U &amp; EPG Links</h2>
-                <p class="muted" style="font-size:0.85rem;margin:-0.25rem 0 0.75rem 0;">vb: (IPTVX / Kodi / VLC)</p>
+                <div class="card-header">
+                    <h2>XTream, M3U &amp; EPG Links</h2>
+                    ${!d.xtream_out_enabled || !d.xtream_out_username ? `<button type="button" class="btn btn-sm" id="goToXtreamSettingsBtn">⚙️ XTream Instellen</button>` : ''}
+                </div>
+                <p class="muted" style="font-size:0.85rem;margin:-0.25rem 0 0.75rem 0;">vb: (IPTVX / TiviMate / Kodi / VLC)</p>
                 <div class="grid-2">
                     <div class="endpoint-row">
                         <label>M3U Playlist URL</label>
@@ -81,6 +84,37 @@ export class DashboardPage extends BaseComponent {
                         </div>
                     </div>
                 </div>
+
+                <hr style="border:none;border-top:1px solid var(--border-color, #2a2f3a);margin:1rem 0;">
+                <h3 style="margin:0 0 0.5rem 0;font-size:1rem;">Xtream Codes Login (IPTVX / TiviMate)</h3>
+                ${d.xtream_out_enabled && d.xtream_out_username && d.xtream_out_password ? `
+                <div class="grid-2">
+                    <div class="endpoint-row" style="grid-column: 1 / -1;">
+                        <label>Server URL</label>
+                        <div class="copy-group">
+                            <input type="text" id="xtreamServerUrlInput" value="${this.escapeHtml(base.replace(/\/+$/, ''))}" readonly>
+                            <button class="btn copy-btn" data-copy="xtreamServerUrlInput">Kopieer</button>
+                        </div>
+                    </div>
+                    <div class="endpoint-row">
+                        <label>Gebruikersnaam</label>
+                        <div class="copy-group">
+                            <input type="text" id="xtreamUserInput" value="${this.escapeHtml(d.xtream_out_username)}" readonly>
+                            <button class="btn copy-btn" data-copy="xtreamUserInput">Kopieer</button>
+                        </div>
+                    </div>
+                    <div class="endpoint-row">
+                        <label>Wachtwoord</label>
+                        <div class="copy-group">
+                            <input type="password" id="xtreamPassInput" value="${this.escapeHtml(d.xtream_out_password)}" readonly>
+                            <button type="button" class="btn" id="toggleXtreamPassBtn" style="min-width:44px;">👁️</button>
+                            <button class="btn copy-btn" data-copy="xtreamPassInput">Kopieer</button>
+                        </div>
+                    </div>
+                </div>
+                ` : `
+                <p class="muted" style="margin:0;">Uitgaande Xtream Codes server is nog niet geactiveerd of geconfigureerd. Klik op <strong>⚙️ XTream Instellen</strong> om inloggegevens aan te maken.</p>
+                `}
             </div>
 
             <div class="card">
@@ -116,6 +150,16 @@ export class DashboardPage extends BaseComponent {
                 if (!input) return;
                 ClipboardHelper.copyText(input.value, btn, null, this.props.toast);
             });
+        });
+
+        document.getElementById('toggleXtreamPassBtn')?.addEventListener('click', () => {
+            const input = document.getElementById('xtreamPassInput');
+            if (!input) return;
+            input.type = input.type === 'password' ? 'text' : 'password';
+        });
+
+        document.getElementById('goToXtreamSettingsBtn')?.addEventListener('click', () => {
+            document.querySelector('[data-page="settings"], [data-tab="settings"]')?.click();
         });
 
         const mount = document.getElementById('dashboardProgressMount');

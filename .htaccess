@@ -16,3 +16,11 @@ Options -Indexes
 
 # Block direct HTTP access to internal directories
 RedirectMatch 403 ^/(app|database|storage|bin|views)/.*$
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^player_api\.php$ index.php?route=xtream_api [QSA,L]
+    RewriteRule ^get\.php$ index.php?route=xtream_get [QSA,L]
+    RewriteRule ^xmltv\.php$ index.php?route=xtream_xmltv [QSA,L]
+    RewriteRule ^live/([^/]+)/([^/]+)/([0-9]+)\.(ts|m3u8)$ index.php?route=xtream_live&username=$1&password=$2&stream_id=$3 [QSA,L]
+</IfModule>

@@ -15,3 +15,8 @@ Dit document beschrijft handmatige acties die beheerders op de QNAP NAS moeten u
 ## Update naar Load Performance & View-Cache (`feature/rearchitecting-cached`)
 - Geen database-migratie of `.env`-wijziging vereist.
 - Zorg dat `storage/cache/` schrijfbaar is voor PHP (voor de automatische aanmaak van `storage/cache/view/`).
+
+## Update naar Uitgaande Xtream Codes Server (`feature/xtream-export`)
+- **QNAP Apache / Web Station (`mod_rewrite`):** Zorg dat `mod_rewrite` actief is en `AllowOverride All` is ingeschakeld voor de projectmap, zodat `.htaccess` de standaard Xtream client-URL's (`/player_api.php`, `/get.php`, `/xmltv.php`, `/live/{user}/{pass}/{id}.{ts|m3u8}`) correct doorstuurt naar `index.php`.
+- **Inloggegevens:** Configureer onder **Instellingen** de uitgaande Xtream Codes gebruikersnaam en wachtwoord (AES-256-GCM versleuteld opgeslagen) en activeer de server.
+
