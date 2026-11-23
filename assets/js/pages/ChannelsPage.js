@@ -2,6 +2,7 @@ import { BaseComponent } from '../core/BaseComponent.js';
 import { debounce } from '../core/Debounce.js';
 import { GroupList } from '../components/GroupList.js';
 import { ChannelTable } from '../components/ChannelTable.js';
+import { GroupChannelToolsBar } from '../components/GroupChannelToolsBar.js';
 
 export class ChannelsPage extends BaseComponent {
     constructor(container, props) {
