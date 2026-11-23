@@ -290,7 +290,7 @@ final class XtreamServerService
     public function getVodInfo(int $vodId): array
     {
         $stmt = $this->pdo->prepare(
-            "SELECT c.id, c.group_id, c.tvg_name, c.tvg_logo, c.custom_name, c.stream_url, c.created_at
+            "SELECT c.id, c.group_id, c.tvg_name, c.tvg_logo, c.custom_name, c.stream_url
              FROM channels c
              INNER JOIN m3u_groups g ON g.id = c.group_id
              WHERE c.id = ? AND g.is_enabled = 1 AND c.is_enabled = 1 AND g.category = 'Film'
@@ -304,7 +304,7 @@ final class XtreamServerService
         }
 
         $name = ChannelNameCleanerService::stripQualityTags((string) ($row['custom_name'] ?: $row['tvg_name'] ?: 'Movie'));
-        $added = (string) (strtotime((string) ($row['created_at'] ?? 'now')) ?: time());
+        $added = (string) time();
         $ext = $this->detectExtension((string) ($row['stream_url'] ?? ''), 'mp4');
 
         return [
@@ -441,7 +441,7 @@ final class XtreamServerService
             $params[] = $categoryId;
         }
 
-        $sql = "SELECT c.id, c.group_id, c.tvg_name, c.tvg_logo, c.custom_name, c.stream_url, c.created_at
+        $sql = "SELECT c.id, c.group_id, c.tvg_name, c.tvg_logo, c.custom_name, c.stream_url
                 FROM channels c
                 INNER JOIN m3u_groups g ON g.id = c.group_id
                 WHERE {$where}
@@ -453,12 +453,13 @@ final class XtreamServerService
         $stmt->execute($params);
 
         $seriesMap = [];
+        $nowStr = (string) time();
         while ($row = $stmt->fetch()) {
             $rawName = ChannelNameCleanerService::stripQualityTags((string) ($row['custom_name'] ?: $row['tvg_name'] ?: 'Series'));
             [$seriesTitle, $season, $epNum] = $this->parseSeriesEpisode($rawName);
             $groupKey = $row['group_id'] . '::' . mb_strtolower($seriesTitle);
 
-            $added = (string) (strtotime((string) ($row['created_at'] ?? 'now')) ?: time());
+            $added = $nowStr;
             $ext = $this->detectExtension((string) ($row['stream_url'] ?? ''), 'mp4');
 
             if (!isset($seriesMap[$groupKey])) {
