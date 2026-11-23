@@ -39,7 +39,10 @@ export class EpgMappingPage extends BaseComponent {
 
         const data = await this.props.api.get('channels', params);
         this.totalItems = Number(data.total || 0);
-        this.mapper.setState({ channels: data.items || [] });
+        const safeItems = (data.items || []).filter(
+            ch => Number(ch.is_enabled ?? 1) === 1 && ch.group_category !== 'Film' && ch.group_category !== 'TV Series'
+        );
+        this.mapper.setState({ channels: safeItems });
         this.updateSortHeaders();
         this.renderPagination();
     }
@@ -49,7 +52,9 @@ export class EpgMappingPage extends BaseComponent {
         if (!sel) return;
         const groups = await this.props.api.get('groups', { scope: 'active', live_only: 1 });
         const rawList = Array.isArray(groups) ? groups : (groups?.items || []);
-        const list = rawList.filter(g => g.category !== 'Film' && g.category !== 'TV Series');
+        const list = rawList.filter(
+            g => Number(g.is_enabled ?? 1) === 1 && g.category !== 'Film' && g.category !== 'TV Series'
+        );
         const cur = sel.value;
         sel.innerHTML = `<option value="">Alle actieve groepen</option>` + list.map(g => {
             const label = this.escapeHtml(g.display_name || g.custom_name || g.original_name || '');

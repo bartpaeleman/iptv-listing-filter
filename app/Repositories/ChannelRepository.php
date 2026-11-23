@@ -67,7 +67,7 @@ final class ChannelRepository extends BaseRepository
             $where[] = 'c.content_type IN (' . implode(', ', $ctPlaceholders) . ')';
         }
         if ($liveOnly) {
-            $where[] = "g.is_enabled = 1 AND COALESCE(g.category, 'Live TV') NOT IN ('Film', 'TV Series')";
+            $where[] = "c.is_enabled = 1 AND g.is_enabled = 1 AND COALESCE(g.category, 'Live TV') NOT IN ('Film', 'TV Series')";
         }
 
         $whereSql = implode(' AND ', $where);
