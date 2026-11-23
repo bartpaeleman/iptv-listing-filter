@@ -52,13 +52,9 @@ final class GroupRepository extends BaseRepository
      * @param array<int, string> $contentTypes
      * @return array<int, array<string, mixed>>
      */
-    public function activeWithCounts(string $sortMode = 'import', array $contentTypes = []): array
+    public function activeWithCounts(string $sortMode = 'asc', array $contentTypes = []): array
     {
-        $orderBy = match ($sortMode) {
-            'asc' => 'ORDER BY g.original_name ASC, g.id ASC',
-            'desc' => 'ORDER BY g.original_name DESC, g.id DESC',
-            default => 'ORDER BY g.import_order ASC, g.id ASC',
-        };
+        $orderBy = 'ORDER BY g.original_name ASC, g.id ASC';
 
         if ($contentTypes !== []) {
             $placeholders = implode(', ', array_fill(0, count($contentTypes), '?'));
@@ -98,10 +94,29 @@ final class GroupRepository extends BaseRepository
         $params = [];
 
         if ($query !== '') {
-            $where[] = '(g.original_name LIKE :q1 OR g.custom_name LIKE :q2)';
-            $like = '%' . $query . '%';
-            $params[':q1'] = $like;
-            $params[':q2'] = $like;
+            if (preg_match('/^(?:\(([^)]+)\)|\[([^\]]+)\]|\\|([^|]+)\\|)\s*(.*)$/u', $query, $m)) {
+                $tag = trim($m[1] !== '' ? $m[1] : ($m[2] !== '' ? $m[2] : $m[3]));
+                $rest = trim($m[4] ?? '');
+                if ($tag !== '') {
+                    $where[] = '(g.original_name LIKE :t1 OR g.original_name LIKE :t2 OR g.original_name LIKE :t3 OR g.original_name LIKE :t4 OR g.original_name LIKE :t5)';
+                    $params[':t1'] = '%[' . $tag . ']%';
+                    $params[':t2'] = '%|' . $tag . '|%';
+                    $params[':t3'] = '%(' . $tag . ')%';
+                    $params[':t4'] = $tag . '|%';
+                    $params[':t5'] = $tag . ' -%';
+                }
+                if ($rest !== '') {
+                    $where[] = '(g.original_name LIKE :q1 OR g.custom_name LIKE :q2)';
+                    $like = '%' . $rest . '%';
+                    $params[':q1'] = $like;
+                    $params[':q2'] = $like;
+                }
+            } else {
+                $where[] = '(g.original_name LIKE :q1 OR g.custom_name LIKE :q2)';
+                $like = '%' . $query . '%';
+                $params[':q1'] = $like;
+                $params[':q2'] = $like;
+            }
         }
         if ($status === 'disabled') {
             $where[] = 'g.is_enabled = 0';
@@ -124,7 +139,7 @@ final class GroupRepository extends BaseRepository
             "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type
              FROM m3u_groups g
              WHERE {$whereSql}
-             ORDER BY g.is_enabled DESC, g.original_name ASC, g.id ASC
+             ORDER BY g.original_name ASC, g.id ASC
              LIMIT {$safeLimit}"
         );
         $stmt->execute($params);

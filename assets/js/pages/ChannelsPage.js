@@ -271,7 +271,6 @@ export class ChannelsPage extends BaseComponent {
                         <h2>Groepen</h2>
                         <div class="btn-group">
                             <button type="button" class="btn btn-sm btn-primary" id="openGroupSearchBtn" style="min-height:44px;">+ Groep toevoegen</button>
-                            <button type="button" class="btn btn-sm" id="groupSortBtn" title="Klik om groepssortering te wisselen (Import / A-Z / Z-A)"><span id="groupSortBadge">⇅ Import</span></button>
                             <button class="btn btn-sm" id="enableAllGroupsBtn">Alles Aan</button>
                             <button class="btn btn-sm" id="disableAllGroupsBtn">Alles Uit</button>
                         </div>
