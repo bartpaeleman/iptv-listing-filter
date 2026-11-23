@@ -70,7 +70,7 @@ class App {
                             sel.value = String(currentLines);
                         }
                         try {
-                            const res = await this.api.get(`app_logs&lines=${currentLines}`);
+                            const res = await this.api.get('app_logs', { lines: currentLines });
                             const lines = res.lines || [];
                             if (meta) {
                                 meta.textContent = `${res.total_lines ?? 0} regels totaal • ${res.file_size_kb ?? 0} KB${res.updated_at ? ` • ${res.updated_at}` : ''}`;
