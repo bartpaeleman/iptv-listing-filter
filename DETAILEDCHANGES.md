@@ -1,5 +1,18 @@
 # Detailed Changes
 
+## Automatische Groepscategorieën & Beheer (`feature/groep-tags`)
+- **`database/schema.sql`, `database/update.sql` & `app/Core/SchemaMigrator.php`:**
+  - Kolommen `category` (`VARCHAR(32)`) en `category_locked` (`TINYINT(1)`) toegevoegd aan `m3u_groups`, plus tabel `group_category_rules` (`schema_integrity_v7`).
+- **`app/Services/GroupCategoryService.php` & `app/Services/M3uParserService.php`:**
+  - `GroupCategoryService::classify()` classificeert groepen op basis van eigen `group_category_rules` en ingebouwde trefwoorden (`Sport`, `Animatie`, `TV Series`, `Film`, fallback `Live TV`).
+  - `M3uParserService::sync()` voert `SchemaMigrator::ensureSchemaUpToDate()`, `classifyUnlockedGroups()` en `ViewCacheService::invalidateAll()` uit na elke M3U-import.
+- **`app/Repositories/GroupRepository.php`, `app/Controllers/ChannelController.php` & `index.php`:**
+  - `GroupRepository` ondersteunt `categories`-filter in `searchGroups()` en `updateCategory()`.
+  - Nieuwe endpoints `update_group_category`, `group_category_rules`, `save_group_category_rule` en `delete_group_category_rule`.
+- **`assets/js/pages/ChannelsPage.js`, `assets/js/pages/EmojiRulesPage.js` & `assets/css/components.css`:**
+  - Oude scope- en `Filter & Laad`-bovenbalk verwijderd; rechter groepsselectiepaneel uitgebreid met 5 togglebare categorie-filterknoppen, aparte categorie-kolom en inline `✏️` edit-knop.
+  - `EmojiRulesPage` uitgebreid met sectie **Groep-categorie Regels**.
+
 ## Load Performance, View-Cache & EPG/Channel UX (`feature/rearchitecting-cached`)
 - **`app/Services/ViewCacheService.php`:**
   - Nieuwe file-based JSON view-cache in `storage/cache/view/` voor `dashboard_stats.json`, `active_groups_*.json` en `group_channels_{id}.json` met `invalidateDashboardStats()`, `invalidateGroupsCache()`, `invalidateGroupChannels()` en `invalidateAll()`.

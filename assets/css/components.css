@@ -310,3 +310,35 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; }
 .btn-danger:hover {
     background: #b91c1c;
 }
+
+.cat-filter-bar {
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.65rem;
+}
+.cat-filter-btn {
+    min-height: 44px;
+    padding: 0 0.85rem;
+    border-radius: 8px;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    background: rgba(15, 23, 42, 0.45);
+    color: inherit;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.cat-filter-btn.active {
+    background: #2563eb;
+    border-color: #3b82f6;
+    color: #fff;
+    font-weight: 600;
+}
+.cat-badge {
+    display: inline-block;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    background: rgba(56, 189, 248, 0.14);
+    color: #38bdf8;
+    white-space: nowrap;
+}

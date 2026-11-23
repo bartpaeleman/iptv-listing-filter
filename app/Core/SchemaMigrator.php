@@ -26,7 +26,7 @@ final class SchemaMigrator
                 "SELECT COUNT(*) FROM information_schema.tables
                  WHERE table_schema = DATABASE() AND table_name IN ('epg_sources', 'country_tags', 'emoji_rules')"
             )->fetchColumn();
-            $flag = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'schema_integrity_v6' LIMIT 1")->fetchColumn();
+            $flag = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'schema_integrity_v7' LIMIT 1")->fetchColumn();
             if ($tblCount === 3 && (string) $flag === '1') {
                 return;
             }
@@ -153,7 +153,27 @@ final class SchemaMigrator
         }
 
         $pdo->exec("INSERT IGNORE INTO settings (setting_key, setting_value, is_encrypted) VALUES ('group_sort_mode', 'import', 0)");
-        $pdo->exec("INSERT INTO settings (setting_key, setting_value, is_encrypted) VALUES ('schema_integrity_v6', '1', 0) ON DUPLICATE KEY UPDATE setting_value = '1'");
+        if (!self::columnExists($pdo, 'm3u_groups', 'category')) {
+            $pdo->exec("ALTER TABLE `m3u_groups` ADD COLUMN `category` VARCHAR(32) NOT NULL DEFAULT 'Live TV' AFTER `content_type`");
+        }
+        if (!self::columnExists($pdo, 'm3u_groups', 'category_locked')) {
+            $pdo->exec("ALTER TABLE `m3u_groups` ADD COLUMN `category_locked` TINYINT(1) NOT NULL DEFAULT 0 AFTER `category`");
+        }
+        if (!self::indexExists($pdo, 'm3u_groups', 'idx_groups_category')) {
+            $pdo->exec('ALTER TABLE `m3u_groups` ADD INDEX `idx_groups_category` (`category`)');
+        }
+        $pdo->exec(
+            "CREATE TABLE IF NOT EXISTS `group_category_rules` (
+                `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `pattern` VARCHAR(100) NOT NULL,
+                `category` VARCHAR(32) NOT NULL DEFAULT 'Live TV',
+                `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `uq_group_cat_pattern` (`pattern`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+
+        $pdo->exec("INSERT INTO settings (setting_key, setting_value, is_encrypted) VALUES ('schema_integrity_v7', '1', 0) ON DUPLICATE KEY UPDATE setting_value = '1'");
     }
 
     /**

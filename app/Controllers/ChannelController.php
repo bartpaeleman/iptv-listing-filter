@@ -64,8 +64,13 @@ final class ChannelController extends BaseController
             ? (string) $_GET['status']
             : 'disabled';
         $limit = min(100, max(10, (int) ($_GET['limit'] ?? 50)));
+        $rawCats = trim((string) ($_GET['categories'] ?? ''));
+        $categories = $rawCats !== '' ? array_values(array_intersect(
+            array_map('trim', explode(',', $rawCats)),
+            \App\Services\GroupCategoryService::CATEGORIES
+        )) : [];
 
-        $groups = (new GroupRepository())->searchGroups($query, $contentTypes, $status, $limit);
+        $groups = (new GroupRepository())->searchGroups($query, $contentTypes, $status, $limit, $categories);
         $emojiService = new EmojiTagService();
         $emojiService->seedDefaultsIfEmpty();
 
@@ -90,6 +95,73 @@ final class ChannelController extends BaseController
 
         (new \App\Repositories\SettingsRepository())->set('group_sort_mode', $mode);
         $this->jsonSuccess(['group_sort_mode' => $mode]);
+    }
+
+    public function updateGroupCategory(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $id = (int) ($input['id'] ?? 0);
+        $category = trim((string) ($input['category'] ?? 'Live TV'));
+        $lock = array_key_exists('lock', $input) ? (bool) $input['lock'] : true;
+        if (!in_array($category, \App\Services\GroupCategoryService::CATEGORIES, true)) {
+            $category = 'Live TV';
+        }
+        if ($id > 0) {
+            (new GroupRepository())->updateCategory($id, $category, $lock);
+            (new ViewCacheService())->invalidateAll();
+        }
+        $this->jsonSuccess(['id' => $id, 'category' => $category, 'category_locked' => $lock ? 1 : 0]);
+    }
+
+    public function groupCategoryRules(): void
+    {
+        $this->requireAuth();
+        $pdo = \App\Core\Database::getInstance();
+        $rows = $pdo->query('SELECT id, pattern, category, is_active FROM group_category_rules ORDER BY category ASC, pattern ASC')->fetchAll();
+        $this->jsonSuccess($rows);
+    }
+
+    public function saveGroupCategoryRule(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $pattern = trim((string) ($input['pattern'] ?? ''));
+        $category = trim((string) ($input['category'] ?? 'Live TV'));
+        if ($pattern === '' || !in_array($category, \App\Services\GroupCategoryService::CATEGORIES, true)) {
+            $this->jsonError('Ongeldig patroon of categorie.', 422);
+            return;
+        }
+        $pdo = \App\Core\Database::getInstance();
+        $stmt = $pdo->prepare(
+            'INSERT INTO group_category_rules (pattern, category, is_active) VALUES (:p, :c, 1)
+             ON DUPLICATE KEY UPDATE category = VALUES(category), is_active = 1'
+        );
+        $stmt->execute([':p' => $pattern, ':c' => $category]);
+        (new \App\Services\GroupCategoryService())->classifyUnlockedGroups($pdo);
+        (new ViewCacheService())->invalidateAll();
+        $this->jsonSuccess();
+    }
+
+    public function deleteGroupCategoryRule(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $id = (int) ($input['id'] ?? 0);
+        if ($id > 0) {
+            $pdo = \App\Core\Database::getInstance();
+            $stmt = $pdo->prepare('DELETE FROM group_category_rules WHERE id = :id');
+            $stmt->execute([':id' => $id]);
+            (new \App\Services\GroupCategoryService())->classifyUnlockedGroups($pdo);
+            (new ViewCacheService())->invalidateAll();
+        }
+        $this->jsonSuccess();
     }
 
     public function updateGroup(): void

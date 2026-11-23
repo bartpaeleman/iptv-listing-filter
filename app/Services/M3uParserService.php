@@ -227,6 +227,9 @@ final class M3uParserService
         fclose($handle);
         $cache->updateItemCount($sourceFile, $channelsAdded + $channelsUpdated + $channelsUnchanged);
         $this->settings->set('last_m3u_sync', $now, false);
+        \App\Core\SchemaMigrator::ensureSchemaUpToDate($this->pdo);
+        (new GroupCategoryService())->classifyUnlockedGroups($this->pdo);
+        (new ViewCacheService())->invalidateAll();
 
         return [
             'groups_added' => $groupsAdded,
