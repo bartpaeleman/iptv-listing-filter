@@ -340,8 +340,8 @@ export class ChannelsPage extends BaseComponent {
                     api: this.props.api,
                     toast: this.props.toast,
                     groupId: id,
-                    onUpdated: (res) => {
-                        this.channelTable.setState({ items: res.items || [], total: res.total || 0 });
+                    onUpdated: async () => {
+                        await this.loadChannels();
                     },
                 });
                 toolsBar.render();
