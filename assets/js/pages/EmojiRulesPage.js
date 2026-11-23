@@ -331,7 +331,7 @@ export class EmojiRulesPage extends BaseComponent {
         document.getElementById('crSearchInput')?.addEventListener('input', e => {
             this.catFilter.search = e.target.value;
             this.catFilter.page = 1;
-            this.render();
+            this.rerenderPreservingFocus('crSearchInput', e.target.selectionStart, e.target.selectionEnd);
         });
         document.getElementById('crCatFilter')?.addEventListener('change', e => {
             this.catFilter.category = e.target.value;
@@ -357,5 +357,16 @@ export class EmojiRulesPage extends BaseComponent {
             this.catFilter.page++;
             this.render();
         });
+    }
+
+    rerenderPreservingFocus(inputId, selStart, selEnd) {
+        this.render();
+        const el = document.getElementById(inputId);
+        if (el) {
+            el.focus();
+            if (typeof selStart === 'number' && typeof selEnd === 'number') {
+                el.setSelectionRange(selStart, selEnd);
+            }
+        }
     }
 }
