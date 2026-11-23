@@ -65,17 +65,12 @@ export class ChannelTable extends BaseComponent {
             });
             tr.querySelector('.ch-use-custom')?.addEventListener('click', () => {
                 const nameInput = tr.querySelector('.ch-name');
-                const emojiSpan = tr.querySelector('.ch-emoji-prefix');
                 const customBtn = tr.querySelector('.ch-use-custom');
                 const emojiPrefix = customBtn?.dataset.emoji || '';
                 const val = (nameInput?.value || '').trim();
                 const finalName = (emojiPrefix && !val.startsWith(emojiPrefix))
                     ? `${emojiPrefix} ${val}`.trim()
                     : val;
-                if (nameInput) nameInput.value = finalName;
-                if (emojiSpan && emojiPrefix && finalName.startsWith(emojiPrefix)) {
-                    emojiSpan.style.display = 'none';
-                }
                 this.props.onUpdate?.(id, { custom_name: finalName });
             });
         });

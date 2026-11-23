@@ -638,6 +638,7 @@ export class ChannelsPage extends BaseComponent {
             });
             this.props.toast?.show('Actieve kanaalnamen omgezet naar custom');
             await this.loadChannels();
+            this.channelTable?.props?.onSelectionChange?.(0);
         });
 
         document.getElementById('bulkResetNamesBtn')?.addEventListener('click', async e => {
@@ -649,6 +650,7 @@ export class ChannelsPage extends BaseComponent {
             });
             this.props.toast?.show('Actieve kanaalnamen hersteld naar origineel');
             await this.loadChannels();
+            this.channelTable?.props?.onSelectionChange?.(0);
         });
 
         thead.querySelectorAll('.ch-sort-th').forEach(th => {
