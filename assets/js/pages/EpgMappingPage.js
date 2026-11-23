@@ -28,6 +28,7 @@ export class EpgMappingPage extends BaseComponent {
 
         const params = {
             active_only: 1,
+            live_only: 1,
             search,
             epg_status,
             sort_by: this.sortBy,
@@ -46,14 +47,15 @@ export class EpgMappingPage extends BaseComponent {
     async loadActiveGroups() {
         const sel = document.getElementById('epgGroupFilter');
         if (!sel) return;
-        const groups = await this.props.api.get('groups', { scope: 'active' });
-        const list = Array.isArray(groups) ? groups : (groups?.items || []);
+        const groups = await this.props.api.get('groups', { scope: 'active', live_only: 1 });
+        const rawList = Array.isArray(groups) ? groups : (groups?.items || []);
+        const list = rawList.filter(g => g.category !== 'Film' && g.category !== 'TV Series');
         const cur = sel.value;
         sel.innerHTML = `<option value="">Alle actieve groepen</option>` + list.map(g => {
             const label = this.escapeHtml(g.display_name || g.custom_name || g.original_name || '');
             return `<option value="${g.id}">${label}</option>`;
         }).join('');
-        sel.value = cur;
+        sel.value = list.some(g => String(g.id) === String(cur)) ? cur : '';
         this.groupsLoaded = true;
     }
 

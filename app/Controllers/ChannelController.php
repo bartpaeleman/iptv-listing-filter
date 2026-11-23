@@ -223,8 +223,9 @@ final class ChannelController extends BaseController
             true
         ) ? (string) $_GET['sort_by'] : 'number';
         $contentTypes = $this->parseContentTypes((string) ($_GET['content_types'] ?? ''));
+        $liveOnly = isset($_GET['live_only']) && $_GET['live_only'] === '1';
 
-        $isDefaultGroupView = ($groupId !== null && $groupId > 0 && $search === '' && $epgStatus === '' && !$activeOnly && $countryTagId === '' && $status === 'all' && $sortBy === 'number' && $offset === 0 && $limit >= 150);
+        $isDefaultGroupView = ($groupId !== null && $groupId > 0 && $search === '' && $epgStatus === '' && !$activeOnly && $countryTagId === '' && $status === 'all' && $sortBy === 'number' && $offset === 0 && $limit >= 150 && !$liveOnly);
         $viewCache = new ViewCacheService();
         if ($isDefaultGroupView) {
             $cached = $viewCache->getGroupChannels($groupId);
@@ -239,7 +240,7 @@ final class ChannelController extends BaseController
             $channelRepo->normalizeActiveGroupNumbers($groupId);
         }
 
-        $res = $channelRepo->filter($groupId, $search, $epgStatus, $activeOnly, $limit, $offset, $countryTagId, $status, $sortBy, $contentTypes);
+        $res = $channelRepo->filter($groupId, $search, $epgStatus, $activeOnly, $limit, $offset, $countryTagId, $status, $sortBy, $contentTypes, $liveOnly);
         $emojiService = new EmojiTagService();
         $emojiService->seedDefaultsIfEmpty();
 
