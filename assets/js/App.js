@@ -28,14 +28,71 @@ class App {
                 load: async () => {
                     const el = document.querySelector('#tab-admin');
                     if (!el) return;
+                    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+                    let currentLines = 10;
+
                     el.innerHTML = `
-                        <div class="card">
+                        <div class="card" style="margin-bottom:1rem;">
                             <h2>Admin &amp; Database Tools</h2>
                             <p class="muted">Voer <code>database/update.sql</code> uit om eventuele openstaande database-migraties toe te passen.</p>
                             <button type="button" id="runUpdateSqlBtn" class="btn btn-primary" style="min-height:44px;">🛠️ Voer update.sql uit</button>
                             <div id="updateSqlResult" style="margin-top:1rem;"></div>
                         </div>
+
+                        <div class="card">
+                            <div class="card-header" style="margin-bottom:0.5rem;">
+                                <h2>Applicatie Log (<code>storage/logs/app.log</code>)</h2>
+                                <span id="appLogMeta" class="muted" style="font-size:0.85rem;">Laden...</span>
+                            </div>
+                            <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
+                                <button type="button" id="logFewerBtn" class="btn btn-sm" style="min-height:44px;">Minder (-10)</button>
+                                <select id="logLinesSelect" style="min-height:44px;font-size:16px;padding:0.25rem 0.5rem;">
+                                    <option value="5">5 regels</option>
+                                    <option value="10" selected>10 regels</option>
+                                    <option value="25">25 regels</option>
+                                    <option value="50">50 regels</option>
+                                    <option value="100">100 regels</option>
+                                    <option value="250">250 regels</option>
+                                </select>
+                                <button type="button" id="logMoreBtn" class="btn btn-sm" style="min-height:44px;">Meer (+10)</button>
+                                <button type="button" id="logRefreshBtn" class="btn btn-sm" style="min-height:44px;">🔄 Vernieuwen</button>
+                                <button type="button" id="logClearBtn" class="btn btn-sm btn-danger" style="min-height:44px;">🗑️ Log wissen</button>
+                            </div>
+                            <pre id="appLogBox" class="log-viewer-box">Laden...</pre>
+                        </div>
                     `;
+
+                    const loadLogs = async () => {
+                        const box = document.getElementById('appLogBox');
+                        const meta = document.getElementById('appLogMeta');
+                        const sel = document.getElementById('logLinesSelect');
+                        if (sel && Array.from(sel.options).some(o => Number(o.value) === currentLines)) {
+                            sel.value = String(currentLines);
+                        }
+                        try {
+                            const res = await this.api.get(`app_logs&lines=${currentLines}`);
+                            const lines = res.lines || [];
+                            if (meta) {
+                                meta.textContent = `${res.total_lines ?? 0} regels totaal • ${res.file_size_kb ?? 0} KB${res.updated_at ? ` • ${res.updated_at}` : ''}`;
+                            }
+                            if (box) {
+                                if (lines.length === 0) {
+                                    box.textContent = '(Logbestand is leeg of bestaat nog niet)';
+                                } else {
+                                    box.innerHTML = lines.map(l => {
+                                        const safe = esc(l);
+                                        return /\[(API ERROR|XTREAM ERROR|FATAL)\]/i.test(l)
+                                            ? `<span class="log-line-error">${safe}</span>`
+                                            : safe;
+                                    }).join('\n');
+                                    box.scrollTop = box.scrollHeight;
+                                }
+                            }
+                        } catch (err) {
+                            if (box) box.textContent = `Fout bij laden van logs: ${err.message}`;
+                        }
+                    };
+
                     document.getElementById('runUpdateSqlBtn')?.addEventListener('click', async () => {
                         const resEl = document.getElementById('updateSqlResult');
                         try {
@@ -43,9 +100,31 @@ class App {
                             this.toast.show('update.sql succesvol uitgevoerd!');
                             if (resEl) resEl.innerHTML = '<div class="alert alert-success">update.sql succesvol uitgevoerd.</div>';
                         } catch (err) {
-                            if (resEl) resEl.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+                            if (resEl) resEl.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
                         }
                     });
+
+                    document.getElementById('logFewerBtn')?.addEventListener('click', () => {
+                        currentLines = Math.max(5, currentLines - 10);
+                        loadLogs();
+                    });
+                    document.getElementById('logMoreBtn')?.addEventListener('click', () => {
+                        currentLines = Math.min(500, currentLines + 10);
+                        loadLogs();
+                    });
+                    document.getElementById('logLinesSelect')?.addEventListener('change', e => {
+                        currentLines = Math.max(5, Math.min(500, Number(e.target.value) || 10));
+                        loadLogs();
+                    });
+                    document.getElementById('logRefreshBtn')?.addEventListener('click', loadLogs);
+                    document.getElementById('logClearBtn')?.addEventListener('click', async () => {
+                        if (!confirm('Weet je zeker dat je storage/logs/app.log wilt wissen?')) return;
+                        await this.api.post('clear_app_logs');
+                        this.toast.show('Applicatie log gewist!');
+                        loadLogs();
+                    });
+
+                    await loadLogs();
                 },
             },
         };

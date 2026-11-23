@@ -92,6 +92,8 @@ switch ($route) {
         $router->addApiRoute('clear_cache', DashboardController::class, 'clearCache');
         $router->addApiRoute('clear_sync_logs', DashboardController::class, 'clearSyncLogs');
         $router->addApiRoute('run_update_sql', DashboardController::class, 'runUpdateSql');
+        $router->addApiRoute('app_logs', DashboardController::class, 'appLogs');
+        $router->addApiRoute('clear_app_logs', DashboardController::class, 'clearAppLogs');
         $router->addApiRoute('logout', DashboardController::class, 'logout');
         $router->addApiRoute('groups', ChannelController::class, 'groups');
         $router->addApiRoute('groups_search', ChannelController::class, 'searchGroups');

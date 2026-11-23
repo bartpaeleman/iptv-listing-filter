@@ -202,4 +202,61 @@ final class DashboardController extends BaseController
         $this->auth->logout();
         $this->jsonSuccess();
     }
+
+    public function appLogs(): void
+    {
+        $this->requireAuth();
+        $requested = max(5, min(500, (int) ($_GET['lines'] ?? 10)));
+        $logFile = dirname(__DIR__, 2) . '/storage/logs/app.log';
+
+        if (!is_file($logFile) || !is_readable($logFile)) {
+            $this->jsonSuccess([
+                'lines' => [],
+                'requested_lines' => $requested,
+                'total_lines' => 0,
+                'file_size_kb' => 0.0,
+                'updated_at' => null,
+            ]);
+            return;
+        }
+
+        $sizeBytes = (int) filesize($logFile);
+        $mtime = @filemtime($logFile);
+        $file = new \SplFileObject($logFile, 'r');
+        $file->seek(PHP_INT_MAX);
+        $totalLines = $file->key();
+        $startLine = max(0, $totalLines - $requested);
+
+        $lines = [];
+        if ($totalLines > 0) {
+            $file->seek($startLine);
+            while (!$file->eof()) {
+                $line = rtrim((string) $file->fgets(), "\r\n");
+                if ($line !== '' || !$file->eof()) {
+                    $lines[] = $line;
+                }
+            }
+        }
+
+        $this->jsonSuccess([
+            'lines' => $lines,
+            'requested_lines' => $requested,
+            'total_lines' => $totalLines,
+            'file_size_kb' => round($sizeBytes / 1024, 2),
+            'updated_at' => $mtime ? date('Y-m-d H:i:s', $mtime) : null,
+        ]);
+    }
+
+    public function clearAppLogs(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $logFile = dirname(__DIR__, 2) . '/storage/logs/app.log';
+        if (is_file($logFile)) {
+            @file_put_contents($logFile, '');
+        }
+        $this->jsonSuccess();
+    }
 }
