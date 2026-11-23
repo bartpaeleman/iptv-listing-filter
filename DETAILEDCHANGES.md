@@ -5,11 +5,12 @@
   - Kolommen `category` (`VARCHAR(32)`) en `category_locked` (`TINYINT(1)`) toegevoegd aan `m3u_groups`, plus tabel `group_category_rules` (`schema_integrity_v7`).
 - **`app/Services/GroupCategoryService.php` & `app/Services/M3uParserService.php`:**
   - `GroupCategoryService::classify()` classificeert groepen op basis van eigen `group_category_rules` en ingebouwde trefwoorden (`Sport`, `Animatie`, `TV Series`, `Film`, `Muziek`, `Adult`, fallback `Live TV`).
-  - `M3uParserService::sync()` voert `SchemaMigrator::ensureSchemaUpToDate()`, `classifyUnlockedGroups()` en `ViewCacheService::invalidateAll()` uit na elke M3U-import.
+  - `M3uParserService::sync()` zet nieuwe groepen en kanalen standaard op `is_enabled = 0`, laat bestaande `is_enabled`-statussen ongemoeid, en voert `SchemaMigrator::ensureSchemaUpToDate()`, `classifyUnlockedGroups()` en `ViewCacheService::invalidateAll()` uit na elke M3U-import.
 - **`app/Repositories/GroupRepository.php`, `app/Controllers/ChannelController.php` & `index.php`:**
   - `GroupRepository` ondersteunt `categories`-filter in `searchGroups()` en `updateCategory()`.
   - Nieuwe endpoints `update_group_category` (strikte whitelist-validatie met HTTP 400), `group_category_rules`, `save_group_category_rule` en `delete_group_category_rule`.
-- **`assets/js/pages/ChannelsPage.js`, `assets/js/pages/EmojiRulesPage.js` & `assets/css/components.css`:**
+- **`assets/js/components/GroupList.js`, `assets/js/pages/ChannelsPage.js`, `assets/js/pages/EmojiRulesPage.js` & `assets/css/components.css`:**
+  - `GroupList` markeert de geselecteerde groep met `.is-selected`; `ChannelsPage` start zonder geselecteerde groep (lege kanaalstaat), reset `selectedGroupId` bij uitschakelen en biedt per groep een inklapbare `👁️ Inhoud` kanaal-preview (`.group-preview-box`).
   - Oude scope- en `Filter & Laad`-bovenbalk verwijderd; rechter groepsselectiepaneel uitgebreid met 7 togglebare categorie-filterknoppen (`Live TV`, `Sport`, `Animatie`, `TV Series`, `Film`, `Muziek`, `Adult`), aparte categorie-kolom en inline `✏️` edit-knop met vaste `<select>`-dropdown (44px touch-target).
   - `EmojiRulesPage` uitgebreid met sectie **Groep-categorie Regels** met vaste `<select>`-dropdown voor alle 7 categorieën.
 

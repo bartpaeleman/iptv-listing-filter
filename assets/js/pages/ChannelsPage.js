@@ -139,10 +139,16 @@ export class ChannelsPage extends BaseComponent {
                                         </select>
                                     </div>
                                 </td>
-                                <td style="text-align:right;">
+                                <td style="text-align:right;white-space:nowrap;">
+                                    <button type="button" class="btn btn-sm group-preview-btn" data-action="preview-group" data-id="${g.id}" style="min-height:44px;margin-right:0.25rem;">👁️ Inhoud</button>
                                     <button type="button" class="btn btn-sm ${enabled ? '' : 'btn-primary'} group-add-toggle-btn" data-id="${g.id}" data-enable="${enabled ? '0' : '1'}" style="min-height:44px;">
                                         ${enabled ? 'Actief ✓' : '+ Activeer'}
                                     </button>
+                                </td>
+                            </tr>
+                            <tr class="group-preview-row hidden" data-preview-for="${g.id}">
+                                <td colspan="3">
+                                    <div class="group-preview-box" data-preview-box="${g.id}">Laden...</div>
                                 </td>
                             </tr>
                         `;
@@ -150,6 +156,32 @@ export class ChannelsPage extends BaseComponent {
                 </tbody>
             </table>
         `;
+
+        resultsEl.querySelectorAll('.group-preview-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = Number(btn.dataset.id);
+                const row = resultsEl.querySelector(`.group-preview-row[data-preview-for="${id}"]`);
+                const box = resultsEl.querySelector(`[data-preview-box="${id}"]`);
+                if (!row || !box) return;
+                if (!row.classList.contains('hidden')) {
+                    row.classList.add('hidden');
+                    return;
+                }
+                row.classList.remove('hidden');
+                box.innerHTML = '<span class="muted">Kanalen laden...</span>';
+                const data = await this.props.api.get('channels', { group_id: id, limit: 100 });
+                const chList = data?.items || [];
+                if (chList.length === 0) {
+                    box.innerHTML = '<span class="muted">Geen kanalen in deze groep.</span>';
+                    return;
+                }
+                box.innerHTML = chList.map(c => {
+                    const chName = this.escapeHtml(c.display_name || c.custom_name || c.tvg_name || '');
+                    const on = Number(c.is_enabled) === 1;
+                    return `<div style="display:flex;justify-content:space-between;padding:0.15rem 0;border-bottom:1px solid rgba(255,255,255,0.05);"><span>${chName}</span><span class="muted">${on ? '✅ Aan' : '⬜ Uit'}</span></div>`;
+                }).join('');
+            });
+        });
 
         resultsEl.querySelectorAll('.cat-edit-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -322,6 +354,9 @@ export class ChannelsPage extends BaseComponent {
             },
             onToggle: async (id, checked) => {
                 await this.props.api.post('update_group', { id, is_enabled: checked ? 1 : 0 });
+                if (!checked && Number(id) === Number(this.selectedGroupId)) {
+                    this.selectedGroupId = null;
+                }
                 this.props.toast.show('Groep bijgewerkt');
                 this.load();
             }
