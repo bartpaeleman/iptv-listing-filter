@@ -459,7 +459,6 @@ final class ChannelController extends BaseController
         }
 
         (new \App\Services\ViewCacheService())->invalidateGroupChannels($groupId);
-        (new \App\Services\UiCacheService())->invalidateAll();
 
         $refreshed = $repo->filter($groupId, '', '', false, 200, 0, '', 'all', 'number');
         $this->jsonSuccess([
