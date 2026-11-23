@@ -460,3 +460,13 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; }
     background: rgba(59, 130, 246, 0.18);
     color: #93c5fd;
 }
+
+/* Compact Collapsible Form Card */
+.compact-form-card .collapsible-card__header {
+    padding: 0.5rem 0.85rem;
+    font-size: 0.95rem;
+}
+
+.compact-form-card .collapsible-card__body {
+    padding: 0.75rem 0.85rem;
+}

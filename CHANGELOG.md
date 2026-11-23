@@ -5,7 +5,7 @@
 - **Groep Kanaal-tools (`GroupChannelToolsBar.js`, `ChannelController::groupChannelTools()`, `ChannelRepository`):** Zoek & Vervang op kanaalnamen binnen een geselecteerde groep.
 - **Kanaalnaam Opschoning (`ChannelNameCleanerService.php`):** Automatisch strippen van video-kwaliteitstags (`SD`, `HD`, `FHD`, `UHD`, `4K`, `8K`, `HEVC`, `H.265`, `RAW`) bij export in M3U (`PlaylistExporterService.php`) en Xtream (`XtreamServerService.php`), zonder de originele `tvg_name` in de database te wijzigen.
 - **Inklapbare Secties & Dynamische QNAP Crontab (`components.css`, `SettingsPage.js`, `DashboardPage.js`):** Alle secundaire secties op Dashboard en Instellingen zijn standaard ingeklapt (`<details class="collapsible-card">`) met chevron-indicator; Uitgaande Feeds + Xtream Server zijn gegroepeerd, en de QNAP Crontab-generator past zich live aan op basis van `Sync Interval (uren)` en `Voorkeursuur (0-23)`.
-- **Landen & Tags Top-level Tab & Redesign (`dashboard.php`, `EmojiRulesPage.js`, `components.css`):** `🏷️ Landen & Tags` toegevoegd als hoofdtab in de navigatiebalk; `EmojiRulesPage` herontworpen met 2 standaard ingeklapte secties (`Land- & Keyword-Emoji Regels` en `Groep-categorie Regels`), live zoek-/filterbalken, sorteerbare kolomheaders en paginatie (max 10 rijen per pagina).
+- **Landen & Tags Top-level Tab & Redesign (`dashboard.php`, `EmojiRulesPage.js`, `components.css`):** `🏷️ Landen & Tags` toegevoegd als hoofdtab in de navigatiebalk; `EmojiRulesPage` verfijnd met compact inklapbaar formulier (`Nieuwe regel toevoegen`), 8-rijen paginatie, inline `Type` header-filter, `Patroon` ASC/DESC sortering en standaard ingeklapte `Groep-categorie Regels` sectie.
 
 ## [Unreleased] - feature/xtream-export
 ### Toegevoegd

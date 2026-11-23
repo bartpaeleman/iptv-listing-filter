@@ -1,15 +1,16 @@
 import { BaseComponent } from '../core/BaseComponent.js';
 
 const GROUP_CATEGORIES = ['Live TV', 'Sport', 'Animatie', 'TV Series', 'Film', 'Muziek', 'Adult'];
-const PAGE_SIZE = 10;
+const EMOJI_PAGE_SIZE = 8;
+const CAT_PAGE_SIZE = 10;
 
 export class EmojiRulesPage extends BaseComponent {
     constructor(container, props) {
         super(container, props);
-        this.emojiFilter = { search: '', type: 'all', status: 'all', sortBy: 'pattern', sortDir: 'asc', page: 1 };
+        this.emojiFilter = { search: '', type: 'all', sortDir: 'asc', page: 1 };
         this.catFilter = { search: '', category: 'all', sortBy: 'pattern', sortDir: 'asc', page: 1 };
         this.editingEmojiId = null;
-        this.editingCatId = null;
+        this.editingEmojiData = null;
     }
 
     async load() {
@@ -23,28 +24,25 @@ export class EmojiRulesPage extends BaseComponent {
         });
     }
 
+    getRuleType(r) {
+        return String(r.match_type || r.rule_type || r.type || '');
+    }
+
     getFilteredEmojiRules() {
         const all = this.state.emojiRules || [];
         const q = this.emojiFilter.search.trim().toLowerCase();
         const filtered = all.filter(r => {
-            if (this.emojiFilter.type !== 'all' && String(r.rule_type || r.type) !== this.emojiFilter.type) return false;
-            const active = Number(r.is_enabled ?? 1) === 1;
-            if (this.emojiFilter.status === 'active' && !active) return false;
-            if (this.emojiFilter.status === 'inactive' && active) return false;
+            const rType = this.getRuleType(r);
+            if (this.emojiFilter.type !== 'all' && rType !== this.emojiFilter.type) return false;
             if (q) {
-                const hay = `${r.pattern || ''} ${r.label || ''} ${r.emoji || ''}`.toLowerCase();
+                const hay = `${r.pattern || ''} ${r.label || ''} ${r.emoji || ''} ${rType}`.toLowerCase();
                 if (!hay.includes(q)) return false;
             }
             return true;
         });
 
         const dir = this.emojiFilter.sortDir === 'desc' ? -1 : 1;
-        const key = this.emojiFilter.sortBy;
-        filtered.sort((a, b) => {
-            const va = String(key === 'type' ? (a.rule_type || a.type || '') : key === 'status' ? (a.is_enabled ?? 1) : (a[key] || '')).toLowerCase();
-            const vb = String(key === 'type' ? (b.rule_type || b.type || '') : key === 'status' ? (b.is_enabled ?? 1) : (b[key] || '')).toLowerCase();
-            return va.localeCompare(vb) * dir;
-        });
+        filtered.sort((a, b) => String(a.pattern || '').localeCompare(String(b.pattern || '')) * dir);
         return filtered;
     }
 
@@ -79,98 +77,100 @@ export class EmojiRulesPage extends BaseComponent {
         }
 
         const emojiAll = this.state.emojiRules || [];
-        const catAll = this.state.catRules || [];
+        const uniqueTypes = Array.from(new Set(emojiAll.map(r => this.getRuleType(r)).filter(Boolean)))
+            .sort((a, b) => a.localeCompare(b));
 
         const emojiFiltered = this.getFilteredEmojiRules();
-        const emojiTotalPages = Math.max(1, Math.ceil(emojiFiltered.length / PAGE_SIZE));
+        const emojiTotalPages = Math.max(1, Math.ceil(emojiFiltered.length / EMOJI_PAGE_SIZE));
         this.emojiFilter.page = Math.min(this.emojiFilter.page, emojiTotalPages);
-        const emojiStart = (this.emojiFilter.page - 1) * PAGE_SIZE;
-        const emojiPageRows = emojiFiltered.slice(emojiStart, emojiStart + PAGE_SIZE);
+        const emojiStart = (this.emojiFilter.page - 1) * EMOJI_PAGE_SIZE;
+        const emojiPageRows = emojiFiltered.slice(emojiStart, emojiStart + EMOJI_PAGE_SIZE);
 
+        const catAll = this.state.catRules || [];
         const catFiltered = this.getFilteredCatRules();
-        const catTotalPages = Math.max(1, Math.ceil(catFiltered.length / PAGE_SIZE));
+        const catTotalPages = Math.max(1, Math.ceil(catFiltered.length / CAT_PAGE_SIZE));
         this.catFilter.page = Math.min(this.catFilter.page, catTotalPages);
-        const catStart = (this.catFilter.page - 1) * PAGE_SIZE;
-        const catPageRows = catFiltered.slice(catStart, catStart + PAGE_SIZE);
+        const catStart = (this.catFilter.page - 1) * CAT_PAGE_SIZE;
+        const catPageRows = catFiltered.slice(catStart, catStart + CAT_PAGE_SIZE);
 
-        const quickEmojis = ['🇧🇪', '🇳🇱', '🇬🇧', '🇺🇸', '🇩🇪', '🇫🇷', '⚽', '🎬', '📺', '🎵', '🔞', '📰'];
+        const editData = this.editingEmojiData || {};
+        const editType = this.getRuleType(editData) || 'country';
 
         this.container.innerHTML = `
-            <details class="collapsible-card" id="emojiRulesAccordion">
+            <details class="collapsible-card compact-form-card" id="newEmojiRuleAccordion" ${this.editingEmojiId ? 'open' : ''}>
                 <summary class="collapsible-card__header">
-                    <span>🏷️ Land- &amp; Keyword-Emoji Regels <span class="badge">${emojiAll.length}</span></span>
+                    <span>➕ ${this.editingEmojiId ? 'Regel bewerken' : 'Nieuwe regel toevoegen'}</span>
                     <span class="collapsible-card__chevron">▼</span>
                 </summary>
                 <div class="collapsible-card__body">
-                    <form id="emojiRuleForm" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;margin-bottom:0.75rem;">
+                    <form id="emojiRuleForm" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
                         <select id="erType" style="min-height:44px;font-size:16px;">
-                            <option value="country">Landcode</option>
-                            <option value="keyword">Keyword</option>
+                            <option value="country" ${editType === 'country' ? 'selected' : ''}>Landcode</option>
+                            <option value="keyword" ${editType === 'keyword' ? 'selected' : ''}>Keyword</option>
                         </select>
-                        <input type="text" id="erPattern" placeholder="Patroon (bv. BE of SPORT)" required style="min-height:44px;font-size:16px;flex:1 1 150px;">
-                        <input type="text" id="erEmoji" placeholder="Emoji (bv. 🇧🇪)" required style="min-height:44px;font-size:16px;width:110px;">
-                        <input type="text" id="erLabel" placeholder="Label (optioneel)" style="min-height:44px;font-size:16px;flex:1 1 150px;">
+                        <input type="text" id="erPattern" value="${this.escapeHtml(editData.pattern || '')}" placeholder="Patroon (bv. BE of SPORT)" required style="min-height:44px;font-size:16px;flex:1 1 150px;">
+                        <input type="text" id="erEmoji" value="${this.escapeHtml(editData.emoji || '')}" placeholder="Emoji (bv. 🇧🇪)" required style="min-height:44px;font-size:16px;width:110px;">
+                        <input type="text" id="erLabel" value="${this.escapeHtml(editData.label || '')}" placeholder="Omschrijving (optioneel)" style="min-height:44px;font-size:16px;flex:1 1 150px;">
                         <button type="submit" class="btn btn-primary" style="min-height:44px;">${this.editingEmojiId ? 'Bijwerken' : 'Opslaan'}</button>
                         ${this.editingEmojiId ? `<button type="button" class="btn" id="erCancelEditBtn" style="min-height:44px;">Annuleren</button>` : ''}
                     </form>
-                    <div style="display:flex;gap:0.35rem;flex-wrap:wrap;margin-bottom:0.75rem;">
-                        ${quickEmojis.map(em => `<button type="button" class="btn btn-sm er-quick-emoji" data-emoji="${em}" style="min-height:36px;">${em}</button>`).join('')}
-                    </div>
-
-                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
-                        <input type="search" id="erSearchInput" value="${this.escapeHtml(this.emojiFilter.search)}" placeholder="Zoek patroon, label of emoji..." style="min-height:44px;font-size:16px;flex:1 1 200px;">
-                        <select id="erTypeFilter" style="min-height:44px;font-size:16px;">
-                            <option value="all" ${this.emojiFilter.type === 'all' ? 'selected' : ''}>Alle types</option>
-                            <option value="country" ${this.emojiFilter.type === 'country' ? 'selected' : ''}>Landcode</option>
-                            <option value="keyword" ${this.emojiFilter.type === 'keyword' ? 'selected' : ''}>Keyword</option>
-                        </select>
-                        <select id="erStatusFilter" style="min-height:44px;font-size:16px;">
-                            <option value="all" ${this.emojiFilter.status === 'all' ? 'selected' : ''}>Alle statussen</option>
-                            <option value="active" ${this.emojiFilter.status === 'active' ? 'selected' : ''}>Actief</option>
-                            <option value="inactive" ${this.emojiFilter.status === 'inactive' ? 'selected' : ''}>Inactief</option>
-                        </select>
-                    </div>
-
-                    <div class="table-wrap">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th class="sortable-th" data-er-sort="emoji">Emoji${this.sortChevron(this.emojiFilter.sortBy, this.emojiFilter.sortDir, 'emoji')}</th>
-                                    <th class="sortable-th" data-er-sort="type">Type${this.sortChevron(this.emojiFilter.sortBy, this.emojiFilter.sortDir, 'type')}</th>
-                                    <th class="sortable-th" data-er-sort="pattern">Patroon${this.sortChevron(this.emojiFilter.sortBy, this.emojiFilter.sortDir, 'pattern')}</th>
-                                    <th class="sortable-th" data-er-sort="label">Label${this.sortChevron(this.emojiFilter.sortBy, this.emojiFilter.sortDir, 'label')}</th>
-                                    <th class="sortable-th" data-er-sort="status">Status${this.sortChevron(this.emojiFilter.sortBy, this.emojiFilter.sortDir, 'status')}</th>
-                                    <th>Acties</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${emojiPageRows.length > 0 ? emojiPageRows.map(r => `
-                                    <tr>
-                                        <td><span class="emoji-pill">${this.escapeHtml(r.emoji || '')}</span></td>
-                                        <td>${this.escapeHtml(r.rule_type || r.type || '')}</td>
-                                        <td><code>${this.escapeHtml(r.pattern || '')}</code></td>
-                                        <td>${this.escapeHtml(r.label || '')}</td>
-                                        <td>
-                                            <button type="button" class="btn btn-sm er-toggle-btn" data-id="${r.id}" data-enabled="${Number(r.is_enabled ?? 1) === 1 ? 0 : 1}" style="min-height:44px;">
-                                                ${Number(r.is_enabled ?? 1) === 1 ? '✅ Actief' : '⏸️ Inactief'}
-                                            </button>
-                                        </td>
-                                        <td style="white-space:nowrap;">
-                                            <button type="button" class="btn btn-sm btn-danger er-delete-btn" data-id="${r.id}" style="min-height:44px;">🗑️</button>
-                                        </td>
-                                    </tr>
-                                `).join('') : '<tr><td colspan="6" class="muted">Geen regels gevonden.</td></tr>'}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="table-pagination-bar">
-                        <button type="button" class="btn btn-sm" id="erPrevPage" ${this.emojiFilter.page <= 1 ? 'disabled' : ''}>← Vorige</button>
-                        <span class="muted">Pagina ${this.emojiFilter.page} van ${emojiTotalPages} (${emojiFiltered.length} regels)</span>
-                        <button type="button" class="btn btn-sm" id="erNextPage" ${this.emojiFilter.page >= emojiTotalPages ? 'disabled' : ''}>Volgende →</button>
-                    </div>
                 </div>
             </details>
+
+            <div class="card" style="margin-bottom:1rem;">
+                <div class="card-header" style="margin-bottom:0.75rem;">
+                    <h2>🏷️ Land- &amp; Keyword-Emoji Regels <span class="badge">${emojiAll.length}</span></h2>
+                    <input type="search" id="erSearchInput" value="${this.escapeHtml(this.emojiFilter.search)}" placeholder="Zoek patroon, omschrijving of emoji..." style="min-height:44px;font-size:16px;max-width:300px;width:100%;">
+                </div>
+
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>
+                                    <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                                        <span>Type</span>
+                                        <select id="emojiTypeHeaderFilter" style="min-height:36px;font-size:14px;padding:0.15rem 0.35rem;">
+                                            <option value="all" ${this.emojiFilter.type === 'all' ? 'selected' : ''}>Alle</option>
+                                            ${uniqueTypes.map(t => `<option value="${this.escapeHtml(t)}" ${this.emojiFilter.type === t ? 'selected' : ''}>${this.escapeHtml(t)}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                </th>
+                                <th class="sortable-th" id="erSortPatternTh">Patroon ${this.emojiFilter.sortDir === 'asc' ? '▲' : '▼'}</th>
+                                <th>Emoji</th>
+                                <th>Omschrijving</th>
+                                <th>Actief</th>
+                                <th>Acties</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${emojiPageRows.length > 0 ? emojiPageRows.map(r => `
+                                <tr>
+                                    <td>${this.escapeHtml(this.getRuleType(r))}</td>
+                                    <td><code>${this.escapeHtml(r.pattern || '')}</code></td>
+                                    <td><span class="emoji-pill">${this.escapeHtml(r.emoji || '')}</span></td>
+                                    <td>${this.escapeHtml(r.label || '')}</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm er-toggle-btn" data-id="${r.id}" data-enabled="${Number(r.is_enabled ?? 1) === 1 ? 0 : 1}" style="min-height:44px;">
+                                            ${Number(r.is_enabled ?? 1) === 1 ? '✅ Actief' : '⏸️ Inactief'}
+                                        </button>
+                                    </td>
+                                    <td style="white-space:nowrap;">
+                                        <button type="button" class="btn btn-sm er-edit-btn" data-id="${r.id}" style="min-height:44px;">✏️</button>
+                                        <button type="button" class="btn btn-sm btn-danger er-delete-btn" data-id="${r.id}" style="min-height:44px;">🗑️</button>
+                                    </td>
+                                </tr>
+                            `).join('') : '<tr><td colspan="6" class="muted">Geen regels gevonden.</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="table-pagination-bar">
+                    <button type="button" class="btn btn-sm" id="erPrevPage" ${this.emojiFilter.page <= 1 ? 'disabled' : ''}>← Vorige</button>
+                    <span class="muted">Pagina ${this.emojiFilter.page} van ${emojiTotalPages} (${emojiFiltered.length} regels)</span>
+                    <button type="button" class="btn btn-sm" id="erNextPage" ${this.emojiFilter.page >= emojiTotalPages ? 'disabled' : ''}>Volgende →</button>
+                </div>
+            </div>
 
             <details class="collapsible-card" id="catRulesAccordion">
                 <summary class="collapsible-card__header">
@@ -232,13 +232,6 @@ export class EmojiRulesPage extends BaseComponent {
     }
 
     bindEvents() {
-        this.container.querySelectorAll('.er-quick-emoji').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const input = document.getElementById('erEmoji');
-                if (input) input.value = btn.dataset.emoji || '';
-            });
-        });
-
         document.getElementById('emojiRuleForm')?.addEventListener('submit', async ev => {
             ev.preventDefault();
             await this.props.api.post('save_emoji_rule', {
@@ -249,13 +242,26 @@ export class EmojiRulesPage extends BaseComponent {
                 label: document.getElementById('erLabel')?.value || '',
             });
             this.editingEmojiId = null;
+            this.editingEmojiData = null;
             this.props.toast.show('Emoji-regel opgeslagen!');
             await this.load();
         });
 
         document.getElementById('erCancelEditBtn')?.addEventListener('click', () => {
             this.editingEmojiId = null;
+            this.editingEmojiData = null;
             this.render();
+        });
+
+        this.container.querySelectorAll('.er-edit-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = Number(btn.dataset.id);
+                const rule = (this.state.emojiRules || []).find(r => Number(r.id) === id);
+                if (!rule) return;
+                this.editingEmojiId = id;
+                this.editingEmojiData = rule;
+                this.render();
+            });
         });
 
         this.container.querySelectorAll('.er-toggle-btn').forEach(btn => {
@@ -282,28 +288,20 @@ export class EmojiRulesPage extends BaseComponent {
             this.emojiFilter.page = 1;
             this.render();
         });
-        document.getElementById('erTypeFilter')?.addEventListener('change', e => {
+
+        const typeSelect = document.getElementById('emojiTypeHeaderFilter');
+        typeSelect?.addEventListener('click', e => e.stopPropagation());
+        typeSelect?.addEventListener('change', e => {
             this.emojiFilter.type = e.target.value;
             this.emojiFilter.page = 1;
             this.render();
         });
-        document.getElementById('erStatusFilter')?.addEventListener('change', e => {
-            this.emojiFilter.status = e.target.value;
-            this.emojiFilter.page = 1;
+
+        document.getElementById('erSortPatternTh')?.addEventListener('click', () => {
+            this.emojiFilter.sortDir = this.emojiFilter.sortDir === 'asc' ? 'desc' : 'asc';
             this.render();
         });
-        this.container.querySelectorAll('[data-er-sort]').forEach(th => {
-            th.addEventListener('click', () => {
-                const col = th.dataset.erSort;
-                if (this.emojiFilter.sortBy === col) {
-                    this.emojiFilter.sortDir = this.emojiFilter.sortDir === 'asc' ? 'desc' : 'asc';
-                } else {
-                    this.emojiFilter.sortBy = col;
-                    this.emojiFilter.sortDir = 'asc';
-                }
-                this.render();
-            });
-        });
+
         document.getElementById('erPrevPage')?.addEventListener('click', () => {
             if (this.emojiFilter.page > 1) { this.emojiFilter.page--; this.render(); }
         });
