@@ -29,20 +29,35 @@ final class PlaylistExporterService
         echo '#EXTM3U url-tvg="' . $this->escapeAttr($epgUrl) . '" x-tvg-url="' . $this->escapeAttr($epgUrl) . "\"\n";
 
         $groupOrder = match ($sortMode) {
-            'asc' => 'g.original_name ASC, g.id ASC',
-            'desc' => 'g.original_name DESC, g.id DESC',
-            default => 'g.import_order ASC, g.id ASC',
+            'asc' => 'g_name ASC, g_id ASC',
+            'desc' => 'g_name DESC, g_id DESC',
+            default => 'g_import_order ASC, g_id ASC',
         };
 
-        $sql = "SELECT c.tvg_id, c.tvg_name, c.tvg_logo, c.stream_url, c.custom_name,
-                       c.channel_number, c.epg_channel_id,
-                       COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS group_name
-                FROM channels c
-                INNER JOIN m3u_groups g ON g.id = c.group_id
-                WHERE g.is_enabled = 1 AND c.is_enabled = 1
-                ORDER BY {$groupOrder},
-                         COALESCE(c.channel_number, 999999) ASC,
-                         c.sort_order ASC, c.id ASC";
+        $sql = "SELECT tvg_id, tvg_name, tvg_logo, stream_url, custom_name, channel_number, epg_channel_id, group_name
+                FROM (
+                    SELECT c.tvg_id, c.tvg_name, c.tvg_logo, c.stream_url, c.custom_name,
+                           c.channel_number, c.epg_channel_id,
+                           COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS group_name,
+                           g.original_name AS g_name, g.import_order AS g_import_order, g.id AS g_id,
+                           COALESCE(c.channel_number, 999999) AS ch_num, c.sort_order AS ch_sort, c.id AS ch_id
+                    FROM channels c
+                    INNER JOIN m3u_groups g ON g.id = c.group_id
+                    WHERE g.is_custom = 0 AND g.is_enabled = 1 AND c.is_enabled = 1
+
+                    UNION ALL
+
+                    SELECT c.tvg_id, c.tvg_name, c.tvg_logo, c.stream_url, c.custom_name,
+                           c.channel_number, c.epg_channel_id,
+                           COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS group_name,
+                           COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS g_name, g.import_order AS g_import_order, g.id AS g_id,
+                           0 AS ch_num, cgc.sort_order AS ch_sort, c.id AS ch_id
+                    FROM custom_group_channels cgc
+                    INNER JOIN m3u_groups g ON g.id = cgc.custom_group_id
+                    INNER JOIN channels c ON c.id = cgc.channel_id
+                    WHERE g.is_custom = 1 AND g.is_enabled = 1 AND c.is_enabled = 1 AND cgc.is_ignored = 0
+                ) AS export_rows
+                ORDER BY {$groupOrder}, ch_num ASC, ch_sort ASC, ch_id ASC";
 
         $stmt = $this->pdo->query($sql);
         while ($row = $stmt->fetch()) {

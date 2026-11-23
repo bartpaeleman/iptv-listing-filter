@@ -507,6 +507,152 @@ final class ChannelController extends BaseController
         ]);
     }
 
+    public function createCustomGroup(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $name = (string) ($input['name'] ?? '');
+        $category = (string) ($input['category'] ?? 'Live TV');
+
+        try {
+            $repo = new \App\Repositories\CustomGroupRepository();
+            $group = $repo->createCustomGroup($name, $category);
+            (new ViewCacheService())->invalidateAll();
+            $this->jsonSuccess($group);
+        } catch (\InvalidArgumentException $e) {
+            $this->jsonError($e->getMessage(), 400);
+        }
+    }
+
+    public function convertToCustomGroup(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $sourceGroupId = (int) ($input['source_group_id'] ?? 0);
+        if ($sourceGroupId <= 0) {
+            $this->jsonError('Ongeldige brongroep.', 400);
+        }
+
+        try {
+            $repo = new \App\Repositories\CustomGroupRepository();
+            $group = $repo->convertProviderGroup($sourceGroupId);
+            (new ViewCacheService())->invalidateAll();
+            $this->jsonSuccess($group);
+        } catch (\Throwable $e) {
+            $this->jsonError($e->getMessage(), 400);
+        }
+    }
+
+    public function deleteCustomGroup(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $customGroupId = (int) ($input['custom_group_id'] ?? 0);
+        $restoreSource = (bool) ($input['restore_source'] ?? true);
+        if ($customGroupId <= 0) {
+            $this->jsonError('Ongeldige custom groep.', 400);
+        }
+
+        try {
+            $repo = new \App\Repositories\CustomGroupRepository();
+            $repo->deleteCustomGroup($customGroupId, $restoreSource);
+            (new ViewCacheService())->invalidateAll();
+            $this->jsonSuccess(['deleted' => true]);
+        } catch (\InvalidArgumentException $e) {
+            $this->jsonError($e->getMessage(), 400);
+        }
+    }
+
+    public function customGroupAddChannels(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $customGroupId = (int) ($input['custom_group_id'] ?? 0);
+        $channelIds = is_array($input['channel_ids'] ?? null) ? $input['channel_ids'] : [];
+        if ($customGroupId <= 0) {
+            $this->jsonError('Ongeldige custom groep.', 400);
+        }
+
+        try {
+            $repo = new \App\Repositories\CustomGroupRepository();
+            $added = $repo->addChannels($customGroupId, $channelIds);
+            (new ViewCacheService())->invalidateAll();
+            $this->jsonSuccess([
+                'added' => $added,
+                'member_ids' => $repo->getChannelIdsInCustomGroup($customGroupId),
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            $this->jsonError($e->getMessage(), 400);
+        }
+    }
+
+    public function customGroupRemoveChannels(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $customGroupId = (int) ($input['custom_group_id'] ?? 0);
+        $channelIds = is_array($input['channel_ids'] ?? null) ? $input['channel_ids'] : [];
+        if ($customGroupId <= 0) {
+            $this->jsonError('Ongeldige custom groep.', 400);
+        }
+
+        $repo = new \App\Repositories\CustomGroupRepository();
+        $repo->removeChannels($customGroupId, $channelIds);
+        (new ViewCacheService())->invalidateAll();
+        $this->jsonSuccess(['removed' => true]);
+    }
+
+    public function customGroupResolveSync(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $customGroupId = (int) ($input['custom_group_id'] ?? 0);
+        if ($customGroupId <= 0) {
+            $this->jsonError('Ongeldige custom groep.', 400);
+        }
+
+        $addIds = is_array($input['add_ids'] ?? null) ? $input['add_ids'] : [];
+        $ignoreAddIds = is_array($input['ignore_add_ids'] ?? null) ? $input['ignore_add_ids'] : [];
+        $removeIds = is_array($input['remove_ids'] ?? null) ? $input['remove_ids'] : [];
+
+        $syncService = new \App\Services\CustomGroupSyncService();
+        $syncService->resolveSyncDiff($customGroupId, $addIds, $ignoreAddIds, $removeIds);
+        (new ViewCacheService())->invalidateAll();
+
+        $group = (new \App\Repositories\CustomGroupRepository())->findById($customGroupId);
+        $this->jsonSuccess([
+            'resolved' => true,
+            'sync_diff_json' => $group['sync_diff_json'] ?? null,
+        ]);
+    }
+
+    public function customGroupMemberIds(): void
+    {
+        $this->requireAuth();
+        $customGroupId = (int) ($_GET['custom_group_id'] ?? 0);
+        if ($customGroupId <= 0) {
+            $this->jsonSuccess(['member_ids' => []]);
+            return;
+        }
+
+        $repo = new \App\Repositories\CustomGroupRepository();
+        $this->jsonSuccess([
+            'member_ids' => $repo->getChannelIdsInCustomGroup($customGroupId),
+        ]);
+    }
+
     /**
      * @return array<int, string>
      */

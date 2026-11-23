@@ -2,6 +2,7 @@ import { BaseComponent } from '../core/BaseComponent.js';
 import { debounce } from '../core/Debounce.js';
 import { GroupList } from '../components/GroupList.js';
 import { ChannelTable } from '../components/ChannelTable.js';
+import { CustomGroupSyncBanner } from '../components/CustomGroupSyncBanner.js';
 import { GroupChannelToolsBar } from '../components/GroupChannelToolsBar.js';
 
 export class ChannelsPage extends BaseComponent {
@@ -344,6 +345,7 @@ export class ChannelsPage extends BaseComponent {
             countryTags: this.countryTags || [],
             isAllChannelsView: !this.selectedGroupId,
         });
+        await this.updateCustomGroupUi();
     }
 
     renderShell() {
@@ -353,7 +355,7 @@ export class ChannelsPage extends BaseComponent {
                     <div class="card-header">
                         <h2>Groepen</h2>
                         <div class="btn-group">
-                            <button type="button" class="btn btn-sm btn-primary" id="openGroupSearchBtn" style="min-height:44px;">+ Groep toevoegen</button>
+                            <button type="button" class="btn btn-sm btn-primary" id="openGroupSearchBtn" style="min-height:44px;">📋 Lijst groepen</button>
                         </div>
                     </div>
                     <input type="search" id="groupSearchInput" placeholder="Filter actieve groepen..." style="font-size:16px;">
@@ -373,6 +375,9 @@ export class ChannelsPage extends BaseComponent {
                         <div class="btn-group">
                             <button type="button" class="btn btn-sm hidden" id="adoptGroupNameBtn" title="Huidige weergavenaam (incl. vlag/emoji) opslaan als custom naam">❐</button>
                             <button type="button" class="btn btn-sm hidden" id="editGroupNameBtn" title="Groepsnaam aanpassen">✏️</button>
+                            <button type="button" class="btn btn-sm hidden" id="convertToCustomBtn" title="Zet deze provider-groep om naar een bewerkbare custom groep">🛠️ Omzetten naar custom groep</button>
+                            <button type="button" class="btn btn-sm btn-danger hidden" id="deleteCustomGroupBtn" title="Verwijder custom groep">🗑️ Verwijder custom groep</button>
+                            <button type="button" class="btn btn-sm btn-danger hidden" id="removeFromCustomGroupBtn" title="Verwijder geselecteerde kanalen uit deze custom groep">🗑️ Verwijder uit groep</button>
                             <button class="btn btn-sm" id="manageCountryTagsBtn">🏷️ Landen & Tags Beheren</button>
                             <button class="btn btn-sm" id="bulkEnableChannelsBtn">Selectie Aan</button>
                             <button class="btn btn-sm" id="bulkDisableChannelsBtn">Selectie Uit</button>
@@ -392,6 +397,12 @@ export class ChannelsPage extends BaseComponent {
                             <option value="no">Zonder EPG</option>
                         </select>
                     </div>
+                    <div id="customGroupTargetBar" class="toolbar hidden" style="align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                        <label for="targetCustomGroupSelect" class="muted" style="font-size:0.9rem;">Toevoegen aan custom groep:</label>
+                        <select id="targetCustomGroupSelect" style="min-height:44px;font-size:16px;min-width:180px;"></select>
+                        <button type="button" class="btn btn-sm btn-primary" id="addToCustomGroupBtn" disabled style="min-height:44px;">➕ Voeg toe (0)</button>
+                    </div>
+                    <div id="customGroupSyncBannerRoot" class="hidden"></div>
                     <div id="groupChannelToolsMount"></div>
                     <div class="table-wrap">
                         <table class="data-table">
@@ -409,6 +420,21 @@ export class ChannelsPage extends BaseComponent {
                     <div id="groupAddPanel" class="hidden">
                         <div class="card-header">
                             <h2>Groep toevoegen</h2>
+                            <button type="button" class="btn btn-sm btn-primary" id="toggleNewCustomGroupBtn" style="min-height:44px;">➕ Nieuwe groep</button>
+                        </div>
+                        <div id="newCustomGroupForm" class="toolbar hidden" style="gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+                            <input type="text" id="newCustomGroupName" placeholder="Naam van nieuwe custom groep..." style="flex:1;min-width:180px;font-size:16px;min-height:44px;">
+                            <select id="newCustomGroupCategory" style="font-size:16px;min-height:44px;">
+                                <option value="Live TV">Live TV</option>
+                                <option value="Sport">Sport</option>
+                                <option value="Animatie">Animatie</option>
+                                <option value="Muziek">Muziek</option>
+                                <option value="Adult">Adult</option>
+                                <option value="Film">Film</option>
+                                <option value="TV Series">TV Series</option>
+                            </select>
+                            <button type="button" class="btn btn-sm btn-primary" id="saveNewCustomGroupBtn" style="min-height:44px;">Aanmaken</button>
+                            <button type="button" class="btn btn-sm" id="cancelNewCustomGroupBtn" style="min-height:44px;">Annuleren</button>
                         </div>
                         <div class="cat-filter-bar" id="groupCategoryFilterBar">
                             <button type="button" class="cat-filter-btn" data-cat="Live TV">Live TV</button>
@@ -474,8 +500,29 @@ export class ChannelsPage extends BaseComponent {
                 if (disableBtn) disableBtn.textContent = count > 0 ? `Selectie Uit (${count})` : 'Selectie Uit';
                 if (adoptBtn) adoptBtn.textContent = count > 0 ? `🏷️ Selectie Custom (${count})` : '🏷️ Selectie Custom';
                 if (resetBtn) resetBtn.textContent = count > 0 ? `↩️ Selectie Origineel (${count})` : '↩️ Selectie Origineel';
+                const addToCustomBtn = document.getElementById('addToCustomGroupBtn');
+                if (addToCustomBtn) {
+                    addToCustomBtn.textContent = `➕ Voeg toe (${count})`;
+                    addToCustomBtn.disabled = count === 0;
+                }
             }
         });
+
+        this.syncBanner = new CustomGroupSyncBanner('#customGroupSyncBannerRoot', {
+            onResolve: async ({ addIds, ignoreAddIds, removeIds }) => {
+                if (!this.selectedGroupId) return;
+                await this.props.api.post('custom_group_resolve_sync', {
+                    custom_group_id: this.selectedGroupId,
+                    add_ids: addIds,
+                    ignore_add_ids: ignoreAddIds,
+                    remove_ids: removeIds,
+                });
+                this.props.toast.show('Sync-wijzigingen verwerkt');
+                await this.load();
+            }
+        });
+
+        this.bindCustomGroupEvents();
 
         document.getElementById('groupSearchInput')?.addEventListener('input', debounce(e => {
             this.groupList.setState({ filter: e.target.value });
@@ -776,6 +823,179 @@ export class ChannelsPage extends BaseComponent {
                 }
                 await this.loadChannels();
             });
+        });
+    }
+
+    bindCustomGroupEvents() {
+        const toggleBtn = document.getElementById('toggleNewCustomGroupBtn');
+        const form = document.getElementById('newCustomGroupForm');
+        const cancelBtn = document.getElementById('cancelNewCustomGroupBtn');
+        const saveBtn = document.getElementById('saveNewCustomGroupBtn');
+        const nameInput = document.getElementById('newCustomGroupName');
+        const catSelect = document.getElementById('newCustomGroupCategory');
+
+        toggleBtn?.addEventListener('click', () => {
+            form?.classList.toggle('hidden');
+            if (form && !form.classList.contains('hidden')) {
+                nameInput?.focus();
+            }
+        });
+
+        cancelBtn?.addEventListener('click', () => {
+            form?.classList.add('hidden');
+            if (nameInput) nameInput.value = '';
+        });
+
+        saveBtn?.addEventListener('click', async () => {
+            const name = (nameInput?.value || '').trim();
+            const category = catSelect?.value || 'Live TV';
+            if (!name) {
+                this.props.toast?.show('Vul een groepsnaam in', 'error');
+                return;
+            }
+            const created = await this.props.api.post('create_custom_group', { name, category });
+            form?.classList.add('hidden');
+            if (nameInput) nameInput.value = '';
+            this.isAddGroupMode = false;
+            document.getElementById('groupAddPanel')?.classList.add('hidden');
+            document.getElementById('channelsViewContainer')?.classList.remove('hidden');
+            document.getElementById('openGroupSearchBtn')?.classList.remove('btn-danger');
+            if (created?.id) {
+                this.selectedGroupId = Number(created.id);
+                this.selectedGroupName = created.custom_name || created.original_name || name;
+            }
+            this.props.toast?.show('Custom groep aangemaakt');
+            await this.load();
+        });
+
+        document.getElementById('convertToCustomBtn')?.addEventListener('click', async () => {
+            if (!this.selectedGroupId) return;
+            if (!confirm('Weet je zeker dat je deze provider-groep wilt omzetten naar een custom groep?')) return;
+            const created = await this.props.api.post('convert_to_custom_group', {
+                source_group_id: this.selectedGroupId,
+            });
+            if (created?.id) {
+                this.selectedGroupId = Number(created.id);
+                this.selectedGroupName = created.custom_name || created.original_name || this.selectedGroupName;
+            }
+            this.props.toast?.show('Groep omgezet naar custom groep');
+            await this.load();
+        });
+
+        document.getElementById('deleteCustomGroupBtn')?.addEventListener('click', async () => {
+            if (!this.selectedGroupId) return;
+            if (!confirm('Weet je zeker dat je deze custom groep wilt verwijderen?')) return;
+            await this.props.api.post('delete_custom_group', {
+                custom_group_id: this.selectedGroupId,
+                restore_source: true,
+            });
+            this.selectedGroupId = null;
+            this.selectedGroupName = '';
+            this.props.toast?.show('Custom groep verwijderd');
+            await this.load();
+        });
+
+        document.getElementById('removeFromCustomGroupBtn')?.addEventListener('click', async () => {
+            if (!this.selectedGroupId) return;
+            const ids = this.channelTable?.getSelectedIds?.() || [];
+            if (ids.length === 0) {
+                this.props.toast?.show('Selecteer eerst kanalen om te verwijderen', 'error');
+                return;
+            }
+            await this.props.api.post('custom_group_remove_channels', {
+                custom_group_id: this.selectedGroupId,
+                channel_ids: ids,
+            });
+            this.props.toast?.show(`${ids.length} kanaal/kanalen verwijderd uit custom groep`);
+            await this.load();
+        });
+
+        document.getElementById('targetCustomGroupSelect')?.addEventListener('change', async () => {
+            await this.loadTargetMemberIds();
+        });
+
+        document.getElementById('addToCustomGroupBtn')?.addEventListener('click', async () => {
+            const targetSelect = document.getElementById('targetCustomGroupSelect');
+            const targetId = Number(targetSelect?.value || 0);
+            const ids = this.channelTable?.getSelectedIds?.() || [];
+            if (!targetId || ids.length === 0) return;
+
+            const res = await this.props.api.post('custom_group_add_channels', {
+                custom_group_id: targetId,
+                channel_ids: ids,
+            });
+            const targetName = targetSelect?.options[targetSelect.selectedIndex]?.textContent || '';
+            this.channelTable?.setState({
+                targetMemberIds: res?.member_ids || [],
+                targetGroupName: targetName,
+            });
+            this.channelTable?.props?.onSelectionChange?.(0);
+            this.props.toast?.show(`${res?.added ?? 0} kanaal/kanalen toegevoegd aan ${targetName}`);
+            await this.loadGroupsOnly?.();
+        });
+    }
+
+    async updateCustomGroupUi() {
+        const groups = this.groupList?.state?.groups || [];
+        const selected = this.selectedGroupId
+            ? groups.find(g => Number(g.id) === Number(this.selectedGroupId))
+            : null;
+        const isCustom = selected && Number(selected.is_custom || 0) === 1;
+
+        document.getElementById('convertToCustomBtn')?.classList.toggle('hidden', !selected || isCustom);
+        document.getElementById('deleteCustomGroupBtn')?.classList.toggle('hidden', !isCustom);
+        document.getElementById('removeFromCustomGroupBtn')?.classList.toggle('hidden', !isCustom);
+
+        if (isCustom && selected) {
+            this.syncBanner?.setData(Number(selected.id), selected.sync_diff_json || null);
+        } else {
+            this.syncBanner?.setData(null, null);
+        }
+
+        const targetBar = document.getElementById('customGroupTargetBar');
+        const targetSelect = document.getElementById('targetCustomGroupSelect');
+        if (!selected || isCustom) {
+            targetBar?.classList.add('hidden');
+            this.channelTable?.setState({ targetMemberIds: [], targetGroupName: '' });
+            return;
+        }
+
+        const sourceCt = selected.content_type || 'live';
+        const compatibleCustomGroups = groups.filter(
+            g => Number(g.is_custom || 0) === 1 && (g.content_type || 'live') === sourceCt
+        );
+
+        if (compatibleCustomGroups.length === 0 || !targetSelect) {
+            targetBar?.classList.add('hidden');
+            this.channelTable?.setState({ targetMemberIds: [], targetGroupName: '' });
+            return;
+        }
+
+        const prevVal = targetSelect.value;
+        targetSelect.innerHTML = compatibleCustomGroups.map(g => {
+            const label = g.custom_name || g.original_name || `Custom #${g.id}`;
+            return `<option value="${g.id}">${this.escapeHtml(label)}</option>`;
+        }).join('');
+        if (prevVal && compatibleCustomGroups.some(g => String(g.id) === String(prevVal))) {
+            targetSelect.value = prevVal;
+        }
+
+        targetBar?.classList.remove('hidden');
+        await this.loadTargetMemberIds();
+    }
+
+    async loadTargetMemberIds() {
+        const targetSelect = document.getElementById('targetCustomGroupSelect');
+        const targetId = Number(targetSelect?.value || 0);
+        if (!targetId) {
+            this.channelTable?.setState({ targetMemberIds: [], targetGroupName: '' });
+            return;
+        }
+        const targetName = targetSelect?.options[targetSelect.selectedIndex]?.textContent || '';
+        const res = await this.props.api.get(`custom_group_member_ids&custom_group_id=${targetId}`);
+        this.channelTable?.setState({
+            targetMemberIds: res?.member_ids || [],
+            targetGroupName: targetName,
         });
     }
 }

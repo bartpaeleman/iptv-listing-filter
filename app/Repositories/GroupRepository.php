@@ -60,11 +60,19 @@ final class GroupRepository extends BaseRepository
             $placeholders = implode(', ', array_fill(0, count($contentTypes), '?'));
             $stmt = $this->pdo->prepare(
                 "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type,
-                        g.category, g.category_locked,
-                        COUNT(c.id) AS channel_count,
-                        SUM(CASE WHEN c.is_enabled = 1 THEN 1 ELSE 0 END) AS active_channel_count
+                        g.category, g.category_locked, g.is_custom, g.source_group_id, g.sync_diff_json,
+                        CASE WHEN g.is_custom = 1 THEN
+                            (SELECT COUNT(*) FROM custom_group_channels cgc WHERE cgc.custom_group_id = g.id AND cgc.is_ignored = 0)
+                        ELSE
+                            COUNT(c.id)
+                        END AS channel_count,
+                        CASE WHEN g.is_custom = 1 THEN
+                            (SELECT COUNT(*) FROM custom_group_channels cgc INNER JOIN channels cc ON cc.id = cgc.channel_id WHERE cgc.custom_group_id = g.id AND cgc.is_ignored = 0 AND cc.is_enabled = 1)
+                        ELSE
+                            SUM(CASE WHEN c.is_enabled = 1 THEN 1 ELSE 0 END)
+                        END AS active_channel_count
                  FROM m3u_groups g
-                 LEFT JOIN channels c ON c.group_id = g.id
+                 LEFT JOIN channels c ON c.group_id = g.id AND g.is_custom = 0
                  WHERE g.is_enabled = 1 AND g.content_type IN ({$placeholders})
                  GROUP BY g.id
                  {$orderBy}"
@@ -75,11 +83,19 @@ final class GroupRepository extends BaseRepository
 
         return $this->pdo->query(
             "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type,
-                    g.category, g.category_locked,
-                    COUNT(c.id) AS channel_count,
-                    SUM(CASE WHEN c.is_enabled = 1 THEN 1 ELSE 0 END) AS active_channel_count
+                    g.category, g.category_locked, g.is_custom, g.source_group_id, g.sync_diff_json,
+                    CASE WHEN g.is_custom = 1 THEN
+                        (SELECT COUNT(*) FROM custom_group_channels cgc WHERE cgc.custom_group_id = g.id AND cgc.is_ignored = 0)
+                    ELSE
+                        COUNT(c.id)
+                    END AS channel_count,
+                    CASE WHEN g.is_custom = 1 THEN
+                        (SELECT COUNT(*) FROM custom_group_channels cgc INNER JOIN channels cc ON cc.id = cgc.channel_id WHERE cgc.custom_group_id = g.id AND cgc.is_ignored = 0 AND cc.is_enabled = 1)
+                    ELSE
+                        SUM(CASE WHEN c.is_enabled = 1 THEN 1 ELSE 0 END)
+                    END AS active_channel_count
              FROM m3u_groups g
-             LEFT JOIN channels c ON c.group_id = g.id
+             LEFT JOIN channels c ON c.group_id = g.id AND g.is_custom = 0
              WHERE g.is_enabled = 1
              GROUP BY g.id
              {$orderBy}"

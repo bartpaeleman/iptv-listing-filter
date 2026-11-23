@@ -30,11 +30,33 @@ CREATE TABLE IF NOT EXISTS `m3u_groups` (
     `content_type` ENUM('live','movie','series') NOT NULL DEFAULT 'live',
     `category` VARCHAR(32) NOT NULL DEFAULT 'Live TV',
     `category_locked` TINYINT(1) NOT NULL DEFAULT 0,
+    `is_custom` TINYINT(1) NOT NULL DEFAULT 0,
+    `source_group_id` INT UNSIGNED NULL DEFAULT NULL,
+    `sync_diff_json` MEDIUMTEXT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_m3u_groups_original_name` (`original_name`),
     KEY `idx_m3u_groups_enabled_sort` (`is_enabled`, `sort_order`),
     KEY `idx_groups_content_type` (`content_type`),
-    KEY `idx_groups_category` (`category`)
+    KEY `idx_groups_category` (`category`),
+    KEY `idx_groups_is_custom` (`is_custom`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `custom_group_channels` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `custom_group_id` INT UNSIGNED NOT NULL,
+    `channel_id` INT UNSIGNED NOT NULL,
+    `sort_order` INT UNSIGNED NOT NULL DEFAULT 0,
+    `is_ignored` TINYINT(1) NOT NULL DEFAULT 0,
+    `added_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_custom_group_channel` (`custom_group_id`, `channel_id`),
+    KEY `idx_cgc_group_sort` (`custom_group_id`, `sort_order`),
+    CONSTRAINT `fk_cgc_custom_group`
+        FOREIGN KEY (`custom_group_id`) REFERENCES `m3u_groups` (`id`)
+        ON DELETE CASCADE,
+    CONSTRAINT `fk_cgc_channel`
+        FOREIGN KEY (`channel_id`) REFERENCES `channels` (`id`)
+        ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `group_category_rules` (

@@ -173,7 +173,39 @@ final class SchemaMigrator
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
 
-        $pdo->exec("INSERT INTO settings (setting_key, setting_value, is_encrypted) VALUES ('schema_integrity_v7', '1', 0) ON DUPLICATE KEY UPDATE setting_value = '1'");
+        if (!self::columnExists($pdo, 'm3u_groups', 'is_custom')) {
+            $pdo->exec('ALTER TABLE `m3u_groups` ADD COLUMN `is_custom` TINYINT(1) NOT NULL DEFAULT 0 AFTER `category_locked`');
+        }
+        if (!self::columnExists($pdo, 'm3u_groups', 'source_group_id')) {
+            $pdo->exec('ALTER TABLE `m3u_groups` ADD COLUMN `source_group_id` INT UNSIGNED NULL DEFAULT NULL AFTER `is_custom`');
+        }
+        if (!self::columnExists($pdo, 'm3u_groups', 'sync_diff_json')) {
+            $pdo->exec('ALTER TABLE `m3u_groups` ADD COLUMN `sync_diff_json` MEDIUMTEXT NULL AFTER `source_group_id`');
+        }
+        if (!self::indexExists($pdo, 'm3u_groups', 'idx_groups_is_custom')) {
+            $pdo->exec('ALTER TABLE `m3u_groups` ADD INDEX `idx_groups_is_custom` (`is_custom`)');
+        }
+        $pdo->exec(
+            "CREATE TABLE IF NOT EXISTS `custom_group_channels` (
+                `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `custom_group_id` INT UNSIGNED NOT NULL,
+                `channel_id` INT UNSIGNED NOT NULL,
+                `sort_order` INT UNSIGNED NOT NULL DEFAULT 0,
+                `is_ignored` TINYINT(1) NOT NULL DEFAULT 0,
+                `added_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `uq_custom_group_channel` (`custom_group_id`, `channel_id`),
+                KEY `idx_cgc_group_sort` (`custom_group_id`, `sort_order`),
+                CONSTRAINT `fk_cgc_custom_group`
+                    FOREIGN KEY (`custom_group_id`) REFERENCES `m3u_groups` (`id`)
+                    ON DELETE CASCADE,
+                CONSTRAINT `fk_cgc_channel`
+                    FOREIGN KEY (`channel_id`) REFERENCES `channels` (`id`)
+                    ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+
+        $pdo->exec("INSERT INTO settings (setting_key, setting_value, is_encrypted) VALUES ('schema_integrity_v8', '1', 0) ON DUPLICATE KEY UPDATE setting_value = '1'");
     }
 
     private static function columnExists(PDO $pdo, string $table, string $column): bool

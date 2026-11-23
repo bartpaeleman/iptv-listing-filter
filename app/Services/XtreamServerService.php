@@ -113,21 +113,43 @@ final class XtreamServerService
             default => 'g.import_order ASC, g.id ASC',
         };
 
-        $where = "g.is_enabled = 1 AND c.is_enabled = 1 AND COALESCE(g.category, 'Live TV') NOT IN ('Film', 'TV Series')";
+        $groupOrder = match ($sortMode) {
+            'asc' => 'g_name ASC, g_id ASC',
+            'desc' => 'g_name DESC, g_id DESC',
+            default => 'g_import_order ASC, g_id ASC',
+        };
+
+        $catFilter = '';
         $params = [];
         if ($categoryId !== null && $categoryId > 0) {
-            $where .= ' AND c.group_id = ?';
-            $params[] = $categoryId;
+            $catFilter = ' AND g.id = ?';
+            $params = [$categoryId, $categoryId];
         }
 
-        $sql = "SELECT c.id, c.group_id, c.tvg_id, c.tvg_name, c.tvg_logo, c.custom_name,
-                       c.channel_number, c.epg_channel_id
-                FROM channels c
-                INNER JOIN m3u_groups g ON g.id = c.group_id
-                WHERE {$where}
-                ORDER BY {$groupOrder},
-                         COALESCE(c.channel_number, 999999) ASC,
-                         c.sort_order ASC, c.id ASC";
+        $sql = "SELECT id, group_id, tvg_id, tvg_name, tvg_logo, custom_name, channel_number, epg_channel_id
+                FROM (
+                    SELECT c.id, c.group_id, c.tvg_id, c.tvg_name, c.tvg_logo, c.custom_name,
+                           c.channel_number, c.epg_channel_id,
+                           g.original_name AS g_name, g.import_order AS g_import_order, g.id AS g_id,
+                           COALESCE(c.channel_number, 999999) AS ch_num, c.sort_order AS ch_sort
+                    FROM channels c
+                    INNER JOIN m3u_groups g ON g.id = c.group_id
+                    WHERE g.is_custom = 0 AND g.is_enabled = 1 AND c.is_enabled = 1
+                      AND COALESCE(g.category, 'Live TV') NOT IN ('Film', 'TV Series'){$catFilter}
+
+                    UNION ALL
+
+                    SELECT c.id, g.id AS group_id, c.tvg_id, c.tvg_name, c.tvg_logo, c.custom_name,
+                           c.channel_number, c.epg_channel_id,
+                           COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS g_name, g.import_order AS g_import_order, g.id AS g_id,
+                           0 AS ch_num, cgc.sort_order AS ch_sort
+                    FROM custom_group_channels cgc
+                    INNER JOIN m3u_groups g ON g.id = cgc.custom_group_id
+                    INNER JOIN channels c ON c.id = cgc.channel_id
+                    WHERE g.is_custom = 1 AND g.is_enabled = 1 AND c.is_enabled = 1 AND cgc.is_ignored = 0
+                      AND COALESCE(g.category, 'Live TV') NOT IN ('Film', 'TV Series'){$catFilter}
+                ) AS live_rows
+                ORDER BY {$groupOrder}, ch_num ASC, ch_sort ASC, id ASC";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
@@ -446,20 +468,33 @@ final class XtreamServerService
             default => 'g.import_order ASC, g.id ASC',
         };
 
-        $where = "g.is_enabled = 1 AND c.is_enabled = 1 AND g.category = 'TV Series'";
+        $catFilter = '';
         $params = [];
         if ($categoryId !== null && $categoryId > 0) {
-            $where .= ' AND c.group_id = ?';
-            $params[] = $categoryId;
+            $catFilter = ' AND g.id = ?';
+            $params = [$categoryId, $categoryId];
         }
 
-        $sql = "SELECT c.id, c.group_id, c.tvg_name, c.tvg_logo, c.custom_name, c.stream_url
-                FROM channels c
-                INNER JOIN m3u_groups g ON g.id = c.group_id
-                WHERE {$where}
-                ORDER BY {$groupOrder},
-                         COALESCE(c.channel_number, 999999) ASC,
-                         c.sort_order ASC, c.id ASC";
+        $sql = "SELECT id, group_id, tvg_name, tvg_logo, custom_name, stream_url
+                FROM (
+                    SELECT c.id, c.group_id, c.tvg_name, c.tvg_logo, c.custom_name, c.stream_url,
+                           g.import_order AS g_import_order, g.id AS g_id,
+                           COALESCE(c.channel_number, 999999) AS ch_num, c.sort_order AS ch_sort
+                    FROM channels c
+                    INNER JOIN m3u_groups g ON g.id = c.group_id
+                    WHERE g.is_custom = 0 AND g.is_enabled = 1 AND c.is_enabled = 1 AND g.category = 'TV Series'{$catFilter}
+
+                    UNION ALL
+
+                    SELECT c.id, g.id AS group_id, c.tvg_name, c.tvg_logo, c.custom_name, c.stream_url,
+                           g.import_order AS g_import_order, g.id AS g_id,
+                           0 AS ch_num, cgc.sort_order AS ch_sort
+                    FROM custom_group_channels cgc
+                    INNER JOIN m3u_groups g ON g.id = cgc.custom_group_id
+                    INNER JOIN channels c ON c.id = cgc.channel_id
+                    WHERE g.is_custom = 1 AND g.is_enabled = 1 AND c.is_enabled = 1 AND cgc.is_ignored = 0 AND g.category = 'TV Series'{$catFilter}
+                ) AS series_rows
+                ORDER BY g_import_order ASC, g_id ASC, ch_num ASC, ch_sort ASC, id ASC";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);

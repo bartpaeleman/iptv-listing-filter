@@ -27,11 +27,20 @@ final class ChannelRepository extends BaseRepository
         array $contentTypes = [],
         bool $liveOnly = false
     ): array {
+        $isCustomGroup = false;
+        if ($groupId !== null) {
+            $cgStmt = $this->pdo->prepare('SELECT is_custom FROM m3u_groups WHERE id = ? LIMIT 1');
+            $cgStmt->execute([$groupId]);
+            $isCustomGroup = (int) $cgStmt->fetchColumn() === 1;
+        }
+
         $where = ['1=1'];
         $params = [];
 
-        if ($groupId !== null) {
+        if ($groupId !== null && !$isCustomGroup) {
             $where[] = 'c.group_id = :gid';
+            $params[':gid'] = $groupId;
+        } elseif ($isCustomGroup) {
             $params[':gid'] = $groupId;
         }
         if ($search !== '') {
@@ -72,22 +81,31 @@ final class ChannelRepository extends BaseRepository
         }
 
         $whereSql = implode(' AND ', $where);
-        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM channels c INNER JOIN m3u_groups g ON g.id = c.group_id WHERE {$whereSql}");
+        $joinSql = $isCustomGroup
+            ? 'INNER JOIN custom_group_channels cgc ON cgc.channel_id = c.id AND cgc.custom_group_id = :gid AND cgc.is_ignored = 0
+               INNER JOIN m3u_groups g ON g.id = cgc.custom_group_id'
+            : 'INNER JOIN m3u_groups g ON g.id = c.group_id';
+
+        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM channels c {$joinSql} WHERE {$whereSql}");
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
-        $subOrder = match ($sortBy) {
-            'name_asc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
-            'name_desc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) DESC, c.id DESC",
-            'epg_status_asc' => "(c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> '') ASC, COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
-            'epg_status_desc' => "(c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> '') DESC, COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
-            'epg_name_asc' => "(ec.display_name IS NULL OR ec.display_name = '') ASC, ec.display_name ASC, c.id ASC",
-            'epg_name_desc' => "(ec.display_name IS NULL OR ec.display_name = '') ASC, ec.display_name DESC, c.id DESC",
-            'import' => 'c.id ASC',
-            'number_desc' => '(c.channel_number IS NULL) ASC, c.channel_number DESC, c.id DESC',
-            default => '(c.channel_number IS NULL) ASC, c.channel_number ASC, c.id ASC',
-        };
-        $orderBy = "ORDER BY c.is_enabled DESC, {$subOrder}";
+        if ($isCustomGroup && $sortBy === 'number') {
+            $orderBy = 'ORDER BY c.is_enabled DESC, cgc.sort_order ASC, c.id ASC';
+        } else {
+            $subOrder = match ($sortBy) {
+                'name_asc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
+                'name_desc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) DESC, c.id DESC",
+                'epg_status_asc' => "(c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> '') ASC, COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
+                'epg_status_desc' => "(c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> '') DESC, COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
+                'epg_name_asc' => "(ec.display_name IS NULL OR ec.display_name = '') ASC, ec.display_name ASC, c.id ASC",
+                'epg_name_desc' => "(ec.display_name IS NULL OR ec.display_name = '') ASC, ec.display_name DESC, c.id DESC",
+                'import' => 'c.id ASC',
+                'number_desc' => '(c.channel_number IS NULL) ASC, c.channel_number DESC, c.id DESC',
+                default => '(c.channel_number IS NULL) ASC, c.channel_number ASC, c.id ASC',
+            };
+            $orderBy = "ORDER BY c.is_enabled DESC, {$subOrder}";
+        }
 
         $sql = "SELECT c.id, c.tvg_id, c.tvg_name, c.tvg_logo, c.group_id, c.custom_name,
                        c.channel_number, c.epg_channel_id, c.epg_match_type, c.is_enabled, c.sort_order,
@@ -95,7 +113,7 @@ final class ChannelRepository extends BaseRepository
                        g.category AS group_category,
                        ec.display_name AS epg_display_name, ec.icon_url AS epg_icon_url
                 FROM channels c
-                INNER JOIN m3u_groups g ON g.id = c.group_id
+                {$joinSql}
                 LEFT JOIN epg_channels ec ON ec.epg_id = c.epg_channel_id
                 WHERE {$whereSql}
                 {$orderBy}

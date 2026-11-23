@@ -2,17 +2,19 @@ import { BaseComponent } from '../core/BaseComponent.js';
 
 export class ChannelTable extends BaseComponent {
     render() {
-        const { channels = [], isAllChannelsView = false } = this.state;
+        const { channels = [], isAllChannelsView = false, targetMemberIds = [], targetGroupName = '' } = this.state;
+        const memberSet = new Set((Array.isArray(targetMemberIds) ? targetMemberIds : []).map(Number));
         this.container.innerHTML = channels.map(c => {
             const rawName = c.custom_name || c.tvg_name;
             const cleanName = c.clean_name || rawName;
             const emojiPrefix = c.emoji_prefix || '';
             const hasCustomName = Boolean(c.custom_name && String(c.custom_name).trim() !== '');
             const isEnabled = Boolean(Number(c.is_enabled));
+            const isMember = !isAllChannelsView && memberSet.has(Number(c.id));
 
             return `
-            <tr data-cid="${c.id}">
-                ${isAllChannelsView ? '' : '<td><input type="checkbox" class="ch-select" title="Selecteer kanaal voor bulkactie"></td>'}
+            <tr data-cid="${c.id}" class="${isMember ? 'row-in-custom-group' : ''}">
+                ${isAllChannelsView ? '' : `<td><input type="checkbox" class="ch-select" ${isMember ? 'disabled title="Reeds toegevoegd aan deze groep"' : 'title="Selecteer kanaal voor bulkactie"'}></td>`}
                 <td>
                     <label class="toggle-switch" title="Kanaal opnemen in actieve M3U-playlist">
                         <input type="checkbox" class="ch-enable" ${isEnabled ? 'checked' : ''}>
@@ -27,6 +29,7 @@ export class ChannelTable extends BaseComponent {
                     <div style="display:flex;align-items:center;gap:0.4rem;">
                         ${emojiPrefix ? `<span class="ch-emoji-prefix" title="${this.escapeHtml(c.tvg_name || '')}">${this.escapeHtml(emojiPrefix)}</span>` : ''}
                         <input type="text" class="ch-name" value="${this.escapeHtml(cleanName)}" title="Origineel: ${this.escapeHtml(c.tvg_name || '')}">
+                        ${isMember ? `<span class="badge badge-in-group" title="Reeds toegevoegd aan deze groep">✓ In ${this.escapeHtml(targetGroupName)}</span>` : ''}
                         <button type="button" class="btn btn-sm ch-use-original ${!hasCustomName ? 'btn-primary' : ''}" title="Originele naam gebruiken" style="min-height:44px;min-width:44px;flex-shrink:0;">↩️</button>
                         <button type="button" class="btn btn-sm ch-use-custom ${hasCustomName ? 'btn-primary' : ''}" data-emoji="${this.escapeHtml(emojiPrefix)}" title="Custom naam incl. vlag/symbool gebruiken" style="min-height:44px;min-width:44px;flex-shrink:0;">${this.escapeHtml(emojiPrefix || '✏️')}</button>
                     </div>
