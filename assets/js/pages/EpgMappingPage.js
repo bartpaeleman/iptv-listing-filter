@@ -115,6 +115,14 @@ export class EpgMappingPage extends BaseComponent {
                 .epg-sort-th { cursor: pointer; user-select: none; white-space: nowrap; }
                 .epg-sort-th:hover { opacity: 0.85; }
                 .epg-sort-th .sort-chevron { margin-left: 0.3rem; font-size: 0.75rem; opacity: 0.85; }
+                .epg-automatch-status { display: none; margin: 0.75rem 0; padding: 0.75rem 1rem; border-radius: 8px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); }
+                .epg-automatch-status.is-active { display: block; }
+                .epg-automatch-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.5rem; font-size: 0.92rem; }
+                .epg-automatch-label { display: flex; align-items: center; gap: 0.5rem; font-weight: 500; }
+                .epg-spinner { width: 16px; height: 16px; border: 2px solid rgba(56, 189, 248, 0.25); border-top-color: var(--accent, #38bdf8); border-radius: 50%; animation: epgSpin 0.8s linear infinite; flex-shrink: 0; }
+                @keyframes epgSpin { to { transform: rotate(360deg); } }
+                .epg-progress-track { width: 100%; height: 8px; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; }
+                .epg-progress-fill { height: 100%; width: 0%; background: var(--accent, #38bdf8); border-radius: 999px; transition: width 0.2s ease; }
             </style>
             <div class="card">
                 <div class="card-header">
@@ -131,6 +139,18 @@ export class EpgMappingPage extends BaseComponent {
                         <option value="unmapped">Geen EPG</option>
                         <option value="mapped">Gekoppeld</option>
                     </select>
+                </div>
+                <div id="epgAutoMatchStatus" class="epg-automatch-status" role="status" aria-live="polite">
+                    <div class="epg-automatch-row">
+                        <span class="epg-automatch-label">
+                            <span class="epg-spinner" aria-hidden="true"></span>
+                            <span id="epgAutoMatchText">Bezig met auto-koppelen van kanalen...</span>
+                        </span>
+                        <span id="epgAutoMatchCounter" class="muted">0%</span>
+                    </div>
+                    <div class="epg-progress-track">
+                        <div id="epgAutoMatchProgress" class="epg-progress-fill"></div>
+                    </div>
                 </div>
                 <div class="table-wrap">
                     <table class="data-table epg-mapping-table">
@@ -174,11 +194,102 @@ export class EpgMappingPage extends BaseComponent {
             this.currentPage = 1;
             this.load();
         });
-        document.getElementById('autoMatchEpgBtn')?.addEventListener('click', async () => {
-            const res = await this.props.api.post('auto_match_epg');
-            this.props.toast.show(`${res.matched} kanalen automatisch gekoppeld!`);
-            this.load();
+        document.getElementById('autoMatchEpgBtn')?.addEventListener('click', () => {
+            this.runAutoMatch();
         });
+    }
+
+    async runAutoMatch() {
+        const btn = document.getElementById('autoMatchEpgBtn');
+        const statusBox = document.getElementById('epgAutoMatchStatus');
+        const statusText = document.getElementById('epgAutoMatchText');
+        const counterEl = document.getElementById('epgAutoMatchCounter');
+        const progressEl = document.getElementById('epgAutoMatchProgress');
+        if (!btn || btn.disabled) return;
+
+        const rawGroupId = document.getElementById('epgGroupFilter')?.value || '';
+        const groupId = rawGroupId !== '' ? Number(rawGroupId) : 0;
+        const rawStatus = document.getElementById('epgStatusFilter')?.value || '';
+        const epgStatus = rawStatus === 'mapped' ? 'coupled' : (rawStatus === 'unmapped' ? 'uncoupled' : 'all');
+        const search = document.getElementById('epgChannelSearch')?.value || '';
+
+        const updateProgress = (processed, total, text) => {
+            const pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+            if (progressEl) progressEl.style.width = `${pct}%`;
+            if (counterEl) counterEl.textContent = total > 0 ? `${processed} / ${total} (${pct}%)` : `${pct}%`;
+            if (statusText && text) statusText.textContent = text;
+        };
+
+        btn.disabled = true;
+        if (statusBox) statusBox.classList.add('is-active');
+        updateProgress(0, 0, 'Kanalen ophalen binnen actieve filter...');
+
+        try {
+            const channelIds = [];
+            let offset = 0;
+            const pageLimit = 200;
+            let total = 0;
+
+            do {
+                const params = {
+                    active_only: 1,
+                    live_only: 1,
+                    search,
+                    epg_status: rawStatus,
+                    limit: pageLimit,
+                    offset,
+                };
+                if (groupId > 0) params.group_id = groupId;
+
+                const page = await this.props.api.get('channels', params);
+                total = Number(page.total || 0);
+                const items = Array.isArray(page.items) ? page.items : [];
+                for (const ch of items) {
+                    if (ch.id) channelIds.push(Number(ch.id));
+                }
+                offset += items.length;
+                if (items.length < pageLimit) break;
+            } while (offset < total);
+
+            if (channelIds.length === 0) {
+                updateProgress(1, 1, 'Geen kanalen gevonden binnen de actieve filter.');
+                this.props.toast.show('Geen kanalen om te koppelen binnen de actieve filter.');
+                return;
+            }
+
+            const batchSize = 50;
+            let processed = 0;
+            let totalMatched = 0;
+            updateProgress(0, channelIds.length, 'Bezig met auto-koppelen van kanalen...');
+
+            for (let i = 0; i < channelIds.length; i += batchSize) {
+                const batch = channelIds.slice(i, i + batchSize);
+                const res = await this.props.api.post('auto_match_epg', {
+                    group_id: groupId,
+                    epg_status: epgStatus,
+                    active_only: 1,
+                    live_only: 1,
+                    channel_ids: batch,
+                });
+                totalMatched += Number(res.matched || 0);
+                processed += batch.length;
+                updateProgress(processed, channelIds.length, 'Bezig met auto-koppelen van kanalen...');
+            }
+
+            updateProgress(channelIds.length, channelIds.length, `Voltooid: ${totalMatched} kanalen gekoppeld.`);
+            this.props.toast.show(`${totalMatched} kanalen automatisch gekoppeld!`);
+            await this.load();
+        } catch (err) {
+            this.props.toast.show(err?.message || 'Fout bij auto-koppelen van kanalen.');
+        } finally {
+            btn.disabled = false;
+            setTimeout(() => {
+                if (statusBox) statusBox.classList.remove('is-active');
+                if (progressEl) progressEl.style.width = '0%';
+                if (counterEl) counterEl.textContent = '0%';
+                if (statusText) statusText.textContent = 'Bezig met auto-koppelen van kanalen...';
+            }, 800);
+        }
     }
 
     async openPicker(channelId, channelName) {
