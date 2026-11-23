@@ -79,6 +79,83 @@ final class EpgMatcherService
         return $matched;
     }
 
+    /**
+     * @param array<int, int> $channelIds
+     * @return array{matched: int, processed: int}
+     */
+    public function autoMatchFiltered(
+        int $groupId = 0,
+        string $epgStatus = 'all',
+        bool $activeOnly = true,
+        bool $liveOnly = true,
+        array $channelIds = []
+    ): array {
+        $where = ['1=1'];
+        $params = [];
+
+        if ($groupId > 0) {
+            $where[] = 'c.group_id = :gid';
+            $params[':gid'] = $groupId;
+        }
+        if ($activeOnly) {
+            $where[] = 'c.is_enabled = 1 AND g.is_enabled = 1';
+        }
+        if ($liveOnly) {
+            $where[] = "c.is_enabled = 1 AND g.is_enabled = 1 AND COALESCE(g.category, 'Live TV') NOT IN ('Film', 'TV Series')";
+        }
+        if ($epgStatus === 'coupled' || $epgStatus === 'mapped' || $epgStatus === 'yes') {
+            $where[] = "c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> ''";
+        } elseif ($epgStatus === 'uncoupled' || $epgStatus === 'unmapped' || $epgStatus === 'no') {
+            $where[] = "(c.epg_channel_id IS NULL OR c.epg_channel_id = '')";
+        }
+        if ($channelIds !== []) {
+            $cleanIds = array_values(array_unique(array_filter(
+                array_map('intval', $channelIds),
+                static fn(int $id): bool => $id > 0
+            )));
+            if ($cleanIds === []) {
+                return ['matched' => 0, 'processed' => 0];
+            }
+            $ph = [];
+            foreach ($cleanIds as $idx => $cid) {
+                $key = ":cid_{$idx}";
+                $ph[] = $key;
+                $params[$key] = $cid;
+            }
+            $where[] = 'c.id IN (' . implode(', ', $ph) . ')';
+        }
+
+        $sql = 'SELECT c.id, c.tvg_id, c.tvg_name, c.custom_name
+                FROM channels c
+                INNER JOIN m3u_groups g ON g.id = c.group_id
+                WHERE ' . implode(' AND ', $where);
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        $channels = $stmt->fetchAll();
+
+        if ($channels === []) {
+            return ['matched' => 0, 'processed' => 0];
+        }
+
+        $epgMap = $this->loadLookupMap();
+        $upd = $this->pdo->prepare("UPDATE channels SET epg_channel_id = :epg, epg_match_type = 'auto' WHERE id = :id");
+        $matched = 0;
+
+        foreach ($channels as $ch) {
+            $name = (string) (($ch['custom_name'] ?? '') !== '' ? $ch['custom_name'] : ($ch['tvg_name'] ?? ''));
+            $epgId = $this->findMatch((string) ($ch['tvg_id'] ?? ''), $name, $epgMap);
+            if ($epgId !== null) {
+                $upd->execute([':epg' => $epgId, ':id' => (int) $ch['id']]);
+                $matched++;
+            }
+        }
+
+        return [
+            'matched' => $matched,
+            'processed' => count($channels),
+        ];
+    }
+
     public static function normalizeName(string $name): string
     {
         $name = strtolower(trim($name));

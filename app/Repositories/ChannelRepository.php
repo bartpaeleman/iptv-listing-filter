@@ -24,7 +24,8 @@ final class ChannelRepository extends BaseRepository
         string $countryTagId = '',
         string $status = 'all',
         string $sortBy = 'number',
-        array $contentTypes = []
+        array $contentTypes = [],
+        bool $liveOnly = false
     ): array {
         $where = ['1=1'];
         $params = [];
@@ -46,9 +47,9 @@ final class ChannelRepository extends BaseRepository
         } elseif ($status === 'disabled') {
             $where[] = 'c.is_enabled = 0';
         }
-        if ($epgStatus === 'mapped' || $epgStatus === 'yes') {
+        if ($epgStatus === 'mapped' || $epgStatus === 'coupled' || $epgStatus === 'yes') {
             $where[] = "c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> ''";
-        } elseif ($epgStatus === 'unmapped' || $epgStatus === 'no') {
+        } elseif ($epgStatus === 'unmapped' || $epgStatus === 'uncoupled' || $epgStatus === 'no') {
             $where[] = "(c.epg_channel_id IS NULL OR c.epg_channel_id = '')";
         }
         if ($countryTagId === 'untagged') {
