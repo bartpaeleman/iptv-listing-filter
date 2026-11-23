@@ -14,8 +14,8 @@
   - Nieuwe endpoints `groups_search` (`ChannelController::searchGroups()`) en `reorder_group_channels` (`ChannelController::reorderGroupChannels()`), plus `ChannelController::setGroupSort()`.
 - **`app/Services/EmojiTagService.php`:**
   - `parseName()` stopt na de eerste keyword-match (`break`) en slaat keyword-emoji's over als `clean_name` al met een emoji begint.
-- **`assets/js/pages/ChannelsPage.js` & `assets/js/pages/EpgMappingPage.js`:**
-  - `ChannelsPage`: auto-load uit view-cache bij openen en bij klikken op scope-toggles, `Bron: ⚡ Cache` / `Bron: 🗄️ Database` toggle, `#activeScopeBadge`, `#channelsLoadProgressWrap`, `+ Groep toevoegen` zoekpaneel, en klikbare `#` / `Naam van het kanaal` headers met `reorder_group_channels`.
+- **`assets/js/pages/ChannelsPage.js`, `assets/css/components.css` & `assets/js/pages/EpgMappingPage.js`:**
+  - `ChannelsPage`: auto-load uit view-cache bij openen en bij klikken op scope-toggles, `Bron: ⚡ Cache` / `Bron: 🗄️ Database` toggle, `#activeScopeBadge`, `#channelsLoadProgressWrap`, `+ Groep toevoegen` verplaatst naar het rechterpaneel (`#groupAddPanel` ter vervanging van `#channelsViewContainer`) met rode toggle-status (`.btn-danger` in `components.css`), en klikbare `#` / `Naam van het kanaal` headers met `reorder_group_channels`.
   - `EpgMappingPage`: 1-rij toolbar met `#epgGroupFilter`, 10 rijen per pagina met paginatie, en sorteerbare kolomheaders met chevrons.
 
 ## Groepen & Kanalen — Stap 2 & 3: Custom Namen, Groepssortering & Dynamische Hernummering (`feature/sorting-and-numbering`)

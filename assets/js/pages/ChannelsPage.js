@@ -273,21 +273,11 @@ export class ChannelsPage extends BaseComponent {
                             <button type="button" class="btn btn-sm btn-primary" id="openGroupSearchBtn" style="min-height:44px;">+ Groep toevoegen</button>
                         </div>
                     </div>
-                    <div id="groupAddPanel" class="hidden" style="padding:0.75rem;margin-bottom:0.75rem;border:1px solid var(--border-color, #334155);border-radius:8px;background:rgba(15,23,42,0.4);">
-                        <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;flex-wrap:wrap;">
-                            <input type="search" id="groupAddSearchInput" placeholder="Zoek groep (bv. BE, NL, Sport)..." style="flex:1;min-width:140px;font-size:16px;min-height:44px;">
-                            <select id="groupAddStatusFilter" style="font-size:16px;min-height:44px;">
-                                <option value="disabled">Alleen inactief</option>
-                                <option value="all">Alle</option>
-                            </select>
-                            <button type="button" class="btn btn-sm" id="closeGroupSearchBtn" style="min-height:44px;">✕</button>
-                        </div>
-                        <div id="groupAddResults" style="max-height:240px;overflow-y:auto;"></div>
-                    </div>
                     <input type="search" id="groupSearchInput" placeholder="Filter actieve groepen..." style="font-size:16px;">
                     <div id="groupsListRoot" class="groups-list"></div>
                 </aside>
                 <div class="card channels-pane">
+                    <div id="channelsViewContainer">
                     <div class="card-header">
                         <div id="groupHeaderTitleWrap" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
                             <h2 id="selectedGroupTitle">Alle Kanalen</h2>
@@ -332,6 +322,21 @@ export class ChannelsPage extends BaseComponent {
                             <tbody id="channelsTableRoot"></tbody>
                         </table>
                     </div>
+                    </div>
+                    <div id="groupAddPanel" class="hidden">
+                        <div class="card-header">
+                            <h2>Groep toevoegen</h2>
+                        </div>
+                        <div class="toolbar" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.75rem;">
+                            <input type="search" id="groupAddSearchInput" placeholder="Zoek groep (bv. BE, NL, [UK], Sport)..." style="flex:1;min-width:180px;font-size:16px;min-height:44px;">
+                            <select id="groupAddStatusFilter" style="font-size:16px;min-height:44px;">
+                                <option value="all">Alle</option>
+                                <option value="disabled" selected>Alleen inactief</option>
+                                <option value="enabled">Alleen actief</option>
+                            </select>
+                        </div>
+                        <div id="groupAddResults" style="max-height:60vh;overflow-y:auto;"></div>
+                    </div>
                 </div>
             </div>
         `;
@@ -369,17 +374,23 @@ export class ChannelsPage extends BaseComponent {
         }, 200));
 
         document.getElementById('openGroupSearchBtn')?.addEventListener('click', () => {
+            this.isAddGroupMode = !this.isAddGroupMode;
+            const btn = document.getElementById('openGroupSearchBtn');
             const panel = document.getElementById('groupAddPanel');
-            if (!panel) return;
-            panel.classList.toggle('hidden');
-            if (!panel.classList.contains('hidden')) {
+            const channelsView = document.getElementById('channelsViewContainer');
+            if (btn) {
+                btn.classList.toggle('btn-danger', this.isAddGroupMode);
+                btn.classList.toggle('btn-primary', !this.isAddGroupMode);
+            }
+            if (panel) panel.classList.toggle('hidden', !this.isAddGroupMode);
+            if (channelsView) channelsView.classList.toggle('hidden', this.isAddGroupMode);
+
+            if (this.isAddGroupMode) {
                 document.getElementById('groupAddSearchInput')?.focus();
                 this.searchAndRenderAddGroups();
+            } else if (this.selectedGroupId) {
+                this.loadChannels();
             }
-        });
-
-        document.getElementById('closeGroupSearchBtn')?.addEventListener('click', () => {
-            document.getElementById('groupAddPanel')?.classList.add('hidden');
         });
 
         document.getElementById('groupAddSearchInput')?.addEventListener('input', debounce(() => {

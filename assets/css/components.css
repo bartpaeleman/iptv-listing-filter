@@ -301,3 +301,12 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; }
 .epg-mapping-table .btn {
     white-space: nowrap;
 }
+
+.btn-danger {
+    background: #dc2626;
+    border-color: #b91c1c;
+    color: #fff;
+}
+.btn-danger:hover {
+    background: #b91c1c;
+}
