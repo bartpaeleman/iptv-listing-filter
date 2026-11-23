@@ -22,6 +22,32 @@ class App {
             cache: new CacheManagerPage('#tab-cache', deps),
             'emoji-rules': new EmojiRulesPage('#tab-emoji-rules', deps),
             settings: new SettingsPage('#tab-settings', deps),
+            admin: {
+                container: document.querySelector('#tab-admin'),
+                escapeHtml: s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
+                load: async () => {
+                    const el = document.querySelector('#tab-admin');
+                    if (!el) return;
+                    el.innerHTML = `
+                        <div class="card">
+                            <h2>Admin &amp; Database Tools</h2>
+                            <p class="muted">Voer <code>database/update.sql</code> uit om eventuele openstaande database-migraties toe te passen.</p>
+                            <button type="button" id="runUpdateSqlBtn" class="btn btn-primary" style="min-height:44px;">🛠️ Voer update.sql uit</button>
+                            <div id="updateSqlResult" style="margin-top:1rem;"></div>
+                        </div>
+                    `;
+                    document.getElementById('runUpdateSqlBtn')?.addEventListener('click', async () => {
+                        const resEl = document.getElementById('updateSqlResult');
+                        try {
+                            await this.api.post('run_update_sql');
+                            this.toast.show('update.sql succesvol uitgevoerd!');
+                            if (resEl) resEl.innerHTML = '<div class="alert alert-success">update.sql succesvol uitgevoerd.</div>';
+                        } catch (err) {
+                            if (resEl) resEl.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+                        }
+                    });
+                },
+            },
         };
     }
 

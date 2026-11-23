@@ -33,7 +33,17 @@ ob_start();
 
 <div id="modalRoot"></div>
 <div id="toastRoot" class="toast hidden"></div>
-<script type="module" src="assets/js/App.js?v=<?= (int) @filemtime(dirname(__DIR__) . '/assets/js/App.js') ?>"></script>
+<?php
+$jsFiles = glob(dirname(__DIR__) . '/assets/js/{,*/}*.js', GLOB_BRACE) ?: [];
+$jsVer = 0;
+foreach ($jsFiles as $f) {
+    $mt = (int) @filemtime($f);
+    if ($mt > $jsVer) {
+        $jsVer = $mt;
+    }
+}
+?>
+<script type="module" src="assets/js/App.js?v=<?= $jsVer ?>"></script>
 <?php
 $content = ob_get_clean();
 $pageTitle = 'IPTV & EPG Manager';
