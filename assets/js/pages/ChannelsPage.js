@@ -271,8 +271,6 @@ export class ChannelsPage extends BaseComponent {
                         <h2>Groepen</h2>
                         <div class="btn-group">
                             <button type="button" class="btn btn-sm btn-primary" id="openGroupSearchBtn" style="min-height:44px;">+ Groep toevoegen</button>
-                            <button class="btn btn-sm" id="enableAllGroupsBtn">Alles Aan</button>
-                            <button class="btn btn-sm" id="disableAllGroupsBtn">Alles Uit</button>
                         </div>
                     </div>
                     <div id="groupAddPanel" class="hidden" style="padding:0.75rem;margin-bottom:0.75rem;border:1px solid var(--border-color, #334155);border-radius:8px;background:rgba(15,23,42,0.4);">
