@@ -33,7 +33,7 @@ export class ChannelsPage extends BaseComponent {
 
     async loadFilteredData() {
         const [groupsRes, tags] = await Promise.all([
-            this.props.api.get('groups', { scope: 'active' }),
+            this.props.api.get('groups', { scope: 'active', refresh: 1 }),
             this.props.api.get('country_tags'),
         ]);
         this.hasLoadedData = true;
