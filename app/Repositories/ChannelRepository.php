@@ -75,7 +75,12 @@ final class ChannelRepository extends BaseRepository
         $subOrder = match ($sortBy) {
             'name_asc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
             'name_desc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) DESC, c.id DESC",
+            'epg_status_asc' => "(c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> '') ASC, COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
+            'epg_status_desc' => "(c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> '') DESC, COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
+            'epg_name_asc' => "(ec.display_name IS NULL OR ec.display_name = '') ASC, ec.display_name ASC, c.id ASC",
+            'epg_name_desc' => "(ec.display_name IS NULL OR ec.display_name = '') ASC, ec.display_name DESC, c.id DESC",
             'import' => 'c.id ASC',
+            'number_desc' => '(c.channel_number IS NULL) ASC, c.channel_number DESC, c.id DESC',
             default => '(c.channel_number IS NULL) ASC, c.channel_number ASC, c.id ASC',
         };
         $orderBy = "ORDER BY c.is_enabled DESC, {$subOrder}";
@@ -98,6 +103,40 @@ final class ChannelRepository extends BaseRepository
             'items' => $stmt->fetchAll(),
             'total' => $total,
         ];
+    }
+
+    public function reorderGroupBySort(int $groupId, string $sortBy): void
+    {
+        if ($groupId <= 0) {
+            return;
+        }
+        $orderSql = match ($sortBy) {
+            'name_asc' => "COALESCE(NULLIF(custom_name, ''), tvg_name) ASC, id ASC",
+            'name_desc' => "COALESCE(NULLIF(custom_name, ''), tvg_name) DESC, id DESC",
+            'number_desc' => '(channel_number IS NULL) ASC, channel_number DESC, id DESC',
+            default => '(channel_number IS NULL) ASC, channel_number ASC, id ASC',
+        };
+
+        $stmt = $this->pdo->prepare(
+            "SELECT id FROM channels WHERE group_id = :gid AND is_enabled = 1 ORDER BY {$orderSql}"
+        );
+        $stmt->execute([':gid' => $groupId]);
+        $ids = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+
+        $this->pdo->beginTransaction();
+        try {
+            $upd = $this->pdo->prepare('UPDATE channels SET channel_number = :num WHERE id = :id');
+            $num = 1;
+            foreach ($ids as $id) {
+                $upd->execute([':num' => $num++, ':id' => (int) $id]);
+            }
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 
     /**

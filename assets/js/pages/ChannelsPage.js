@@ -10,8 +10,14 @@ export class ChannelsPage extends BaseComponent {
         this.channelSearch = '';
         this.groupSortMode = 'import';
         this.channelSortBy = 'number';
+        try {
+            this.groupChannelSortMap = JSON.parse(localStorage.getItem('iptv_group_channel_sort') || '{}');
+        } catch {
+            this.groupChannelSortMap = {};
+        }
         this.selectedContentTypes = new Set(['live']);
         this.hasLoadedData = false;
+        this.loadFromDb = false;
         this.groupList = null;
         this.channelTable = null;
     }
@@ -22,10 +28,35 @@ export class ChannelsPage extends BaseComponent {
             this.container.dataset.mounted = '1';
         }
         if (!this.hasLoadedData) {
-            this.renderPreloadPrompt();
+            const loadedFromCache = await this.tryAutoLoadFromCache();
+            if (!loadedFromCache) {
+                this.renderPreloadPrompt();
+            }
             return;
         }
         await this.loadFilteredData();
+    }
+
+    async tryAutoLoadFromCache() {
+        if (this.selectedContentTypes.size === 0) return false;
+        const contentTypes = Array.from(this.selectedContentTypes).join(',');
+        const [groupsRes, tags] = await Promise.all([
+            this.props.api.get('groups', { content_types: contentTypes, scope: 'active', cache_only: 1 }),
+            this.props.api.get('country_tags'),
+        ]);
+        const list = Array.isArray(groupsRes) ? groupsRes : (groupsRes?.items || []);
+        if (list.length === 0) {
+            return false;
+        }
+        this.hasLoadedData = true;
+        this.groups = list;
+        this.countryTags = tags || [];
+        this.populateCountryFilter();
+        this.updateGroupSortButton();
+        this.groupList.setState({ groups: this.groups, selectedGroupId: this.selectedGroupId, countryTags: this.countryTags });
+        this.updateGroupHeader();
+        this.renderSelectGroupPrompt();
+        return true;
     }
 
     renderPreloadPrompt() {
@@ -39,25 +70,140 @@ export class ChannelsPage extends BaseComponent {
         }
     }
 
+    getScopeLabel() {
+        const labels = { live: 'Live TV', movie: 'Films', series: 'TV Series' };
+        const active = Array.from(this.selectedContentTypes).map(t => labels[t] || t);
+        return active.length > 0 ? active.join(' + ') : 'Geen selectie';
+    }
+
+    updateActiveScopeBadge() {
+        const badge = document.getElementById('activeScopeBadge');
+        if (!badge) return;
+        const label = this.getScopeLabel();
+        badge.textContent = `Scope: ${label}`;
+        badge.style.opacity = this.selectedContentTypes.size > 0 ? '1' : '0.6';
+    }
+
+    startLoadProgress() {
+        const wrap = document.getElementById('channelsLoadProgressWrap');
+        const text = document.getElementById('channelsLoadProgressText');
+        const timeEl = document.getElementById('channelsLoadProgressTime');
+        const bar = document.getElementById('channelsLoadProgressBar');
+        if (!wrap || !text || !timeEl || !bar) return;
+
+        if (this._progressTimer) clearInterval(this._progressTimer);
+        const start = Date.now();
+        const sourceLabel = this.loadFromDb ? 'database' : 'view-cache';
+        text.textContent = `Laden uit ${sourceLabel} (${this.getScopeLabel()})...`;
+        timeEl.textContent = '0s verstreken';
+        bar.style.width = '12%';
+        wrap.classList.remove('hidden');
+
+        this._progressTimer = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - start) / 1000);
+            const estTotal = this.loadFromDb ? Math.max(8, elapsed + 3) : 2;
+            const pct = Math.min(92, Math.round(12 + (elapsed / estTotal) * 80));
+            bar.style.width = `${pct}%`;
+            timeEl.textContent = this.loadFromDb
+                ? `${elapsed}s verstreken • even geduld`
+                : `${elapsed}s verstreken`;
+        }, 400);
+    }
+
+    stopLoadProgress() {
+        if (this._progressTimer) {
+            clearInterval(this._progressTimer);
+            this._progressTimer = null;
+        }
+        const wrap = document.getElementById('channelsLoadProgressWrap');
+        const text = document.getElementById('channelsLoadProgressText');
+        const bar = document.getElementById('channelsLoadProgressBar');
+        if (!wrap || !text || !bar) return;
+        bar.style.width = '100%';
+        text.textContent = `Geladen (${this.getScopeLabel()}) ✓`;
+        setTimeout(() => wrap.classList.add('hidden'), 900);
+    }
+
     async loadFilteredData() {
         if (this.selectedContentTypes.size === 0) {
             this.props.toast?.show('Selecteer minstens één categorie (Live TV, Films of Series).', 'warning');
             return;
         }
+        this.startLoadProgress();
+        try {
+            const contentTypes = Array.from(this.selectedContentTypes).join(',');
+            const [groupsRes, tags] = await Promise.all([
+                this.props.api.get('groups', { content_types: contentTypes, scope: 'active', refresh: this.loadFromDb ? '1' : '0' }),
+                this.props.api.get('country_tags'),
+            ]);
+            this.hasLoadedData = true;
+            this.groups = Array.isArray(groupsRes) ? groupsRes : (groupsRes?.items || []);
+            this.groupSortMode = groupsRes?.group_sort_mode || this.groupSortMode || 'import';
+            this.countryTags = tags || [];
+            this.populateCountryFilter();
+            this.updateGroupSortButton();
+            this.groupList.setState({ groups: this.groups, selectedGroupId: this.selectedGroupId, countryTags: this.countryTags });
+            this.updateGroupHeader();
+            if (this.selectedGroupId) {
+                await this.loadChannels();
+            } else {
+                this.renderSelectGroupPrompt();
+            }
+        } finally {
+            this.stopLoadProgress();
+        }
+    }
+
+    async searchAndRenderAddGroups() {
+        const resultsEl = document.getElementById('groupAddResults');
+        if (!resultsEl) return;
+        const q = (document.getElementById('groupAddSearchInput')?.value || '').trim();
+        const status = document.getElementById('groupAddStatusFilter')?.value || 'disabled';
         const contentTypes = Array.from(this.selectedContentTypes).join(',');
-        const [groupsRes, tags] = await Promise.all([
-            this.props.api.get('groups', { content_types: contentTypes }),
-            this.props.api.get('country_tags'),
-        ]);
-        this.hasLoadedData = true;
-        this.groups = Array.isArray(groupsRes) ? groupsRes : (groupsRes?.items || []);
-        this.groupSortMode = groupsRes?.group_sort_mode || this.groupSortMode || 'import';
-        this.countryTags = tags || [];
-        this.populateCountryFilter();
-        this.updateGroupSortButton();
-        this.groupList.setState({ groups: this.groups, selectedGroupId: this.selectedGroupId, countryTags: this.countryTags });
-        this.updateGroupHeader();
-        await this.loadChannels();
+
+        resultsEl.innerHTML = `<div class="muted" style="padding:0.5rem;">Zoeken...</div>`;
+        const items = await this.props.api.get('groups_search', {
+            q,
+            status,
+            content_types: contentTypes,
+            limit: 50,
+        });
+
+        if (!Array.isArray(items) || items.length === 0) {
+            resultsEl.innerHTML = `<div class="muted" style="padding:0.5rem;">Geen groepen gevonden.</div>`;
+            return;
+        }
+
+        resultsEl.innerHTML = items.map(g => {
+            const name = this.escapeHtml(g.display_name || g.custom_name || g.original_name || '');
+            const enabled = Number(g.is_enabled) === 1;
+            return `
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;padding:0.35rem 0.25rem;border-bottom:1px solid rgba(255,255,255,0.06);">
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">${name}</span>
+                    <button type="button" class="btn btn-sm ${enabled ? '' : 'btn-primary'} group-add-toggle-btn" data-id="${g.id}" data-enable="${enabled ? '0' : '1'}" style="min-height:36px;flex-shrink:0;">
+                        ${enabled ? 'Actief ✓' : '+ Activeer'}
+                    </button>
+                </div>
+            `;
+        }).join('');
+
+        resultsEl.querySelectorAll('.group-add-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = Number(btn.dataset.id);
+                const enable = Number(btn.dataset.enable);
+                await this.props.api.post('update_group', { id, is_enabled: enable });
+                this.props.toast?.show(enable ? 'Groep geactiveerd en toegevoegd' : 'Groep gedeactiveerd');
+                await this.loadFilteredData();
+                await this.searchAndRenderAddGroups();
+            });
+        });
+    }
+
+    renderSelectGroupPrompt() {
+        const channelsRoot = document.getElementById('channelsTableRoot');
+        if (channelsRoot) {
+            channelsRoot.innerHTML = `<tr><td colspan="4" class="muted" style="padding:2rem;text-align:center;">Selecteer een actieve groep links om de kanalen te laden, of klik op <strong>+ Groep toevoegen</strong> om extra groepen op te zoeken.</td></tr>`;
+        }
     }
 
     populateCountryFilter() {
@@ -71,6 +217,10 @@ export class ChannelsPage extends BaseComponent {
 
     async loadChannels() {
         if (!this.hasLoadedData || this.selectedContentTypes.size === 0) {
+            return;
+        }
+        if (!this.selectedGroupId && !this.channelSearch.trim()) {
+            this.renderSelectGroupPrompt();
             return;
         }
         const params = {
@@ -94,26 +244,40 @@ export class ChannelsPage extends BaseComponent {
 
     renderShell() {
         this.container.innerHTML = `
-            <div id="contentTypeFilterBar" class="card" style="margin-bottom:1rem;padding:0.75rem 1rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                <button type="button" class="btn content-type-toggle active" data-type="live" style="min-height:44px;padding:0 1rem;">📺 Live TV</button>
-                <button type="button" class="btn content-type-toggle" data-type="movie" style="min-height:44px;padding:0 1rem;">🎬 Films</button>
-                <button type="button" class="btn content-type-toggle" data-type="series" style="min-height:44px;padding:0 1rem;">🎞️ Series</button>
-                <button type="button" class="btn btn-primary" id="applyContentTypeFilterBtn" style="min-height:44px;padding:0 1.25rem;margin-left:auto;">🔍 Filter &amp; Laad</button>
+            <div id="contentTypeFilterBar" class="card" style="margin-bottom:1rem;padding:0.75rem 1rem;display:flex;flex-direction:column;gap:0.6rem;">
+                <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;width:100%;">
+                    <button type="button" class="btn content-type-toggle active" data-type="live" style="min-height:44px;padding:0 1rem;">📺 Live TV</button>
+                    <button type="button" class="btn content-type-toggle" data-type="movie" style="min-height:44px;padding:0 1rem;">🎬 Films</button>
+                    <button type="button" class="btn content-type-toggle" data-type="series" style="min-height:44px;padding:0 1rem;">🎞️ Series</button>
+                    <span id="activeScopeBadge" class="muted" style="font-size:0.88rem;padding:0.25rem 0.6rem;border-radius:6px;background:rgba(56,189,248,0.12);color:var(--accent,#38bdf8);">Scope: Live TV</span>
+                    <div style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                        <button type="button" class="btn" id="loadSourceToggleBtn" title="Toont welke bron de knop Filter & Laad gebruikt (klik om te wisselen)" style="min-height:44px;padding:0 0.9rem;">Bron: ⚡ Cache</button>
+                        <button type="button" class="btn btn-primary" id="applyContentTypeFilterBtn" style="min-height:44px;padding:0 1.25rem;">🔍 Filter &amp; Laad</button>
+                    </div>
+                </div>
+                <div id="channelsLoadProgressWrap" class="hidden" style="width:100%;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.85rem;margin-bottom:0.25rem;">
+                        <span id="channelsLoadProgressText">Laden...</span>
+                        <span id="channelsLoadProgressTime" class="muted">0s</span>
+                    </div>
+                    <div style="width:100%;height:6px;background:rgba(255,255,255,0.1);border-radius:999px;overflow:hidden;">
+                        <div id="channelsLoadProgressBar" style="width:0%;height:100%;background:var(--accent,#38bdf8);transition:width 0.25s ease;"></div>
+                    </div>
+                </div>
             </div>
             <div class="split-view">
                 <aside class="card groups-pane">
                     <div class="card-header">
                         <h2>Groepen</h2>
                         <div class="btn-group">
-                            <button type="button" class="btn btn-sm" id="groupSortBtn" title="Klik om groepssortering te wisselen (Import / A-Z / Z-A)"><span id="groupSortBadge">⇅ Import</span></button>
-                            <button class="btn btn-sm" id="enableAllGroupsBtn">Alles Aan</button>
-                            <button class="btn btn-sm" id="disableAllGroupsBtn">Alles Uit</button>
+                            <button type="button" class="btn btn-sm btn-primary" id="openGroupSearchBtn" style="min-height:44px;">+ Groep toevoegen</button>
                         </div>
                     </div>
-                    <input type="search" id="groupSearchInput" placeholder="Filter groepen...">
+                    <input type="search" id="groupSearchInput" placeholder="Filter actieve groepen..." style="font-size:16px;">
                     <div id="groupsListRoot" class="groups-list"></div>
                 </aside>
                 <div class="card channels-pane">
+                    <div id="channelsViewContainer">
                     <div class="card-header">
                         <div id="groupHeaderTitleWrap" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
                             <h2 id="selectedGroupTitle">Alle Kanalen</h2>
@@ -158,6 +322,21 @@ export class ChannelsPage extends BaseComponent {
                             <tbody id="channelsTableRoot"></tbody>
                         </table>
                     </div>
+                    </div>
+                    <div id="groupAddPanel" class="hidden">
+                        <div class="card-header">
+                            <h2>Groep toevoegen</h2>
+                        </div>
+                        <div class="toolbar" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.75rem;">
+                            <input type="search" id="groupAddSearchInput" placeholder="Zoek groep (bv. BE, NL, [UK], Sport)..." style="flex:1;min-width:180px;font-size:16px;min-height:44px;">
+                            <select id="groupAddStatusFilter" style="font-size:16px;min-height:44px;">
+                                <option value="all">Alle</option>
+                                <option value="disabled" selected>Alleen inactief</option>
+                                <option value="enabled">Alleen actief</option>
+                            </select>
+                        </div>
+                        <div id="groupAddResults" style="max-height:60vh;overflow-y:auto;"></div>
+                    </div>
                 </div>
             </div>
         `;
@@ -165,6 +344,7 @@ export class ChannelsPage extends BaseComponent {
         this.groupList = new GroupList('#groupsListRoot', {
             onSelect: (id, name) => {
                 this.selectedGroupId = id;
+                this.channelSortBy = 'number';
                 this.updateGroupHeader(name);
                 this.groupList.setState({ selectedGroupId: id });
                 this.loadChannels();
@@ -192,6 +372,34 @@ export class ChannelsPage extends BaseComponent {
         document.getElementById('groupSearchInput')?.addEventListener('input', debounce(e => {
             this.groupList.setState({ filter: e.target.value });
         }, 200));
+
+        document.getElementById('openGroupSearchBtn')?.addEventListener('click', () => {
+            this.isAddGroupMode = !this.isAddGroupMode;
+            const btn = document.getElementById('openGroupSearchBtn');
+            const panel = document.getElementById('groupAddPanel');
+            const channelsView = document.getElementById('channelsViewContainer');
+            if (btn) {
+                btn.classList.toggle('btn-danger', this.isAddGroupMode);
+                btn.classList.toggle('btn-primary', !this.isAddGroupMode);
+            }
+            if (panel) panel.classList.toggle('hidden', !this.isAddGroupMode);
+            if (channelsView) channelsView.classList.toggle('hidden', this.isAddGroupMode);
+
+            if (this.isAddGroupMode) {
+                document.getElementById('groupAddSearchInput')?.focus();
+                this.searchAndRenderAddGroups();
+            } else if (this.selectedGroupId) {
+                this.loadChannels();
+            }
+        });
+
+        document.getElementById('groupAddSearchInput')?.addEventListener('input', debounce(() => {
+            this.searchAndRenderAddGroups();
+        }, 300));
+
+        document.getElementById('groupAddStatusFilter')?.addEventListener('change', () => {
+            this.searchAndRenderAddGroups();
+        });
 
         document.getElementById('channelSearchInput')?.addEventListener('input', debounce(e => {
             this.channelSearch = e.target.value;
@@ -222,7 +430,7 @@ export class ChannelsPage extends BaseComponent {
         document.getElementById('manageCountryTagsBtn')?.addEventListener('click', () => this.openCountryModal());
 
         document.querySelectorAll('#contentTypeFilterBar .content-type-toggle').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 const type = btn.dataset.type;
                 if (!type) return;
                 if (this.selectedContentTypes.has(type)) {
@@ -232,7 +440,22 @@ export class ChannelsPage extends BaseComponent {
                     this.selectedContentTypes.add(type);
                     btn.classList.add('active');
                 }
+                this.updateActiveScopeBadge();
+                this.selectedGroupId = null;
+                const loaded = await this.tryAutoLoadFromCache();
+                if (!loaded) {
+                    this.groups = [];
+                    this.groupList?.setState({ groups: [], selectedGroupId: null, countryTags: this.countryTags || [] });
+                    this.renderPreloadPrompt();
+                }
             });
+        });
+
+        document.getElementById('loadSourceToggleBtn')?.addEventListener('click', e => {
+            this.loadFromDb = !this.loadFromDb;
+            const btn = e.currentTarget;
+            btn.textContent = this.loadFromDb ? 'Bron: 🗄️ Database' : 'Bron: ⚡ Cache';
+            btn.classList.toggle('btn-warning', this.loadFromDb);
         });
 
         document.getElementById('applyContentTypeFilterBtn')?.addEventListener('click', () => {
@@ -384,22 +607,49 @@ export class ChannelsPage extends BaseComponent {
     updateChannelsTableHeader() {
         const thead = document.getElementById('channelsTableHead');
         if (!thead) return;
+        const numIcon = this.channelSortBy === 'number' ? '▲' : (this.channelSortBy === 'number_desc' ? '▼' : '⇅');
+        const nameIcon = this.channelSortBy === 'name_asc' ? '▲' : (this.channelSortBy === 'name_desc' ? '▼' : '⇅');
+        const numColor = (this.channelSortBy === 'number' || this.channelSortBy === 'number_desc') ? 'color:var(--accent,#38bdf8);' : '';
+        const nameColor = (this.channelSortBy === 'name_asc' || this.channelSortBy === 'name_desc') ? 'color:var(--accent,#38bdf8);' : '';
+
         if (!this.selectedGroupId) {
             thead.innerHTML = `
                 <tr>
                     <th style="width:72px;">Aan/Uit</th>
-                    <th style="width:90px;">#</th>
-                    <th>Naam van het kanaal</th>
+                    <th class="ch-sort-th" data-sort="number" style="width:90px;cursor:pointer;user-select:none;${numColor}"># <span style="font-size:0.75rem;">${numIcon}</span></th>
+                    <th class="ch-sort-th" data-sort="name" style="cursor:pointer;user-select:none;${nameColor}">Naam van het kanaal <span style="font-size:0.75rem;">${nameIcon}</span></th>
                 </tr>`;
         } else {
             thead.innerHTML = `
                 <tr>
                     <th style="width:40px;"><input type="checkbox" id="selectAllChannelsCheckbox" title="Selecteer alle zichtbare kanalen"></th>
                     <th style="width:72px;">Aan/Uit</th>
-                    <th style="width:90px;">#</th>
-                    <th>Naam van het kanaal</th>
+                    <th class="ch-sort-th" data-sort="number" style="width:90px;cursor:pointer;user-select:none;${numColor}"># <span style="font-size:0.75rem;">${numIcon}</span></th>
+                    <th class="ch-sort-th" data-sort="name" style="cursor:pointer;user-select:none;${nameColor}">Naam van het kanaal <span style="font-size:0.75rem;">${nameIcon}</span></th>
                     <th>Groep</th>
                 </tr>`;
         }
+
+        thead.querySelectorAll('.ch-sort-th').forEach(th => {
+            th.addEventListener('click', async () => {
+                const key = th.dataset.sort;
+                if (key === 'number') {
+                    this.channelSortBy = this.channelSortBy === 'number' ? 'number_desc' : 'number';
+                } else if (key === 'name') {
+                    this.channelSortBy = this.channelSortBy === 'name_asc' ? 'name_desc' : 'name_asc';
+                }
+                if (this.selectedGroupId) {
+                    this.groupChannelSortMap[String(this.selectedGroupId)] = this.channelSortBy;
+                    try {
+                        localStorage.setItem('iptv_group_channel_sort', JSON.stringify(this.groupChannelSortMap));
+                    } catch {}
+                    await this.props.api.post('reorder_group_channels', {
+                        group_id: this.selectedGroupId,
+                        sort_by: this.channelSortBy,
+                    });
+                }
+                await this.loadChannels();
+            });
+        });
     }
 }

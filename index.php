@@ -69,12 +69,14 @@ switch ($route) {
         $router->addApiRoute('run_update_sql', DashboardController::class, 'runUpdateSql');
         $router->addApiRoute('logout', DashboardController::class, 'logout');
         $router->addApiRoute('groups', ChannelController::class, 'groups');
+        $router->addApiRoute('groups_search', ChannelController::class, 'searchGroups');
         $router->addApiRoute('set_group_sort', ChannelController::class, 'setGroupSort');
         $router->addApiRoute('update_group', ChannelController::class, 'updateGroup');
         $router->addApiRoute('bulk_groups', ChannelController::class, 'bulkGroups');
         $router->addApiRoute('channels', ChannelController::class, 'channels');
         $router->addApiRoute('update_channel', ChannelController::class, 'updateChannel');
         $router->addApiRoute('bulk_channels', ChannelController::class, 'bulkChannels');
+        $router->addApiRoute('reorder_group_channels', ChannelController::class, 'reorderGroupChannels');
         $router->addApiRoute('country_tags', ChannelController::class, 'countryTags');
         $router->addApiRoute('save_country_tag', ChannelController::class, 'saveCountryTag');
         $router->addApiRoute('delete_country_tag', ChannelController::class, 'deleteCountryTag');

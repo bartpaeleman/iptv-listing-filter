@@ -48,6 +48,104 @@ final class GroupRepository extends BaseRepository
         )->fetchAll();
     }
 
+    /**
+     * @param array<int, string> $contentTypes
+     * @return array<int, array<string, mixed>>
+     */
+    public function activeWithCounts(string $sortMode = 'asc', array $contentTypes = []): array
+    {
+        $orderBy = 'ORDER BY g.original_name ASC, g.id ASC';
+
+        if ($contentTypes !== []) {
+            $placeholders = implode(', ', array_fill(0, count($contentTypes), '?'));
+            $stmt = $this->pdo->prepare(
+                "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type,
+                        COUNT(c.id) AS channel_count,
+                        SUM(CASE WHEN c.is_enabled = 1 THEN 1 ELSE 0 END) AS active_channel_count
+                 FROM m3u_groups g
+                 LEFT JOIN channels c ON c.group_id = g.id
+                 WHERE g.is_enabled = 1 AND g.content_type IN ({$placeholders})
+                 GROUP BY g.id
+                 {$orderBy}"
+            );
+            $stmt->execute(array_values($contentTypes));
+            return $stmt->fetchAll();
+        }
+
+        return $this->pdo->query(
+            "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type,
+                    COUNT(c.id) AS channel_count,
+                    SUM(CASE WHEN c.is_enabled = 1 THEN 1 ELSE 0 END) AS active_channel_count
+             FROM m3u_groups g
+             LEFT JOIN channels c ON c.group_id = g.id
+             WHERE g.is_enabled = 1
+             GROUP BY g.id
+             {$orderBy}"
+        )->fetchAll();
+    }
+
+    /**
+     * @param array<int, string> $contentTypes
+     * @return array<int, array<string, mixed>>
+     */
+    public function searchGroups(string $query, array $contentTypes = [], string $status = 'disabled', int $limit = 50): array
+    {
+        $where = ['1=1'];
+        $params = [];
+
+        if ($query !== '') {
+            if (preg_match('/^(?:\(([^)]+)\)|\[([^\]]+)\]|\\|([^|]+)\\|)\s*(.*)$/u', $query, $m)) {
+                $tag = trim($m[1] !== '' ? $m[1] : ($m[2] !== '' ? $m[2] : $m[3]));
+                $rest = trim($m[4] ?? '');
+                if ($tag !== '') {
+                    $where[] = '(g.original_name LIKE :t1 OR g.original_name LIKE :t2 OR g.original_name LIKE :t3 OR g.original_name LIKE :t4 OR g.original_name LIKE :t5)';
+                    $params[':t1'] = '%[' . $tag . ']%';
+                    $params[':t2'] = '%|' . $tag . '|%';
+                    $params[':t3'] = '%(' . $tag . ')%';
+                    $params[':t4'] = $tag . '|%';
+                    $params[':t5'] = $tag . ' -%';
+                }
+                if ($rest !== '') {
+                    $where[] = '(g.original_name LIKE :q1 OR g.custom_name LIKE :q2)';
+                    $like = '%' . $rest . '%';
+                    $params[':q1'] = $like;
+                    $params[':q2'] = $like;
+                }
+            } else {
+                $where[] = '(g.original_name LIKE :q1 OR g.custom_name LIKE :q2)';
+                $like = '%' . $query . '%';
+                $params[':q1'] = $like;
+                $params[':q2'] = $like;
+            }
+        }
+        if ($status === 'disabled') {
+            $where[] = 'g.is_enabled = 0';
+        } elseif ($status === 'enabled') {
+            $where[] = 'g.is_enabled = 1';
+        }
+        if ($contentTypes !== []) {
+            $ph = [];
+            foreach (array_values($contentTypes) as $idx => $ct) {
+                $key = ":ct_{$idx}";
+                $ph[] = $key;
+                $params[$key] = $ct;
+            }
+            $where[] = 'g.content_type IN (' . implode(', ', $ph) . ')';
+        }
+
+        $safeLimit = max(1, min(100, $limit));
+        $whereSql = implode(' AND ', $where);
+        $stmt = $this->pdo->prepare(
+            "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type
+             FROM m3u_groups g
+             WHERE {$whereSql}
+             ORDER BY g.original_name ASC, g.id ASC
+             LIMIT {$safeLimit}"
+        );
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
     public function updateGroup(int $id, ?int $isEnabled, ?string $customName, ?int $sortOrder): void
     {
         $fields = [];
