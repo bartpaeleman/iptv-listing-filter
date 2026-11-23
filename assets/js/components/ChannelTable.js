@@ -27,8 +27,8 @@ export class ChannelTable extends BaseComponent {
                     <div style="display:flex;align-items:center;gap:0.4rem;">
                         ${emojiPrefix ? `<span class="ch-emoji-prefix" title="${this.escapeHtml(c.tvg_name || '')}">${this.escapeHtml(emojiPrefix)}</span>` : ''}
                         <input type="text" class="ch-name" value="${this.escapeHtml(cleanName)}" title="Origineel: ${this.escapeHtml(c.tvg_name || '')}">
-                        ${emojiPrefix ? `<button type="button" class="btn btn-sm ch-adopt-flag" data-emoji="${this.escapeHtml(emojiPrefix)}" title="Naam incl. landvlag opslaan als custom naam" style="min-height:44px;min-width:44px;flex-shrink:0;">❐</button>` : ''}
-                        ${hasCustomName ? `<button type="button" class="btn btn-sm ch-reset-name" title="Originele naam herstellen (${this.escapeHtml(c.tvg_name || '')})" style="min-height:44px;min-width:44px;flex-shrink:0;">↩️</button>` : ''}
+                        <button type="button" class="btn btn-sm ch-use-original ${!hasCustomName ? 'btn-primary' : ''}" title="Originele naam gebruiken" style="min-height:44px;min-width:44px;flex-shrink:0;">↩️</button>
+                        <button type="button" class="btn btn-sm ch-use-custom ${hasCustomName ? 'btn-primary' : ''}" data-emoji="${this.escapeHtml(emojiPrefix)}" title="Custom naam incl. vlag/symbool gebruiken" style="min-height:44px;min-width:44px;flex-shrink:0;">${this.escapeHtml(emojiPrefix || '✏️')}</button>
                     </div>
                 </td>
             </tr>
@@ -50,19 +50,23 @@ export class ChannelTable extends BaseComponent {
             tr.querySelector('.ch-name')?.addEventListener('change', ev => {
                 this.props.onUpdate?.(id, { custom_name: ev.target.value });
             });
-            tr.querySelector('.ch-adopt-flag')?.addEventListener('click', () => {
+            tr.querySelector('.ch-use-original')?.addEventListener('click', () => {
+                this.props.onUpdate?.(id, { custom_name: '' });
+            });
+            tr.querySelector('.ch-use-custom')?.addEventListener('click', () => {
                 const nameInput = tr.querySelector('.ch-name');
                 const emojiSpan = tr.querySelector('.ch-emoji-prefix');
-                const adoptBtn = tr.querySelector('.ch-adopt-flag');
-                const emoji = adoptBtn?.dataset.emoji || '';
-                const cleanName = (nameInput?.value || '').trim();
-                const adoptedName = `${emoji} ${cleanName}`.trim();
-                if (nameInput) nameInput.value = adoptedName;
-                if (emojiSpan) emojiSpan.style.display = 'none';
-                this.props.onUpdate?.(id, { custom_name: adoptedName });
-            });
-            tr.querySelector('.ch-reset-name')?.addEventListener('click', () => {
-                this.props.onUpdate?.(id, { custom_name: '' });
+                const customBtn = tr.querySelector('.ch-use-custom');
+                const emojiPrefix = customBtn?.dataset.emoji || '';
+                const val = (nameInput?.value || '').trim();
+                const finalName = (emojiPrefix && !val.startsWith(emojiPrefix))
+                    ? `${emojiPrefix} ${val}`.trim()
+                    : val;
+                if (nameInput) nameInput.value = finalName;
+                if (emojiSpan && emojiPrefix && finalName.startsWith(emojiPrefix)) {
+                    emojiSpan.style.display = 'none';
+                }
+                this.props.onUpdate?.(id, { custom_name: finalName });
             });
         });
     }

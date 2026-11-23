@@ -455,6 +455,29 @@ final class ChannelController extends BaseController
             $replace = (string) ($input['replace'] ?? '');
             $caseSensitive = ((int) ($input['case_sensitive'] ?? 0)) === 1;
             $affected = $repo->bulkReplaceNameInGroup($groupId, $search, $replace, $caseSensitive);
+        } elseif ($mode === 'adopt_all_display_names') {
+            $channels = $repo->filter($groupId, '', '', false, 5000, 0, '', 'all', 'number')['items'];
+            foreach ($channels as $ch) {
+                $tvgName = (string) ($ch['tvg_name'] ?? '');
+                $parsed = \App\Services\EmojiTagService::parseName($tvgName, false);
+                $displayName = trim((string) ($parsed['display_name'] ?? ''));
+                $emoji = (string) ($parsed['emoji_prefix'] ?? '');
+                if ($displayName !== '' && $displayName !== $tvgName) {
+                    if ($emoji !== '' && str_starts_with($tvgName, $emoji) && str_starts_with($displayName, $emoji . ' ' . $emoji)) {
+                        $displayName = trim(substr($displayName, strlen($emoji)));
+                    }
+                    $repo->updateChannel((int) $ch['id'], ['custom_name' => $displayName]);
+                    $affected++;
+                }
+            }
+        } elseif ($mode === 'reset_all_custom_names') {
+            $channels = $repo->filter($groupId, '', '', false, 5000, 0, '', 'all', 'number')['items'];
+            foreach ($channels as $ch) {
+                if ($ch['custom_name'] !== null && $ch['custom_name'] !== '') {
+                    $repo->updateChannel((int) $ch['id'], ['custom_name' => null]);
+                    $affected++;
+                }
+            }
         } else {
             $this->jsonError('Ongeldige modus.', 400);
         }
