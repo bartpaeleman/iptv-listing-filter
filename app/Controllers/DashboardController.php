@@ -203,14 +203,23 @@ final class DashboardController extends BaseController
         $this->jsonSuccess();
     }
 
+    private const ALLOWED_LOGS = ['app.log', 'sync.log'];
+
     public function appLogs(): void
     {
         $this->requireAuth();
+        $requestedFile = isset($_GET['file']) && $_GET['file'] !== '' ? (string) $_GET['file'] : 'app.log';
+        if (!in_array($requestedFile, self::ALLOWED_LOGS, true)) {
+            $this->jsonError('Ongeldig logbestand.', 400);
+            return;
+        }
+
         $requested = max(5, min(500, (int) ($_GET['lines'] ?? 10)));
-        $logFile = dirname(__DIR__, 2) . '/storage/logs/app.log';
+        $logFile = dirname(__DIR__, 2) . '/storage/logs/' . $requestedFile;
 
         if (!is_file($logFile) || !is_readable($logFile)) {
             $this->jsonSuccess([
+                'file' => $requestedFile,
                 'lines' => [],
                 'requested_lines' => $requested,
                 'total_lines' => 0,
@@ -239,6 +248,7 @@ final class DashboardController extends BaseController
         }
 
         $this->jsonSuccess([
+            'file' => $requestedFile,
             'lines' => $lines,
             'requested_lines' => $requested,
             'total_lines' => $totalLines,
@@ -253,10 +263,16 @@ final class DashboardController extends BaseController
         $input = $this->getJsonInput();
         $this->verifyCsrf($input);
 
-        $logFile = dirname(__DIR__, 2) . '/storage/logs/app.log';
+        $requestedFile = isset($input['file']) && $input['file'] !== '' ? (string) $input['file'] : 'app.log';
+        if (!in_array($requestedFile, self::ALLOWED_LOGS, true)) {
+            $this->jsonError('Ongeldig logbestand.', 400);
+            return;
+        }
+
+        $logFile = dirname(__DIR__, 2) . '/storage/logs/' . $requestedFile;
         if (is_file($logFile)) {
             @file_put_contents($logFile, '');
         }
-        $this->jsonSuccess();
+        $this->jsonSuccess(['file' => $requestedFile]);
     }
 }

@@ -218,7 +218,7 @@ final class XtreamServerService
             return ['epg_listings' => []];
         }
 
-        $epgId = (string) ($channel['epg_channel_id'] ?: $channel['tvg_id'] ?: '');
+        $epgId = trim((string) ($channel['epg_channel_id'] ?: $channel['tvg_id'] ?: ''));
         if ($epgId === '') {
             return ['epg_listings' => []];
         }
