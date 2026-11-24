@@ -91,7 +91,9 @@ final class ChannelRepository extends BaseRepository
         $total = (int) $countStmt->fetchColumn();
 
         if ($isCustomGroup && $sortBy === 'number') {
-            $orderBy = 'ORDER BY c.is_enabled DESC, cgc.sort_order ASC, c.id ASC';
+            $orderBy = 'ORDER BY c.is_enabled DESC, cgc.sort_order ASC, cgc.id ASC';
+        } elseif ($isCustomGroup && $sortBy === 'number_desc') {
+            $orderBy = 'ORDER BY c.is_enabled DESC, cgc.sort_order DESC, cgc.id DESC';
         } else {
             $subOrder = match ($sortBy) {
                 'name_asc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",

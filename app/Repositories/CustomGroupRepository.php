@@ -219,6 +219,10 @@ final class CustomGroupRepository extends BaseRepository
             }
         }
 
+        if ($added > 0) {
+            $this->normalizeSortOrder($customGroupId);
+        }
+
         return $added;
     }
 
@@ -238,6 +242,7 @@ final class CustomGroupRepository extends BaseRepository
              WHERE custom_group_id = ? AND channel_id IN ({$placeholders})"
         );
         $stmt->execute(array_merge([$customGroupId], $cleanIds));
+        $this->normalizeSortOrder($customGroupId);
     }
 
     /**
@@ -272,5 +277,110 @@ final class CustomGroupRepository extends BaseRepository
         );
         $stmt->execute([$customGroupId]);
         return array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+    }
+
+    public function normalizeSortOrder(int $customGroupId): void
+    {
+        if ($customGroupId <= 0) {
+            return;
+        }
+        $stmt = $this->pdo->prepare(
+            'SELECT id FROM custom_group_channels
+             WHERE custom_group_id = ? AND is_ignored = 0
+             ORDER BY sort_order ASC, id ASC'
+        );
+        $stmt->execute([$customGroupId]);
+        $rowIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        if ($rowIds === []) {
+            return;
+        }
+
+        $upd = $this->pdo->prepare('UPDATE custom_group_channels SET sort_order = ? WHERE id = ?');
+        $order = 1;
+        foreach ($rowIds as $rowId) {
+            $upd->execute([$order++, (int) $rowId]);
+        }
+    }
+
+    public function reorderChannelInCustomGroup(int $customGroupId, int $channelId, int $newPosition): void
+    {
+        if ($customGroupId <= 0 || $channelId <= 0) {
+            return;
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare(
+                'SELECT channel_id FROM custom_group_channels
+                 WHERE custom_group_id = ? AND is_ignored = 0
+                 ORDER BY sort_order ASC, id ASC'
+            );
+            $stmt->execute([$customGroupId]);
+            $ids = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+
+            $currentIdx = array_search($channelId, $ids, true);
+            if ($currentIdx === false) {
+                $this->pdo->rollBack();
+                return;
+            }
+
+            array_splice($ids, $currentIdx, 1);
+            $targetIdx = max(0, min(count($ids), $newPosition - 1));
+            array_splice($ids, $targetIdx, 0, [$channelId]);
+
+            $upd = $this->pdo->prepare(
+                'UPDATE custom_group_channels SET sort_order = ? WHERE custom_group_id = ? AND channel_id = ?'
+            );
+            $order = 1;
+            foreach ($ids as $cid) {
+                $upd->execute([$order++, $customGroupId, $cid]);
+            }
+
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    public function reorderCustomGroupBySort(int $customGroupId, string $sortBy): void
+    {
+        if ($customGroupId <= 0) {
+            return;
+        }
+
+        $orderSql = match ($sortBy) {
+            'name', 'name_asc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
+            'name_desc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) DESC, c.id DESC",
+            'number_desc' => 'cgc.sort_order DESC, cgc.id DESC',
+            default => 'cgc.sort_order ASC, cgc.id ASC',
+        };
+
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT cgc.id FROM custom_group_channels cgc
+                 INNER JOIN channels c ON c.id = cgc.channel_id
+                 WHERE cgc.custom_group_id = ? AND cgc.is_ignored = 0
+                 ORDER BY c.is_enabled DESC, {$orderSql}"
+            );
+            $stmt->execute([$customGroupId]);
+            $rowIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+
+            $upd = $this->pdo->prepare('UPDATE custom_group_channels SET sort_order = ? WHERE id = ?');
+            $order = 1;
+            foreach ($rowIds as $rowId) {
+                $upd->execute([$order++, (int) $rowId]);
+            }
+
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 }

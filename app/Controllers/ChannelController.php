@@ -282,7 +282,19 @@ final class ChannelController extends BaseController
         $repo = new ChannelRepository();
 
         if (array_key_exists('channel_number', $input) && $input['channel_number'] !== '' && $input['channel_number'] !== null) {
-            $reordered = $repo->reorderChannelInGroup($id, (int) $input['channel_number']);
+            $customGid = (int) ($input['custom_group_id'] ?? $input['group_id'] ?? 0);
+            $isCustomGid = false;
+            if ($customGid > 0) {
+                $cgRepo = new \App\Repositories\CustomGroupRepository();
+                $cgRow = $cgRepo->findById($customGid);
+                $isCustomGid = $cgRow !== null && (int) ($cgRow['is_custom'] ?? 0) === 1;
+            }
+            if ($isCustomGid) {
+                (new \App\Repositories\CustomGroupRepository())->reorderChannelInCustomGroup($customGid, $id, (int) $input['channel_number']);
+                $reordered = $repo->filter($customGid, '', '', false, 150, 0, '', 'all', 'number')['items'];
+            } else {
+                $reordered = $repo->reorderChannelInGroup($id, (int) $input['channel_number']);
+            }
             $emojiService = new EmojiTagService();
             foreach ($reordered as &$ch) {
                 $rawCh = (string) (($ch['custom_name'] ?? '') !== '' ? $ch['custom_name'] : ($ch['tvg_name'] ?? ''));
