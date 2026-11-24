@@ -113,3 +113,13 @@
 - 4-staps Web Installer (`public/install.php`) met automatische vergrendeling.
 - Responsive dark/light-ready Admin Dashboard (`public/index.php`, `app.css`, `app.js`).
 - CLI sync entrypoint (`bin/sync.php`) en JSON REST/Cron API (`public/api.php`).
+
+## [Unreleased] - Custom Groepen & Kanaalbeheer
+### Added
+- Custom groepen (`is_custom = 1`) aanmaken, provider-groepen converteren, en kanalen toevoegen/verwijderen via `custom_group_channels`.
+- Dedicated database-kanaalzoeker (`CustomGroupAvailableChannels`) met handmatige zoekknop, land/tag-, brongroep-, categorie- en statusfilters, en 20-batch paginatie.
+- Sync-diff detectie en resolutie (`CustomGroupSyncService` & `CustomGroupSyncBanner`) voor geconverteerde provider-groepen.
+
+### Fixed
+- Groep-gebonden volgnummering en sortering (`custom_group_channels.sort_order`) voor custom groepen zonder de originele provider-groepen aan te tasten.
+- `Selectie Aan` / `Selectie Uit` (`bulkChannels`) en `Zoek & Vervang` (`groupChannelTools`) ondersteunen nu ook custom groepen.

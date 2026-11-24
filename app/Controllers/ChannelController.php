@@ -282,7 +282,19 @@ final class ChannelController extends BaseController
         $repo = new ChannelRepository();
 
         if (array_key_exists('channel_number', $input) && $input['channel_number'] !== '' && $input['channel_number'] !== null) {
-            $reordered = $repo->reorderChannelInGroup($id, (int) $input['channel_number']);
+            $customGid = (int) ($input['custom_group_id'] ?? $input['group_id'] ?? 0);
+            $isCustomGid = false;
+            if ($customGid > 0) {
+                $cgRepo = new \App\Repositories\CustomGroupRepository();
+                $cgRow = $cgRepo->findById($customGid);
+                $isCustomGid = $cgRow !== null && (int) ($cgRow['is_custom'] ?? 0) === 1;
+            }
+            if ($isCustomGid) {
+                (new \App\Repositories\CustomGroupRepository())->reorderChannelInCustomGroup($customGid, $id, (int) $input['channel_number']);
+                $reordered = $repo->filter($customGid, '', '', false, 150, 0, '', 'all', 'number')['items'];
+            } else {
+                $reordered = $repo->reorderChannelInGroup($id, (int) $input['channel_number']);
+            }
             $emojiService = new EmojiTagService();
             foreach ($reordered as &$ch) {
                 $rawCh = (string) (($ch['custom_name'] ?? '') !== '' ? $ch['custom_name'] : ($ch['tvg_name'] ?? ''));
@@ -328,13 +340,25 @@ final class ChannelController extends BaseController
         $search = trim((string) ($input['search'] ?? ''));
 
         $repo = new ChannelRepository();
-        $repo->bulkSetEnabled($enable, $ids, $groupId, $search);
-        $viewCache = new ViewCacheService();
+        $isCustomGroup = false;
         if ($groupId !== null && $groupId > 0) {
-            $repo->normalizeActiveGroupNumbers($groupId);
-            $viewCache->invalidateGroupChannels($groupId);
-        } else {
+            $cgRow = (new \App\Repositories\CustomGroupRepository())->findById($groupId);
+            $isCustomGroup = $cgRow !== null && (int) ($cgRow['is_custom'] ?? 0) === 1;
+        }
+
+        if ($isCustomGroup && $ids !== []) {
+            $repo->bulkSetEnabled($enable, $ids, null, '');
+            $viewCache = new ViewCacheService();
             $viewCache->invalidateAll();
+        } else {
+            $repo->bulkSetEnabled($enable, $ids, $groupId, $search);
+            $viewCache = new ViewCacheService();
+            if ($groupId !== null && $groupId > 0) {
+                $repo->normalizeActiveGroupNumbers($groupId);
+                $viewCache->invalidateGroupChannels($groupId);
+            } else {
+                $viewCache->invalidateAll();
+            }
         }
         $viewCache->invalidateGroupsCache();
         $viewCache->invalidateDashboardStats();
@@ -455,12 +479,12 @@ final class ChannelController extends BaseController
             }
             $affected = $repo->bulkSetEnabledByIds($groupId, $matchingIds, 0);
         } elseif ($mode === 'search_replace') {
-            $search = (string) ($input['search'] ?? '');
+            $search = (string) ($input['find'] ?? $input['search'] ?? '');
             if ($search === '') {
                 $this->jsonError('Zoektekst mag niet leeg zijn.', 400);
             }
-            $replace = (string) ($input['replace'] ?? '');
-            $caseSensitive = ((int) ($input['case_sensitive'] ?? 0)) === 1;
+            $replace = (string) ($input['replace'] ?? $input['replace_with'] ?? '');
+            $caseSensitive = !empty($input['case_sensitive']);
             $affected = $repo->bulkReplaceNameInGroup($groupId, $search, $replace, $caseSensitive);
         } elseif ($mode === 'adopt_all_display_names') {
             $channels = $repo->filter($groupId, '', '', false, 5000, 0, '', 'all', 'number')['items'];
@@ -497,7 +521,7 @@ final class ChannelController extends BaseController
             $this->jsonError('Ongeldige modus.', 400);
         }
 
-        (new \App\Services\ViewCacheService())->invalidateGroupChannels($groupId);
+        (new \App\Services\ViewCacheService())->invalidateAll();
 
         $refreshed = $repo->filter($groupId, '', '', false, 200, 0, '', 'all', 'number');
         $this->jsonSuccess([
@@ -505,6 +529,175 @@ final class ChannelController extends BaseController
             'items' => $refreshed['items'],
             'total' => $refreshed['total'],
         ]);
+    }
+
+    public function createCustomGroup(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $name = (string) ($input['name'] ?? '');
+        $category = (string) ($input['category'] ?? 'Live TV');
+
+        try {
+            $repo = new \App\Repositories\CustomGroupRepository();
+            $group = $repo->createCustomGroup($name, $category);
+            (new ViewCacheService())->invalidateAll();
+            $this->jsonSuccess($group);
+        } catch (\InvalidArgumentException $e) {
+            $this->jsonError($e->getMessage(), 400);
+        }
+    }
+
+    public function convertToCustomGroup(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $sourceGroupId = (int) ($input['source_group_id'] ?? 0);
+        if ($sourceGroupId <= 0) {
+            $this->jsonError('Ongeldige brongroep.', 400);
+        }
+
+        try {
+            $repo = new \App\Repositories\CustomGroupRepository();
+            $group = $repo->convertProviderGroup($sourceGroupId);
+            (new ViewCacheService())->invalidateAll();
+            $this->jsonSuccess($group);
+        } catch (\Throwable $e) {
+            $this->jsonError($e->getMessage(), 400);
+        }
+    }
+
+    public function deleteCustomGroup(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $customGroupId = (int) ($input['custom_group_id'] ?? 0);
+        $restoreSource = (bool) ($input['restore_source'] ?? true);
+        if ($customGroupId <= 0) {
+            $this->jsonError('Ongeldige custom groep.', 400);
+        }
+
+        try {
+            $repo = new \App\Repositories\CustomGroupRepository();
+            $repo->deleteCustomGroup($customGroupId, $restoreSource);
+            (new ViewCacheService())->invalidateAll();
+            $this->jsonSuccess(['deleted' => true]);
+        } catch (\InvalidArgumentException $e) {
+            $this->jsonError($e->getMessage(), 400);
+        }
+    }
+
+    public function customGroupAddChannels(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $customGroupId = (int) ($input['custom_group_id'] ?? 0);
+        $channelIds = is_array($input['channel_ids'] ?? null) ? $input['channel_ids'] : [];
+        if ($customGroupId <= 0) {
+            $this->jsonError('Ongeldige custom groep.', 400);
+        }
+
+        try {
+            $repo = new \App\Repositories\CustomGroupRepository();
+            $added = $repo->addChannels($customGroupId, $channelIds);
+            (new ViewCacheService())->invalidateAll();
+            $this->jsonSuccess([
+                'added' => $added,
+                'member_ids' => $repo->getChannelIdsInCustomGroup($customGroupId),
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            $this->jsonError($e->getMessage(), 400);
+        }
+    }
+
+    public function customGroupRemoveChannels(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $customGroupId = (int) ($input['custom_group_id'] ?? 0);
+        $channelIds = is_array($input['channel_ids'] ?? null) ? $input['channel_ids'] : [];
+        if ($customGroupId <= 0) {
+            $this->jsonError('Ongeldige custom groep.', 400);
+        }
+
+        $repo = new \App\Repositories\CustomGroupRepository();
+        $repo->removeChannels($customGroupId, $channelIds);
+        (new ViewCacheService())->invalidateAll();
+        $this->jsonSuccess(['removed' => true]);
+    }
+
+    public function customGroupResolveSync(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $customGroupId = (int) ($input['custom_group_id'] ?? 0);
+        if ($customGroupId <= 0) {
+            $this->jsonError('Ongeldige custom groep.', 400);
+        }
+
+        $addIds = is_array($input['add_ids'] ?? null) ? $input['add_ids'] : [];
+        $ignoreAddIds = is_array($input['ignore_add_ids'] ?? null) ? $input['ignore_add_ids'] : [];
+        $removeIds = is_array($input['remove_ids'] ?? null) ? $input['remove_ids'] : [];
+
+        $syncService = new \App\Services\CustomGroupSyncService();
+        $syncService->resolveSyncDiff($customGroupId, $addIds, $ignoreAddIds, $removeIds);
+        (new ViewCacheService())->invalidateAll();
+
+        $group = (new \App\Repositories\CustomGroupRepository())->findById($customGroupId);
+        $this->jsonSuccess([
+            'resolved' => true,
+            'sync_diff_json' => $group['sync_diff_json'] ?? null,
+        ]);
+    }
+
+    public function customGroupMemberIds(): void
+    {
+        $this->requireAuth();
+        $customGroupId = (int) ($_GET['custom_group_id'] ?? 0);
+        if ($customGroupId <= 0) {
+            $this->jsonSuccess(['member_ids' => []]);
+            return;
+        }
+
+        $repo = new \App\Repositories\CustomGroupRepository();
+        $this->jsonSuccess([
+            'member_ids' => $repo->getChannelIdsInCustomGroup($customGroupId),
+        ]);
+    }
+
+    public function searchCompatibleChannels(): void
+    {
+        $this->requireAuth();
+        $customGroupId = (int) ($_GET['custom_group_id'] ?? 0);
+        if ($customGroupId <= 0) {
+            $this->jsonError('Ongeldige custom groep.', 400);
+        }
+
+        $q = (string) ($_GET['q'] ?? '');
+        $sourceGroupId = isset($_GET['source_group_id']) && $_GET['source_group_id'] !== ''
+            ? (int) $_GET['source_group_id']
+            : null;
+        $limit = (int) ($_GET['limit'] ?? 20);
+        $offset = (int) ($_GET['offset'] ?? 0);
+        $category = (string) ($_GET['category'] ?? '');
+        $status = (string) ($_GET['status'] ?? 'all');
+        $countryTag = (string) ($_GET['country_tag'] ?? '');
+
+        $repo = new ChannelRepository();
+        $result = $repo->searchCompatibleChannels($customGroupId, $q, $sourceGroupId, $limit, $offset, $category, $status, $countryTag);
+        $this->jsonSuccess($result);
     }
 
     /**

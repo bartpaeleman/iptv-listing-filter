@@ -10,7 +10,18 @@ export class ApiClient {
             : window.location.pathname;
         const url = new URL(window.location.origin + path);
         url.searchParams.set('route', 'api');
-        url.searchParams.set('endpoint', String(endpoint));
+
+        const rawEndpoint = String(endpoint);
+        const [cleanEndpoint, ...extraParts] = rawEndpoint.split(/[?&]/);
+        url.searchParams.set('endpoint', cleanEndpoint);
+        for (const part of extraParts) {
+            if (!part) continue;
+            const eqIdx = part.indexOf('=');
+            if (eqIdx > 0) {
+                url.searchParams.set(part.slice(0, eqIdx), decodeURIComponent(part.slice(eqIdx + 1)));
+            }
+        }
+
         for (const [k, v] of Object.entries(params)) {
             if (v !== undefined && v !== null) {
                 url.searchParams.set(k, String(v));

@@ -27,11 +27,20 @@ final class ChannelRepository extends BaseRepository
         array $contentTypes = [],
         bool $liveOnly = false
     ): array {
+        $isCustomGroup = false;
+        if ($groupId !== null) {
+            $cgStmt = $this->pdo->prepare('SELECT is_custom FROM m3u_groups WHERE id = ? LIMIT 1');
+            $cgStmt->execute([$groupId]);
+            $isCustomGroup = (int) $cgStmt->fetchColumn() === 1;
+        }
+
         $where = ['1=1'];
         $params = [];
 
-        if ($groupId !== null) {
+        if ($groupId !== null && !$isCustomGroup) {
             $where[] = 'c.group_id = :gid';
+            $params[':gid'] = $groupId;
+        } elseif ($isCustomGroup) {
             $params[':gid'] = $groupId;
         }
         if ($search !== '') {
@@ -72,30 +81,43 @@ final class ChannelRepository extends BaseRepository
         }
 
         $whereSql = implode(' AND ', $where);
-        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM channels c INNER JOIN m3u_groups g ON g.id = c.group_id WHERE {$whereSql}");
+        $joinSql = $isCustomGroup
+            ? 'INNER JOIN custom_group_channels cgc ON cgc.channel_id = c.id AND cgc.custom_group_id = :gid AND cgc.is_ignored = 0
+               INNER JOIN m3u_groups g ON g.id = cgc.custom_group_id'
+            : 'INNER JOIN m3u_groups g ON g.id = c.group_id';
+
+        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM channels c {$joinSql} WHERE {$whereSql}");
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
-        $subOrder = match ($sortBy) {
-            'name_asc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
-            'name_desc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) DESC, c.id DESC",
-            'epg_status_asc' => "(c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> '') ASC, COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
-            'epg_status_desc' => "(c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> '') DESC, COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
-            'epg_name_asc' => "(ec.display_name IS NULL OR ec.display_name = '') ASC, ec.display_name ASC, c.id ASC",
-            'epg_name_desc' => "(ec.display_name IS NULL OR ec.display_name = '') ASC, ec.display_name DESC, c.id DESC",
-            'import' => 'c.id ASC',
-            'number_desc' => '(c.channel_number IS NULL) ASC, c.channel_number DESC, c.id DESC',
-            default => '(c.channel_number IS NULL) ASC, c.channel_number ASC, c.id ASC',
-        };
-        $orderBy = "ORDER BY c.is_enabled DESC, {$subOrder}";
+        if ($isCustomGroup && $sortBy === 'number') {
+            $orderBy = 'ORDER BY c.is_enabled DESC, cgc.sort_order ASC, cgc.id ASC';
+        } elseif ($isCustomGroup && $sortBy === 'number_desc') {
+            $orderBy = 'ORDER BY c.is_enabled DESC, cgc.sort_order DESC, cgc.id DESC';
+        } else {
+            $subOrder = match ($sortBy) {
+                'name_asc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
+                'name_desc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) DESC, c.id DESC",
+                'epg_status_asc' => "(c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> '') ASC, COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
+                'epg_status_desc' => "(c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> '') DESC, COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
+                'epg_name_asc' => "(ec.display_name IS NULL OR ec.display_name = '') ASC, ec.display_name ASC, c.id ASC",
+                'epg_name_desc' => "(ec.display_name IS NULL OR ec.display_name = '') ASC, ec.display_name DESC, c.id DESC",
+                'import' => 'c.id ASC',
+                'number_desc' => '(c.channel_number IS NULL) ASC, c.channel_number DESC, c.id DESC',
+                default => '(c.channel_number IS NULL) ASC, c.channel_number ASC, c.id ASC',
+            };
+            $orderBy = "ORDER BY c.is_enabled DESC, {$subOrder}";
+        }
+
+        $channelNumExpr = $isCustomGroup ? 'cgc.sort_order AS channel_number' : 'c.channel_number';
 
         $sql = "SELECT c.id, c.tvg_id, c.tvg_name, c.tvg_logo, c.group_id, c.custom_name,
-                       c.channel_number, c.epg_channel_id, c.epg_match_type, c.is_enabled, c.sort_order,
+                       {$channelNumExpr}, c.epg_channel_id, c.epg_match_type, c.is_enabled, c.sort_order,
                        COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS group_name,
                        g.category AS group_category,
                        ec.display_name AS epg_display_name, ec.icon_url AS epg_icon_url
                 FROM channels c
-                INNER JOIN m3u_groups g ON g.id = c.group_id
+                {$joinSql}
                 LEFT JOIN epg_channels ec ON ec.epg_id = c.epg_channel_id
                 WHERE {$whereSql}
                 {$orderBy}
@@ -115,6 +137,43 @@ final class ChannelRepository extends BaseRepository
         if ($groupId <= 0) {
             return;
         }
+        $cgStmt = $this->pdo->prepare('SELECT is_custom FROM m3u_groups WHERE id = ? LIMIT 1');
+        $cgStmt->execute([$groupId]);
+        $isCustom = (int) $cgStmt->fetchColumn() === 1;
+
+        if ($isCustom) {
+            $orderSql = match ($sortBy) {
+                'name_asc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
+                'name_desc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) DESC, c.id DESC",
+                'number_desc' => 'cgc.sort_order DESC, c.id DESC',
+                default => 'cgc.sort_order ASC, c.id ASC',
+            };
+            $stmt = $this->pdo->prepare(
+                "SELECT c.id FROM custom_group_channels cgc
+                 INNER JOIN channels c ON c.id = cgc.channel_id
+                 WHERE cgc.custom_group_id = :gid AND cgc.is_ignored = 0
+                 ORDER BY c.is_enabled DESC, {$orderSql}"
+            );
+            $stmt->execute([':gid' => $groupId]);
+            $ids = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+
+            $this->pdo->beginTransaction();
+            try {
+                $upd = $this->pdo->prepare('UPDATE custom_group_channels SET sort_order = :num WHERE custom_group_id = :gid AND channel_id = :id');
+                $num = 1;
+                foreach ($ids as $id) {
+                    $upd->execute([':num' => $num++, ':gid' => $groupId, ':id' => (int) $id]);
+                }
+                $this->pdo->commit();
+            } catch (\Throwable $e) {
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->rollBack();
+                }
+                throw $e;
+            }
+            return;
+        }
+
         $orderSql = match ($sortBy) {
             'name_asc' => "COALESCE(NULLIF(custom_name, ''), tvg_name) ASC, id ASC",
             'name_desc' => "COALESCE(NULLIF(custom_name, ''), tvg_name) DESC, id DESC",
@@ -334,9 +393,22 @@ final class ChannelRepository extends BaseRepository
             return 0;
         }
 
+        $cgStmt = $this->pdo->prepare('SELECT is_custom FROM m3u_groups WHERE id = ? LIMIT 1');
+        $cgStmt->execute([$groupId]);
+        $isCustom = (int) $cgStmt->fetchColumn() === 1;
+
         $this->pdo->beginTransaction();
         try {
-            $stmt = $this->pdo->prepare('SELECT id, tvg_name, custom_name FROM channels WHERE group_id = :gid');
+            if ($isCustom) {
+                $stmt = $this->pdo->prepare(
+                    'SELECT c.id, c.tvg_name, c.custom_name
+                     FROM channels c
+                     INNER JOIN custom_group_channels cgc ON cgc.channel_id = c.id
+                     WHERE cgc.custom_group_id = :gid AND cgc.is_ignored = 0'
+                );
+            } else {
+                $stmt = $this->pdo->prepare('SELECT id, tvg_name, custom_name FROM channels WHERE group_id = :gid');
+            }
             $stmt->execute([':gid' => $groupId]);
             $rows = $stmt->fetchAll();
 
@@ -374,5 +446,156 @@ final class ChannelRepository extends BaseRepository
             }
             throw $e;
         }
+    }
+
+    /**
+     * @return array{items: array<int, array<string, mixed>>, has_more: bool, next_offset: int, compatible_groups: array<int, array<string, mixed>>}
+     */
+    public function searchCompatibleChannels(
+        int $customGroupId,
+        string $query = '',
+        ?int $sourceGroupId = null,
+        int $limit = 20,
+        int $offset = 0,
+        string $category = '',
+        string $status = 'all',
+        string $countryTag = ''
+    ): array {
+        $grpStmt = $this->pdo->prepare('SELECT category FROM m3u_groups WHERE id = ? AND is_custom = 1 LIMIT 1');
+        $grpStmt->execute([$customGroupId]);
+        $targetCategory = $grpStmt->fetchColumn();
+        if ($targetCategory === false) {
+            return ['items' => [], 'has_more' => false, 'next_offset' => 0, 'allowed_categories' => []];
+        }
+        $targetCategory = (string) $targetCategory;
+
+        $allowedCategories = match ($targetCategory) {
+            'Film' => ['Film'],
+            'TV Series' => ['TV Series'],
+            default => ['Live TV', 'Sport', 'Animatie', 'Muziek', 'Adult'],
+        };
+
+        $limit = max(1, min(100, $limit));
+        $offset = max(0, $offset);
+
+        $where = [
+            'g.is_custom = 0',
+            "LTRIM(c.tvg_name) NOT LIKE '###%'",
+            "LTRIM(COALESCE(c.custom_name, '')) NOT LIKE '###%'",
+        ];
+        $params = [':cgid' => $customGroupId];
+
+        $cleanCategory = trim($category);
+        if ($cleanCategory !== '' && in_array($cleanCategory, $allowedCategories, true)) {
+            $where[] = "COALESCE(g.category, 'Live TV') = :selectedCategory";
+            $params[':selectedCategory'] = $cleanCategory;
+        } else {
+            $catPlaceholders = [];
+            foreach ($allowedCategories as $idx => $catVal) {
+                $key = ":acat_{$idx}";
+                $catPlaceholders[] = $key;
+                $params[$key] = $catVal;
+            }
+            $where[] = "COALESCE(g.category, 'Live TV') IN (" . implode(', ', $catPlaceholders) . ')';
+        }
+
+        if ($sourceGroupId !== null && $sourceGroupId > 0) {
+            $where[] = 'c.group_id = :sgid';
+            $params[':sgid'] = $sourceGroupId;
+        }
+
+        if ($status === 'enabled') {
+            $where[] = 'c.is_enabled = 1';
+        } elseif ($status === 'disabled') {
+            $where[] = 'c.is_enabled = 0';
+        }
+
+        $cleanTag = trim($countryTag, "[]()|: \t\n\r");
+        if ($cleanTag !== '') {
+            $pPipeEnd = '%' . $cleanTag . '|%';
+            $pPipeStart = '%|' . $cleanTag . '%';
+            $pBracket = '%[' . $cleanTag . ']%';
+            $pParen = '%(' . $cleanTag . ')%';
+            $pColon = '%' . $cleanTag . ':%';
+            $where[] = '(c.tvg_name LIKE :t1 OR c.tvg_name LIKE :t2 OR c.tvg_name LIKE :t3 OR c.tvg_name LIKE :t4 OR c.tvg_name LIKE :t9
+                         OR g.original_name LIKE :t5 OR g.original_name LIKE :t6 OR g.original_name LIKE :t7 OR g.original_name LIKE :t8 OR g.original_name LIKE :t10)';
+            $params[':t1'] = $pPipeEnd;
+            $params[':t2'] = $pPipeStart;
+            $params[':t3'] = $pBracket;
+            $params[':t4'] = $pParen;
+            $params[':t5'] = $pPipeEnd;
+            $params[':t6'] = $pPipeStart;
+            $params[':t7'] = $pBracket;
+            $params[':t8'] = $pParen;
+            $params[':t9'] = $pColon;
+            $params[':t10'] = $pColon;
+        }
+
+        $cleanQuery = trim($query);
+        if ($cleanQuery !== '') {
+            $where[] = "(LOWER(c.tvg_name) LIKE :q1 OR LOWER(COALESCE(c.custom_name, '')) LIKE :q2)";
+            $like = '%' . mb_strtolower($cleanQuery) . '%';
+            $params[':q1'] = $like;
+            $params[':q2'] = $like;
+        }
+
+        $whereSql = implode(' AND ', $where);
+        $fetchLimit = $limit + 1;
+
+        $sql = "SELECT c.id, c.tvg_name, c.custom_name, c.group_id, c.epg_channel_id, c.is_enabled,
+                       COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) AS display_name,
+                       COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS group_display_name,
+                       CASE WHEN cgc.id IS NOT NULL AND cgc.is_ignored = 0 THEN 1 ELSE 0 END AS already_in_custom
+                FROM channels c
+                INNER JOIN m3u_groups g ON g.id = c.group_id
+                LEFT JOIN custom_group_channels cgc ON cgc.channel_id = c.id AND cgc.custom_group_id = :cgid
+                WHERE {$whereSql}
+                ORDER BY c.tvg_name ASC, c.id ASC
+                LIMIT {$fetchLimit} OFFSET {$offset}";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        $hasMore = count($rows) > $limit;
+        if ($hasMore) {
+            array_pop($rows);
+        }
+
+        foreach ($rows as &$row) {
+            $inCustom = ((int) $row['already_in_custom']) === 1;
+            $row['id'] = (int) $row['id'];
+            $row['group_id'] = (int) $row['group_id'];
+            $row['is_enabled'] = ((int) $row['is_enabled']) === 1;
+            $row['already_in_custom'] = $inCustom;
+            $row['in_custom_group'] = $inCustom;
+        }
+        unset($row);
+
+        $compatibleGroups = [];
+        if ($offset === 0) {
+            $catPlaceholders2 = [];
+            $cgParams = [];
+            foreach ($allowedCategories as $idx => $catVal) {
+                $key = ":cgcat_{$idx}";
+                $catPlaceholders2[] = $key;
+                $cgParams[$key] = $catVal;
+            }
+            $cgSql = "SELECT id, COALESCE(NULLIF(custom_name, ''), original_name) AS name
+                      FROM m3u_groups
+                      WHERE is_custom = 0 AND COALESCE(category, 'Live TV') IN (" . implode(', ', $catPlaceholders2) . ')
+                      ORDER BY name ASC';
+            $cgStmt = $this->pdo->prepare($cgSql);
+            $cgStmt->execute($cgParams);
+            $compatibleGroups = $cgStmt->fetchAll();
+        }
+
+        return [
+            'items' => $rows,
+            'has_more' => $hasMore,
+            'next_offset' => $offset + count($rows),
+            'allowed_categories' => $allowedCategories,
+            'compatible_groups' => $compatibleGroups,
+        ];
     }
 }

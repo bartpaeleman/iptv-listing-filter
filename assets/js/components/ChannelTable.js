@@ -2,17 +2,28 @@ import { BaseComponent } from '../core/BaseComponent.js';
 
 export class ChannelTable extends BaseComponent {
     render() {
-        const { channels = [], isAllChannelsView = false } = this.state;
+        const { channels = [], isAllChannelsView = false, isCustomGroup = false, targetGroupId = null, targetMemberIds = [], targetGroupName = '' } = this.state;
+        const memberSet = new Set((Array.isArray(targetMemberIds) ? targetMemberIds : []).map(Number));
         this.container.innerHTML = channels.map(c => {
             const rawName = c.custom_name || c.tvg_name;
             const cleanName = c.clean_name || rawName;
             const emojiPrefix = c.emoji_prefix || '';
             const hasCustomName = Boolean(c.custom_name && String(c.custom_name).trim() !== '');
             const isEnabled = Boolean(Number(c.is_enabled));
+            const isMember = !isAllChannelsView && memberSet.has(Number(c.id));
+
+            let customActionBtn = '';
+            if (isCustomGroup && !isAllChannelsView) {
+                customActionBtn = `<button type="button" class="btn-icon-remove ch-remove-from-custom" title="Verwijderen uit custom groep">−</button>`;
+            } else if (!isCustomGroup && !isAllChannelsView && targetGroupId) {
+                customActionBtn = isMember
+                    ? `<span class="badge badge-in-group" title="Reeds in ${this.escapeHtml(targetGroupName)}">✓</span><button type="button" class="btn-icon-remove ch-toggle-target-custom" data-in-group="1" title="Verwijderen uit ${this.escapeHtml(targetGroupName)}">−</button>`
+                    : `<button type="button" class="btn-icon-add ch-toggle-target-custom" data-in-group="0" title="Toevoegen aan ${this.escapeHtml(targetGroupName)}">+</button>`;
+            }
 
             return `
-            <tr data-cid="${c.id}">
-                ${isAllChannelsView ? '' : '<td><input type="checkbox" class="ch-select" title="Selecteer kanaal voor bulkactie"></td>'}
+            <tr data-cid="${c.id}" class="${isMember ? 'row-in-custom-group' : ''}">
+                ${isAllChannelsView ? '' : `<td><input type="checkbox" class="ch-select" ${isMember ? 'disabled title="Reeds toegevoegd aan deze groep"' : 'title="Selecteer kanaal voor bulkactie"'}></td>`}
                 <td>
                     <label class="toggle-switch" title="Kanaal opnemen in actieve M3U-playlist">
                         <input type="checkbox" class="ch-enable" ${isEnabled ? 'checked' : ''}>
@@ -29,6 +40,7 @@ export class ChannelTable extends BaseComponent {
                         <input type="text" class="ch-name" value="${this.escapeHtml(cleanName)}" title="Origineel: ${this.escapeHtml(c.tvg_name || '')}">
                         <button type="button" class="btn btn-sm ch-use-original ${!hasCustomName ? 'btn-primary' : ''}" title="Originele naam gebruiken" style="min-height:44px;min-width:44px;flex-shrink:0;">↩️</button>
                         <button type="button" class="btn btn-sm ch-use-custom ${hasCustomName ? 'btn-primary' : ''}" data-emoji="${this.escapeHtml(emojiPrefix)}" title="Custom naam incl. vlag/symbool gebruiken" style="min-height:44px;min-width:44px;flex-shrink:0;">${this.escapeHtml(emojiPrefix || '✏️')}</button>
+                        ${customActionBtn}
                     </div>
                 </td>
             </tr>
@@ -72,6 +84,13 @@ export class ChannelTable extends BaseComponent {
                     ? `${emojiPrefix} ${val}`.trim()
                     : val;
                 this.props.onUpdate?.(id, { custom_name: finalName });
+            });
+            tr.querySelector('.ch-remove-from-custom')?.addEventListener('click', () => {
+                if (this.props.onRemoveFromCustomGroup) this.props.onRemoveFromCustomGroup(id);
+            });
+            tr.querySelector('.ch-toggle-target-custom')?.addEventListener('click', ev => {
+                const inGroup = ev.currentTarget.dataset.inGroup === '1';
+                if (this.props.onToggleTargetCustomGroup) this.props.onToggleTargetCustomGroup(id, inGroup);
             });
         });
     }

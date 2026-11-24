@@ -145,3 +145,10 @@
 - **Zelfherstellende SchemaMigrator (`SchemaMigrator.php`, `index.php`):**
   - `ensureSchemaUpToDate()` splitst `database/schema.sql` (na strippen van SQL-comments) en voert alle `CREATE TABLE IF NOT EXISTS` en `INSERT IGNORE` statements idempotent uit; slaat DDL over zodra `epg_sources`/`country_tags` bestaan en `schema_integrity_v2 = 1`.
   - `register_shutdown_function()` in `index.php` vangt fatale PHP-fouten op en retourneert HTTP 500 JSON.
+
+## Custom Groepen & Kanaalbeheer
+- `database/schema.sql`, `database/update.sql`, `app/Core/SchemaMigrator.php`: kolommen `is_custom`, `source_group_id`, `sync_diff_json` op `m3u_groups` en nieuwe tabel `custom_group_channels`.
+- `app/Repositories/CustomGroupRepository.php`: CRUD, conversie, kanaalkoppeling, `normalizeSortOrder()`, `reorderChannelInCustomGroup()` en `reorderCustomGroupBySort()`.
+- `app/Services/CustomGroupSyncService.php` & `app/Services/M3uParserService.php`: sync-diff evaluatie en bescherming van custom groepen.
+- `app/Repositories/ChannelRepository.php` & `app/Controllers/ChannelController.php`: `searchCompatibleChannels()`, `custom_group_*` endpoints, `bulkChannels()`, `updateChannel()` en `groupChannelTools()` voor custom groepen.
+- `assets/js/components/CustomGroupAvailableChannels.js`, `CustomGroupSyncBanner.js`, `ChannelTable.js`, `GroupList.js`, `ChannelsPage.js`, `assets/css/components.css`: UI voor custom groepen, compacte `+`/`−` icon-knoppen, en 10-rijen scrollbare database-zoeker.

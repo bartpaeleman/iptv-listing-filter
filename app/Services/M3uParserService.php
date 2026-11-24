@@ -299,7 +299,7 @@ final class M3uParserService
     private function loadGroupCache(): array
     {
         $map = [];
-        foreach ($this->pdo->query('SELECT id, original_name FROM m3u_groups')->fetchAll() as $row) {
+        foreach ($this->pdo->query('SELECT id, original_name FROM m3u_groups WHERE is_custom = 0')->fetchAll() as $row) {
             $map[(string) $row['original_name']] = (int) $row['id'];
         }
         return $map;

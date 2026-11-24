@@ -1,0 +1,392 @@
+import { BaseComponent } from '../core/BaseComponent.js';
+
+export class CustomGroupAvailableChannels extends BaseComponent {
+    constructor(el, { api, toast, onChanged } = {}) {
+        super(el);
+        this.api = api;
+        this.toast = toast;
+        this.onChanged = onChanged || (() => {});
+        this.customGroupId = null;
+        this.customGroupCategory = 'Live TV';
+        this.countryTags = [];
+        this.compatibleGroups = [];
+        this.filters = {
+            q: '',
+            country_tag: '',
+            source_group_id: '',
+            status: 'all',
+            category: '',
+        };
+        this.items = [];
+        this.seenIds = new Set();
+        this.offset = 0;
+        this.hasMore = false;
+        this.isLoading = false;
+        this.searchMode = 'search'; // 'search' | 'next' | 'done'
+        this.observer = null;
+    }
+
+    async mount(customGroupId, { category = 'Live TV', countryTags = [] } = {}) {
+        this.customGroupId = Number(customGroupId);
+        this.customGroupCategory = category || 'Live TV';
+        this.countryTags = Array.isArray(countryTags) ? countryTags : [];
+        this.compatibleGroups = [];
+        this.filters = {
+            q: '',
+            country_tag: '',
+            source_group_id: '',
+            status: 'all',
+            category: '',
+        };
+        this.searchMode = 'search';
+        this.container?.classList.remove('hidden');
+        this.renderShell();
+        await this.executeSearch();
+    }
+
+    unmount() {
+        this.customGroupId = null;
+        this.items = [];
+        this.seenIds.clear();
+        this.disconnectObserver();
+        if (this.container) {
+            this.container.innerHTML = '';
+            this.container.classList.add('hidden');
+        }
+    }
+
+    markChannelMembership(channelId, inCustomGroup) {
+        const cid = Number(channelId);
+        this.items = this.items.map(item =>
+            Number(item.id) === cid
+                ? { ...item, in_custom_group: inCustomGroup, already_in_custom: inCustomGroup }
+                : item
+        );
+        const btn = this.container?.querySelector(`.js-avail-toggle-btn[data-cid="${cid}"]`);
+        if (btn) {
+            if (inCustomGroup) {
+                btn.textContent = '−';
+                btn.title = 'Verwijder uit custom groep';
+                btn.classList.remove('btn-icon-add');
+                btn.classList.add('btn-icon-remove');
+                btn.dataset.inGroup = '1';
+            } else {
+                btn.textContent = '+';
+                btn.title = 'Toevoegen aan custom groep';
+                btn.classList.remove('btn-icon-remove');
+                btn.classList.add('btn-icon-add');
+                btn.dataset.inGroup = '0';
+            }
+        }
+    }
+
+    getAllowedCategories() {
+        if (this.customGroupCategory === 'Film') return ['Film'];
+        if (this.customGroupCategory === 'TV Series') return ['TV Series'];
+        return ['Live TV', 'Sport', 'Animatie', 'Muziek', 'Adult'];
+    }
+
+    resetToSearchMode() {
+        this.searchMode = 'search';
+        this.offset = 0;
+        this.updateSearchButton();
+    }
+
+    async executeSearch() {
+        this.readFilterInputs();
+        this.offset = 0;
+        this.hasMore = false;
+        this.items = [];
+        this.seenIds.clear();
+        const listEl = this.container?.querySelector('.js-avail-list');
+        if (listEl) listEl.innerHTML = '';
+        await this.fetchNextBatch();
+    }
+
+    readFilterInputs() {
+        const tagEl = this.container?.querySelector('#dbFilterCountryTag');
+        const srcEl = this.container?.querySelector('#dbFilterSourceGroup');
+        const qEl = this.container?.querySelector('#dbFilterQuery');
+        const statusEl = this.container?.querySelector('#dbFilterStatus');
+        const catEl = this.container?.querySelector('#dbFilterCategory');
+        if (tagEl) this.filters.country_tag = tagEl.value;
+        if (srcEl) this.filters.source_group_id = srcEl.value;
+        if (qEl) this.filters.q = qEl.value.trim();
+        if (statusEl) this.filters.status = statusEl.value;
+        if (catEl) this.filters.category = catEl.value;
+    }
+
+    async fetchNextBatch() {
+        if (!this.customGroupId || this.isLoading) return;
+        this.isLoading = true;
+        this.updateFooter();
+
+        const params = {
+            custom_group_id: this.customGroupId,
+            q: this.filters.q || '',
+            country_tag: this.filters.country_tag || '',
+            source_group_id: this.filters.source_group_id || '',
+            status: this.filters.status || 'all',
+            category: this.filters.category || '',
+            limit: 20,
+            offset: this.offset,
+        };
+
+        try {
+            const res = await this.api.get('search_compatible_channels', params);
+            if (this.offset === 0 && Array.isArray(res?.compatible_groups)) {
+                this.compatibleGroups = res.compatible_groups;
+                this.populateSourceGroups();
+            }
+            const batch = Array.isArray(res?.items) ? res.items : [];
+            const newRows = [];
+            for (const row of batch) {
+                const cid = Number(row.id);
+                if (!this.seenIds.has(cid)) {
+                    this.seenIds.add(cid);
+                    this.items.push(row);
+                    newRows.push(row);
+                }
+            }
+            this.hasMore = Boolean(res?.has_more);
+            this.offset = Number(res?.next_offset ?? this.items.length);
+            this.searchMode = this.hasMore ? 'next' : 'done';
+            this.appendRows(newRows);
+        } finally {
+            this.isLoading = false;
+            this.updateSearchButton();
+            this.updateFooter();
+            this.setupObserver();
+        }
+    }
+
+    populateSourceGroups() {
+        const srcEl = this.container?.querySelector('#dbFilterSourceGroup');
+        if (!srcEl) return;
+        const prev = srcEl.value;
+        srcEl.innerHTML = `<option value="">Alle groepen</option>` + this.compatibleGroups.map(g =>
+            `<option value="${g.id}">${this.escapeHtml(g.name || '')}</option>`
+        ).join('');
+        if (prev && this.compatibleGroups.some(g => String(g.id) === String(prev))) {
+            srcEl.value = prev;
+        }
+    }
+
+    renderShell() {
+        if (!this.container) return;
+        this.disconnectObserver();
+
+        const tagOptions = this.countryTags.map(t => {
+            const rawPattern = String(t.tag_pattern || '');
+            const cleanCode = rawPattern.replace(/[\[\]()|:]/g, '').trim();
+            const label = `${t.flag_emoji || ''} ${t.country_name || cleanCode} (${cleanCode})`.trim();
+            return `<option value="${this.escapeHtml(cleanCode)}">${this.escapeHtml(label)}</option>`;
+        }).join('');
+
+        const allowedCats = this.getAllowedCategories();
+        const catOptions = allowedCats.length > 1
+            ? `<option value="">Alle Live categorieën</option>` + allowedCats.map(c => `<option value="${c}">${c}</option>`).join('')
+            : allowedCats.map(c => `<option value="${c}">${c}</option>`).join('');
+
+        this.container.innerHTML = `
+            <div class="avail-channels-section">
+                <div class="db-channel-filter-bar" style="flex-direction:column;align-items:stretch;">
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                        <select id="dbFilterCountryTag" style="flex:1;min-width:140px;min-height:44px;font-size:16px;">
+                            <option value="">Alle landen/tags</option>
+                            ${tagOptions}
+                        </select>
+                        <select id="dbFilterSourceGroup" style="flex:1;min-width:160px;min-height:44px;font-size:16px;">
+                            <option value="">Alle groepen</option>
+                        </select>
+                        <select id="dbFilterCategory" style="flex:1;min-width:140px;min-height:44px;font-size:16px;">
+                            ${catOptions}
+                        </select>
+                    </div>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                        <input type="search" id="dbFilterQuery" placeholder="Zoek kanaalnaam..." style="flex:2;min-width:180px;min-height:44px;font-size:16px;">
+                        <select id="dbFilterStatus" style="flex:1;min-width:130px;min-height:44px;font-size:16px;">
+                            <option value="all">Alle statussen</option>
+                            <option value="enabled">Actief</option>
+                            <option value="disabled">Inactief</option>
+                        </select>
+                        <button type="button" class="btn btn-sm btn-primary" id="dbFilterSearchBtn" style="min-height:44px;">🔍 Zoeken</button>
+                    </div>
+                </div>
+                <div class="avail-channels-header">
+                    <strong>Beschikbare compatibele kanalen (database)</strong>
+                    <span class="muted js-avail-count" style="font-size:0.85rem;">0 kanalen geladen</span>
+                </div>
+                <div class="db-results-scroll-container js-avail-scroll">
+                    <div class="avail-channels-list js-avail-list"></div>
+                    <div class="avail-channels-sentinel js-avail-sentinel"></div>
+                </div>
+                <div class="db-avail-footer">
+                    <button type="button" class="btn btn-sm btn-load-more hidden" id="dbLoadMoreBtn" style="min-height:44px;">⬇️ Volgende 20 resultaten</button>
+                    <div class="muted js-avail-status" style="padding:0.4rem;text-align:center;font-size:0.85rem;"></div>
+                </div>
+            </div>
+        `;
+
+        this.bindShellEvents();
+    }
+
+    updateSearchButton() {
+        const btn = this.container?.querySelector('#dbFilterSearchBtn');
+        if (!btn) return;
+        if (this.searchMode === 'next') {
+            btn.textContent = '⬇️ Volgende 20 resultaten';
+            btn.disabled = false;
+        } else if (this.searchMode === 'done') {
+            btn.textContent = '✓ Alle resultaten geladen';
+            btn.disabled = true;
+        } else {
+            btn.textContent = '🔍 Zoeken';
+            btn.disabled = false;
+        }
+    }
+
+    bindShellEvents() {
+        this.container.querySelector('#dbFilterSearchBtn')?.addEventListener('click', () => {
+            if (this.searchMode === 'next') {
+                this.fetchNextBatch();
+            } else if (this.searchMode === 'search') {
+                this.executeSearch();
+            }
+        });
+
+        this.container.querySelector('#dbFilterQuery')?.addEventListener('input', () => {
+            this.resetToSearchMode();
+        });
+        this.container.querySelector('#dbFilterQuery')?.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.executeSearch();
+            }
+        });
+
+        ['#dbFilterCountryTag', '#dbFilterSourceGroup', '#dbFilterStatus', '#dbFilterCategory'].forEach(sel => {
+            this.container.querySelector(sel)?.addEventListener('change', () => {
+                this.resetToSearchMode();
+            });
+        });
+
+        this.container.querySelector('#dbLoadMoreBtn')?.addEventListener('click', () => this.fetchNextBatch());
+    }
+
+    appendRows(rows) {
+        const listEl = this.container?.querySelector('.js-avail-list');
+        if (!listEl) return;
+
+        const fragment = document.createElement('div');
+        fragment.innerHTML = rows.map(ch => {
+            const inGroup = Boolean(ch.in_custom_group ?? ch.already_in_custom);
+            const hasEpg = Boolean(ch.epg_channel_id && String(ch.epg_channel_id).trim() !== '');
+            const epgBadge = hasEpg
+                ? '<span class="badge badge-epg-ok" title="EPG gekoppeld">EPG</span>'
+                : '<span class="badge badge-epg-none" title="Geen EPG">Geen EPG</span>';
+            const btnClass = inGroup ? 'btn-icon-remove' : 'btn-icon-add';
+            const btnText = inGroup ? '−' : '+';
+            const btnTitle = inGroup ? 'Verwijder uit custom groep' : 'Toevoegen aan custom groep';
+            const displayName = ch.display_name || ch.tvg_name || '';
+            const rawTvgName = ch.tvg_name || '';
+
+            return `
+                <div class="avail-channel-row" data-cid="${ch.id}">
+                    <div class="avail-channel-info">
+                        <div class="avail-channel-names">
+                            <span class="avail-channel-name">${this.escapeHtml(displayName)}</span>
+                            ${rawTvgName ? `<span class="avail-channel-raw-name muted">${this.escapeHtml(rawTvgName)}</span>` : ''}
+                        </div>
+                        <span class="badge badge-group-source">${this.escapeHtml(ch.group_display_name || '')}</span>
+                        ${epgBadge}
+                    </div>
+                    <button type="button" class="js-avail-toggle-btn ${btnClass}" data-cid="${ch.id}" data-in-group="${inGroup ? '1' : '0'}" title="${btnTitle}">${btnText}</button>
+                </div>
+            `;
+        }).join('');
+
+        while (fragment.firstElementChild) {
+            const rowEl = fragment.firstElementChild;
+            const btn = rowEl.querySelector('.js-avail-toggle-btn');
+            btn?.addEventListener('click', () => this.handleToggle(btn));
+            listEl.appendChild(rowEl);
+        }
+    }
+
+    async handleToggle(btn) {
+        if (!this.customGroupId) return;
+        const cid = Number(btn.dataset.cid);
+        const currentlyInGroup = btn.dataset.inGroup === '1';
+        btn.disabled = true;
+
+        try {
+            if (currentlyInGroup) {
+                await this.api.post('custom_group_remove_channels', {
+                    custom_group_id: this.customGroupId,
+                    channel_ids: [cid],
+                });
+                this.markChannelMembership(cid, false);
+                this.toast?.show('Kanaal verwijderd uit custom groep');
+            } else {
+                await this.api.post('custom_group_add_channels', {
+                    custom_group_id: this.customGroupId,
+                    channel_ids: [cid],
+                });
+                this.markChannelMembership(cid, true);
+                this.toast?.show('Kanaal toegevoegd aan custom groep');
+            }
+            await this.onChanged();
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    updateFooter() {
+        const countEl = this.container?.querySelector('.js-avail-count');
+        const statusEl = this.container?.querySelector('.js-avail-status');
+        const loadMoreBtn = this.container?.querySelector('#dbLoadMoreBtn');
+
+        if (countEl) {
+            countEl.textContent = this.hasMore
+                ? `${this.items.length} kanalen geladen`
+                : `Alle ${this.items.length} resultaten geladen`;
+        }
+        if (loadMoreBtn) {
+            loadMoreBtn.classList.toggle('hidden', !this.hasMore || this.isLoading);
+        }
+        if (statusEl) {
+            if (this.isLoading) {
+                statusEl.textContent = 'Kanalen laden...';
+            } else if (this.items.length === 0) {
+                statusEl.textContent = 'Geen compatibele kanalen gevonden voor de huidige filters.';
+            } else {
+                statusEl.textContent = this.hasMore
+                    ? 'Scroll omlaag of klik op "Volgende 20 resultaten"'
+                    : `Alle ${this.items.length} resultaten geladen`;
+            }
+        }
+    }
+
+    disconnectObserver() {
+        if (this.observer) {
+            this.observer.disconnect();
+            this.observer = null;
+        }
+    }
+
+    setupObserver() {
+        this.disconnectObserver();
+        if (!this.hasMore) return;
+        const sentinel = this.container?.querySelector('.js-avail-sentinel');
+        const scrollContainer = this.container?.querySelector('.js-avail-scroll');
+        if (!sentinel || typeof IntersectionObserver === 'undefined') return;
+
+        this.observer = new IntersectionObserver(entries => {
+            if (entries.some(e => e.isIntersecting) && this.hasMore && !this.isLoading) {
+                this.fetchNextBatch();
+            }
+        }, { root: scrollContainer || null, rootMargin: '120px' });
+        this.observer.observe(sentinel);
+    }
+}
