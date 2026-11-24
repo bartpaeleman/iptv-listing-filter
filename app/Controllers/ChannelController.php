@@ -521,7 +521,7 @@ final class ChannelController extends BaseController
             $this->jsonError('Ongeldige modus.', 400);
         }
 
-        (new \App\Services\ViewCacheService())->invalidateGroupChannels($groupId);
+        (new \App\Services\ViewCacheService())->invalidateAll();
 
         $refreshed = $repo->filter($groupId, '', '', false, 200, 0, '', 'all', 'number');
         $this->jsonSuccess([

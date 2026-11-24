@@ -393,9 +393,22 @@ final class ChannelRepository extends BaseRepository
             return 0;
         }
 
+        $cgStmt = $this->pdo->prepare('SELECT is_custom FROM m3u_groups WHERE id = ? LIMIT 1');
+        $cgStmt->execute([$groupId]);
+        $isCustom = (int) $cgStmt->fetchColumn() === 1;
+
         $this->pdo->beginTransaction();
         try {
-            $stmt = $this->pdo->prepare('SELECT id, tvg_name, custom_name FROM channels WHERE group_id = :gid');
+            if ($isCustom) {
+                $stmt = $this->pdo->prepare(
+                    'SELECT c.id, c.tvg_name, c.custom_name
+                     FROM channels c
+                     INNER JOIN custom_group_channels cgc ON cgc.channel_id = c.id
+                     WHERE cgc.custom_group_id = :gid AND cgc.is_ignored = 0'
+                );
+            } else {
+                $stmt = $this->pdo->prepare('SELECT id, tvg_name, custom_name FROM channels WHERE group_id = :gid');
+            }
             $stmt->execute([':gid' => $groupId]);
             $rows = $stmt->fetchAll();
 
