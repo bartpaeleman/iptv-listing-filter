@@ -763,3 +763,33 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; }
     height: 4px;
     width: 100%;
 }
+
+.btn-xs-success {
+    background: #16a34a;
+    color: #fff;
+    border: none;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    cursor: pointer;
+    min-height: 32px;
+}
+
+.btn-xs-success:hover {
+    background: #15803d;
+}
+
+.btn-xs-danger {
+    background: #dc2626;
+    color: #fff;
+    border: none;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    cursor: pointer;
+    min-height: 32px;
+}
+
+.btn-xs-danger:hover {
+    background: #b91c1c;
+}

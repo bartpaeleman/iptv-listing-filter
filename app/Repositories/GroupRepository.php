@@ -109,7 +109,7 @@ final class GroupRepository extends BaseRepository
      */
     public function searchGroups(string $query, array $contentTypes = [], string $status = 'disabled', int $limit = 100, int $offset = 0, array $categories = []): array
     {
-        $where = ['1=1'];
+        $where = ['g.is_custom = 0'];
         $params = [];
 
         if ($query !== '') {

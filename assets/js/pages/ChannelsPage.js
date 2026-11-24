@@ -288,7 +288,7 @@ export class ChannelsPage extends BaseComponent {
                     const targetBar = compatibleCustom.length > 0 ? `
                         <div class="preview-target-bar">
                             <label class="muted" style="font-size:0.85rem;">Doelgroep:</label>
-                            <select class="js-preview-target-group" style="min-height:44px;font-size:16px;">
+                            <select class="preview-target-custom-group" style="min-height:44px;font-size:16px;">
                                 ${compatibleCustom.map(g => `<option value="${g.id}">${this.escapeHtml(g.custom_name || g.original_name || '')}</option>`).join('')}
                             </select>
                         </div>
@@ -300,15 +300,15 @@ export class ChannelsPage extends BaseComponent {
                         const isMember = memberSet.has(Number(c.id));
                         const actionHtml = compatibleCustom.length > 0
                             ? (isMember
-                                ? `<button type="button" class="btn btn-sm badge-in-group" disabled>✓ In groep</button>`
-                                : `<button type="button" class="btn btn-sm btn-primary js-preview-add-ch" data-cid="${c.id}">+ Toevoegen</button>`)
+                                ? `<button type="button" class="btn btn-xs-danger js-preview-toggle-ch" data-cid="${c.id}" data-in-group="1">Verwijderen</button>`
+                                : `<button type="button" class="btn btn-xs-success js-preview-toggle-ch" data-cid="${c.id}" data-in-group="0">+ Toevoegen</button>`)
                             : '';
                         return `<div class="preview-channel-row"><span>${chName}</span><div style="display:flex;align-items:center;gap:0.5rem;"><span class="muted">${on ? '✅ Aan' : '⬜ Uit'}</span>${actionHtml}</div></div>`;
                     }).join('');
 
                     box.innerHTML = targetBar + rowsHtml;
 
-                    const sel = box.querySelector('.js-preview-target-group');
+                    const sel = box.querySelector('.preview-target-custom-group');
                     if (sel) {
                         if (box.dataset.selectedTargetId) {
                             sel.value = box.dataset.selectedTargetId;
@@ -320,21 +320,42 @@ export class ChannelsPage extends BaseComponent {
                         });
                     }
 
-                    box.querySelectorAll('.js-preview-add-ch').forEach(addBtn => {
-                        addBtn.addEventListener('click', async () => {
-                            const targetId = Number(box.querySelector('.js-preview-target-group')?.value || compatibleCustom[0]?.id || 0);
-                            const cid = Number(addBtn.dataset.cid);
+                    box.querySelectorAll('.js-preview-toggle-ch').forEach(toggleBtn => {
+                        toggleBtn.addEventListener('click', async () => {
+                            const targetId = Number(box.querySelector('.preview-target-custom-group')?.value || compatibleCustom[0]?.id || 0);
+                            const cid = Number(toggleBtn.dataset.cid);
+                            const inGroup = toggleBtn.dataset.inGroup === '1';
                             if (!targetId || !cid) return;
-                            await this.props.api.post('custom_group_add_channels', {
-                                custom_group_id: targetId,
-                                channel_ids: [cid],
-                            });
-                            addBtn.textContent = '✓ In groep';
-                            addBtn.classList.remove('btn-primary');
-                            addBtn.classList.add('badge-in-group');
-                            addBtn.disabled = true;
-                            this.props.toast?.show('Kanaal toegevoegd aan custom groep');
-                            await this.loadGroupsOnly?.();
+
+                            toggleBtn.disabled = true;
+                            try {
+                                if (inGroup) {
+                                    await this.props.api.post('custom_group_remove_channels', {
+                                        custom_group_id: targetId,
+                                        channel_ids: [cid],
+                                    });
+                                    memberSet.delete(cid);
+                                    toggleBtn.dataset.inGroup = '0';
+                                    toggleBtn.textContent = '+ Toevoegen';
+                                    toggleBtn.classList.remove('btn-xs-danger');
+                                    toggleBtn.classList.add('btn-xs-success');
+                                    this.props.toast?.show('Kanaal verwijderd uit custom groep');
+                                } else {
+                                    await this.props.api.post('custom_group_add_channels', {
+                                        custom_group_id: targetId,
+                                        channel_ids: [cid],
+                                    });
+                                    memberSet.add(cid);
+                                    toggleBtn.dataset.inGroup = '1';
+                                    toggleBtn.textContent = 'Verwijderen';
+                                    toggleBtn.classList.remove('btn-xs-success');
+                                    toggleBtn.classList.add('btn-xs-danger');
+                                    this.props.toast?.show('Kanaal toegevoegd aan custom groep');
+                                }
+                                await this.loadGroupsOnly?.();
+                            } finally {
+                                toggleBtn.disabled = false;
+                            }
                         });
                     });
                 };
