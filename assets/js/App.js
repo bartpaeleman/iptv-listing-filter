@@ -30,6 +30,7 @@ class App {
                     if (!el) return;
                     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
                     let currentLines = 10;
+                    let currentFile = 'app.log';
 
                     el.innerHTML = `
                         <div class="card" style="margin-bottom:1rem;">
@@ -41,10 +42,14 @@ class App {
 
                         <div class="card">
                             <div class="card-header" style="margin-bottom:0.5rem;">
-                                <h2>Applicatie Log (<code>storage/logs/app.log</code>)</h2>
+                                <h2>Applicatie Log (<code id="appLogPath">storage/logs/app.log</code>)</h2>
                                 <span id="appLogMeta" class="muted" style="font-size:0.85rem;">Laden...</span>
                             </div>
                             <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
+                                <select id="logFileSelect" aria-label="Logbestand" style="min-height:44px;font-size:16px;padding:0.25rem 0.5rem;">
+                                    <option value="app.log" selected>Applicatie Log (app.log)</option>
+                                    <option value="sync.log">Sync Log (sync.log)</option>
+                                </select>
                                 <button type="button" id="logFewerBtn" class="btn btn-sm" style="min-height:44px;">Minder (-10)</button>
                                 <select id="logLinesSelect" style="min-height:44px;font-size:16px;padding:0.25rem 0.5rem;">
                                     <option value="5">5 regels</option>
@@ -65,12 +70,16 @@ class App {
                     const loadLogs = async () => {
                         const box = document.getElementById('appLogBox');
                         const meta = document.getElementById('appLogMeta');
+                        const pathEl = document.getElementById('appLogPath');
                         const sel = document.getElementById('logLinesSelect');
+                        if (pathEl) {
+                            pathEl.textContent = `storage/logs/${currentFile}`;
+                        }
                         if (sel && Array.from(sel.options).some(o => Number(o.value) === currentLines)) {
                             sel.value = String(currentLines);
                         }
                         try {
-                            const res = await this.api.get('app_logs', { lines: currentLines });
+                            const res = await this.api.get('app_logs', { lines: currentLines, file: currentFile });
                             const lines = res.lines || [];
                             if (meta) {
                                 meta.textContent = `${res.total_lines ?? 0} regels totaal • ${res.file_size_kb ?? 0} KB${res.updated_at ? ` • ${res.updated_at}` : ''}`;
@@ -104,6 +113,10 @@ class App {
                         }
                     });
 
+                    document.getElementById('logFileSelect')?.addEventListener('change', e => {
+                        currentFile = e.target.value === 'sync.log' ? 'sync.log' : 'app.log';
+                        loadLogs();
+                    });
                     document.getElementById('logFewerBtn')?.addEventListener('click', () => {
                         currentLines = Math.max(5, currentLines - 10);
                         loadLogs();
@@ -166,9 +179,9 @@ class App {
                         }
                     });
                     document.getElementById('logClearBtn')?.addEventListener('click', async () => {
-                        if (!confirm('Weet je zeker dat je storage/logs/app.log wilt wissen?')) return;
-                        await this.api.post('clear_app_logs');
-                        this.toast.show('Applicatie log gewist!');
+                        if (!confirm(`Weet je zeker dat je storage/logs/${currentFile} wilt wissen?`)) return;
+                        await this.api.post('clear_app_logs', { file: currentFile });
+                        this.toast.show(`${currentFile} gewist!`);
                         loadLogs();
                     });
 
