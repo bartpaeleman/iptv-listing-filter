@@ -48,7 +48,7 @@ final class PlaylistExporterService
                     UNION ALL
 
                     SELECT c.tvg_id, c.tvg_name, c.tvg_logo, c.stream_url, c.custom_name,
-                           c.channel_number, c.epg_channel_id,
+                           cgc.sort_order AS channel_number, c.epg_channel_id,
                            COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS group_name,
                            COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS g_name, g.import_order AS g_import_order, g.id AS g_id,
                            0 AS ch_num, cgc.sort_order AS ch_sort, c.id AS ch_id

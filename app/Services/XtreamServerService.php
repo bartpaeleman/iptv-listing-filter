@@ -140,7 +140,7 @@ final class XtreamServerService
                     UNION ALL
 
                     SELECT c.id, g.id AS group_id, c.tvg_id, c.tvg_name, c.tvg_logo, c.custom_name,
-                           c.channel_number, c.epg_channel_id,
+                           cgc.sort_order AS channel_number, c.epg_channel_id,
                            COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS g_name, g.import_order AS g_import_order, g.id AS g_id,
                            0 AS ch_num, cgc.sort_order AS ch_sort
                     FROM custom_group_channels cgc
@@ -187,7 +187,15 @@ final class XtreamServerService
             "SELECT c.epg_channel_id, c.tvg_id
              FROM channels c
              INNER JOIN m3u_groups g ON g.id = c.group_id
-             WHERE c.id = ? AND g.is_enabled = 1 AND c.is_enabled = 1
+             WHERE c.id = ? AND c.is_enabled = 1
+               AND (
+                   g.is_enabled = 1
+                   OR EXISTS (
+                       SELECT 1 FROM custom_group_channels cgc
+                       INNER JOIN m3u_groups cg ON cg.id = cgc.custom_group_id
+                       WHERE cgc.channel_id = c.id AND cgc.is_ignored = 0 AND cg.is_custom = 1 AND cg.is_enabled = 1
+                   )
+               )
              LIMIT 1"
         );
         $stmt->execute([$streamId]);

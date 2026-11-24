@@ -30,7 +30,15 @@ final class EpgExporterService
              FROM epg_channels ec
              INNER JOIN channels c ON c.epg_channel_id = ec.epg_id
              INNER JOIN m3u_groups g ON g.id = c.group_id
-             WHERE g.is_enabled = 1 AND c.is_enabled = 1
+             WHERE c.is_enabled = 1
+               AND (
+                   g.is_enabled = 1
+                   OR EXISTS (
+                       SELECT 1 FROM custom_group_channels cgc
+                       INNER JOIN m3u_groups cg ON cg.id = cgc.custom_group_id
+                       WHERE cgc.channel_id = c.id AND cgc.is_ignored = 0 AND cg.is_custom = 1 AND cg.is_enabled = 1
+                   )
+               )
              ORDER BY ec.display_name ASC"
         );
 
