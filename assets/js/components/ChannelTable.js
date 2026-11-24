@@ -15,10 +15,6 @@ export class ChannelTable extends BaseComponent {
             let customActionBtn = '';
             if (isCustomGroup && !isAllChannelsView) {
                 customActionBtn = `<button type="button" class="btn-icon-remove ch-remove-from-custom" title="Verwijder uit custom groep">−</button>`;
-            } else if (!isCustomGroup && !isAllChannelsView && targetGroupId) {
-                customActionBtn = isMember
-                    ? `<button type="button" class="btn-icon-remove ch-toggle-target-custom" data-in-group="1" title="Verwijder uit ${this.escapeHtml(targetGroupName)}">−</button>`
-                    : `<button type="button" class="btn-icon-add ch-toggle-target-custom" data-in-group="0" title="Toevoegen aan ${this.escapeHtml(targetGroupName)}">+</button>`;
             }
 
             return `
