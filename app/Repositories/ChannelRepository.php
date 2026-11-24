@@ -404,7 +404,9 @@ final class ChannelRepository extends BaseRepository
         int $limit = 50,
         int $offset = 0,
         string $category = '',
-        string $status = 'all'
+        string $status = 'all',
+        string $countryTagId = '',
+        string $hasEpg = ''
     ): array {
         $grpStmt = $this->pdo->prepare('SELECT content_type FROM m3u_groups WHERE id = ? AND is_custom = 1 LIMIT 1');
         $grpStmt->execute([$customGroupId]);
@@ -445,6 +447,19 @@ final class ChannelRepository extends BaseRepository
             $where[] = 'c.is_enabled = 0';
         }
 
+        if ($countryTagId === 'untagged') {
+            $where[] = 'c.country_tag_id IS NULL';
+        } elseif ($countryTagId !== '' && ctype_digit($countryTagId)) {
+            $where[] = 'c.country_tag_id = :ctid';
+            $params[':ctid'] = (int) $countryTagId;
+        }
+
+        if ($hasEpg === 'yes') {
+            $where[] = "c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> ''";
+        } elseif ($hasEpg === 'no') {
+            $where[] = "(c.epg_channel_id IS NULL OR c.epg_channel_id = '')";
+        }
+
         $cleanQuery = trim($query);
         if ($cleanQuery !== '') {
             $where[] = '(c.tvg_name LIKE :q1 OR c.custom_name LIKE :q2 OR g.original_name LIKE :q3)';
@@ -457,7 +472,7 @@ final class ChannelRepository extends BaseRepository
         $whereSql = implode(' AND ', $where);
         $fetchLimit = $limit + 1;
 
-        $sql = "SELECT c.id, c.tvg_name, c.custom_name, c.group_id, c.epg_channel_id,
+        $sql = "SELECT c.id, c.tvg_name, c.custom_name, c.group_id, c.epg_channel_id, c.is_enabled,
                        COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) AS display_name,
                        COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS group_display_name,
                        CASE WHEN cgc.id IS NOT NULL AND cgc.is_ignored = 0 THEN 1 ELSE 0 END AS already_in_custom
@@ -465,7 +480,7 @@ final class ChannelRepository extends BaseRepository
                 INNER JOIN m3u_groups g ON g.id = c.group_id
                 LEFT JOIN custom_group_channels cgc ON cgc.channel_id = c.id AND cgc.custom_group_id = :cgid
                 WHERE {$whereSql}
-                ORDER BY g.original_name ASC, COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC
+                ORDER BY c.tvg_name ASC, c.id ASC
                 LIMIT {$fetchLimit} OFFSET {$offset}";
 
         $stmt = $this->pdo->prepare($sql);
@@ -478,9 +493,12 @@ final class ChannelRepository extends BaseRepository
         }
 
         foreach ($rows as &$row) {
+            $inCustom = ((int) $row['already_in_custom']) === 1;
             $row['id'] = (int) $row['id'];
             $row['group_id'] = (int) $row['group_id'];
-            $row['already_in_custom'] = ((int) $row['already_in_custom']) === 1;
+            $row['is_enabled'] = ((int) $row['is_enabled']) === 1;
+            $row['already_in_custom'] = $inCustom;
+            $row['in_custom_group'] = $inCustom;
         }
         unset($row);
 

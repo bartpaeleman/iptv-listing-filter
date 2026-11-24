@@ -4,6 +4,7 @@ import { GroupList } from '../components/GroupList.js';
 import { ChannelTable } from '../components/ChannelTable.js';
 import { CustomGroupSyncBanner } from '../components/CustomGroupSyncBanner.js';
 import { CustomGroupChannelPicker } from '../components/CustomGroupChannelPicker.js';
+import { CustomGroupAvailableChannels } from '../components/CustomGroupAvailableChannels.js';
 import { GroupChannelToolsBar } from '../components/GroupChannelToolsBar.js';
 
 export class ChannelsPage extends BaseComponent {
@@ -483,6 +484,7 @@ export class ChannelsPage extends BaseComponent {
                             <tbody id="channelsTableRoot"></tbody>
                         </table>
                     </div>
+                    <div id="customGroupAvailableChannelsRoot" class="hidden"></div>
                     </div>
                     <div id="groupAddPanel" class="hidden">
                         <div class="card-header">
@@ -594,6 +596,15 @@ export class ChannelsPage extends BaseComponent {
             toast: this.props.toast,
             onAdded: async () => {
                 await this.load();
+            }
+        });
+
+        this.availableChannels = new CustomGroupAvailableChannels('#customGroupAvailableChannelsRoot', {
+            api: this.props.api,
+            toast: this.props.toast,
+            onChanged: async () => {
+                await this.loadChannels();
+                await this.loadGroupsOnly?.();
             }
         });
 
@@ -981,6 +992,7 @@ export class ChannelsPage extends BaseComponent {
                 custom_group_id: this.selectedGroupId,
                 channel_ids: ids,
             });
+            ids.forEach(cid => this.availableChannels?.markChannelMembership(cid, false));
             this.props.toast?.show(`${ids.length} kanaal/kanalen verwijderd uit custom groep`);
             await this.load();
         });
@@ -1027,8 +1039,20 @@ export class ChannelsPage extends BaseComponent {
 
         if (isCustom && selected) {
             this.syncBanner?.setData(Number(selected.id), selected.sync_diff_json || null);
+            const filters = {
+                q: document.getElementById('channelSearchInput')?.value || '',
+                country_tag_id: document.getElementById('channelCountryFilter')?.value || '',
+                status: document.getElementById('channelStatusFilter')?.value || 'all',
+                has_epg: document.getElementById('channelEpgFilter')?.value || 'all',
+            };
+            if (this.availableChannels?.customGroupId === Number(selected.id)) {
+                await this.availableChannels.setFilters(filters);
+            } else {
+                await this.availableChannels?.mount(Number(selected.id), filters);
+            }
         } else {
             this.syncBanner?.setData(null, null);
+            this.availableChannels?.unmount();
         }
 
         const targetBar = document.getElementById('customGroupTargetBar');
