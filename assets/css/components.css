@@ -820,3 +820,17 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; }
 .btn-load-more:hover {
     background: rgba(255, 255, 255, 0.14);
 }
+
+.avail-channel-names {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.avail-channel-raw-name {
+    font-size: 0.78rem;
+    opacity: 0.75;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

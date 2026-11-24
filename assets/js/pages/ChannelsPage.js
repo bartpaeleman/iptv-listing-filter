@@ -582,6 +582,17 @@ export class ChannelsPage extends BaseComponent {
                 await this.props.api.post('update_channel', { id, ...payload });
                 this.props.toast.show('Kanaal bijgewerkt');
             },
+            onRemoveFromCustomGroup: async id => {
+                if (!this.selectedGroupId) return;
+                await this.props.api.post('custom_group_remove_channels', {
+                    custom_group_id: this.selectedGroupId,
+                    channel_ids: [id],
+                });
+                this.availableChannels?.markChannelMembership(id, false);
+                this.props.toast?.show('Kanaal verwijderd uit custom groep');
+                await this.loadChannels();
+                await this.loadGroupsOnly?.();
+            },
             onSelectionChange: count => {
                 const enableBtn = document.getElementById('bulkEnableChannelsBtn');
                 const disableBtn = document.getElementById('bulkDisableChannelsBtn');
@@ -1058,7 +1069,8 @@ export class ChannelsPage extends BaseComponent {
         const selected = this.selectedGroupId
             ? groups.find(g => Number(g.id) === Number(this.selectedGroupId))
             : null;
-        const isCustom = selected && Number(selected.is_custom || 0) === 1;
+        const isCustom = Boolean(selected && Number(selected.is_custom || 0) === 1);
+        this.channelTable?.setState({ isCustomGroup: isCustom });
 
         document.getElementById('convertToCustomBtn')?.classList.toggle('hidden', !selected || isCustom);
         document.getElementById('openCustomChannelPickerBtn')?.classList.toggle('hidden', !isCustom);

@@ -9,9 +9,11 @@ export class CustomGroupAvailableChannels extends BaseComponent {
         this.customGroupId = null;
         this.customGroupCategory = 'Live TV';
         this.countryTags = [];
+        this.compatibleGroups = [];
         this.filters = {
             q: '',
             country_tag: '',
+            source_group_id: '',
             status: 'all',
             category: '',
         };
@@ -20,6 +22,7 @@ export class CustomGroupAvailableChannels extends BaseComponent {
         this.offset = 0;
         this.hasMore = false;
         this.isLoading = false;
+        this.searchMode = 'search'; // 'search' | 'next' | 'done'
         this.observer = null;
     }
 
@@ -27,12 +30,15 @@ export class CustomGroupAvailableChannels extends BaseComponent {
         this.customGroupId = Number(customGroupId);
         this.customGroupCategory = category || 'Live TV';
         this.countryTags = Array.isArray(countryTags) ? countryTags : [];
+        this.compatibleGroups = [];
         this.filters = {
             q: '',
             country_tag: '',
+            source_group_id: '',
             status: 'all',
             category: '',
         };
+        this.searchMode = 'search';
         this.container?.classList.remove('hidden');
         this.renderShell();
         await this.executeSearch();
@@ -78,6 +84,12 @@ export class CustomGroupAvailableChannels extends BaseComponent {
         return ['Live TV', 'Sport', 'Animatie', 'Muziek', 'Adult'];
     }
 
+    resetToSearchMode() {
+        this.searchMode = 'search';
+        this.offset = 0;
+        this.updateSearchButton();
+    }
+
     async executeSearch() {
         this.readFilterInputs();
         this.offset = 0;
@@ -91,10 +103,12 @@ export class CustomGroupAvailableChannels extends BaseComponent {
 
     readFilterInputs() {
         const tagEl = this.container?.querySelector('#dbFilterCountryTag');
+        const srcEl = this.container?.querySelector('#dbFilterSourceGroup');
         const qEl = this.container?.querySelector('#dbFilterQuery');
         const statusEl = this.container?.querySelector('#dbFilterStatus');
         const catEl = this.container?.querySelector('#dbFilterCategory');
         if (tagEl) this.filters.country_tag = tagEl.value;
+        if (srcEl) this.filters.source_group_id = srcEl.value;
         if (qEl) this.filters.q = qEl.value.trim();
         if (statusEl) this.filters.status = statusEl.value;
         if (catEl) this.filters.category = catEl.value;
@@ -109,6 +123,7 @@ export class CustomGroupAvailableChannels extends BaseComponent {
             custom_group_id: this.customGroupId,
             q: this.filters.q || '',
             country_tag: this.filters.country_tag || '',
+            source_group_id: this.filters.source_group_id || '',
             status: this.filters.status || 'all',
             category: this.filters.category || '',
             limit: 20,
@@ -117,6 +132,10 @@ export class CustomGroupAvailableChannels extends BaseComponent {
 
         try {
             const res = await this.api.get('search_compatible_channels', params);
+            if (this.offset === 0 && Array.isArray(res?.compatible_groups)) {
+                this.compatibleGroups = res.compatible_groups;
+                this.populateSourceGroups();
+            }
             const batch = Array.isArray(res?.items) ? res.items : [];
             const newRows = [];
             for (const row of batch) {
@@ -129,11 +148,25 @@ export class CustomGroupAvailableChannels extends BaseComponent {
             }
             this.hasMore = Boolean(res?.has_more);
             this.offset = Number(res?.next_offset ?? this.items.length);
+            this.searchMode = this.hasMore ? 'next' : 'done';
             this.appendRows(newRows);
         } finally {
             this.isLoading = false;
+            this.updateSearchButton();
             this.updateFooter();
             this.setupObserver();
+        }
+    }
+
+    populateSourceGroups() {
+        const srcEl = this.container?.querySelector('#dbFilterSourceGroup');
+        if (!srcEl) return;
+        const prev = srcEl.value;
+        srcEl.innerHTML = `<option value="">Alle groepen</option>` + this.compatibleGroups.map(g =>
+            `<option value="${g.id}">${this.escapeHtml(g.name || '')}</option>`
+        ).join('');
+        if (prev && this.compatibleGroups.some(g => String(g.id) === String(prev))) {
+            srcEl.value = prev;
         }
     }
 
@@ -143,7 +176,7 @@ export class CustomGroupAvailableChannels extends BaseComponent {
 
         const tagOptions = this.countryTags.map(t => {
             const rawPattern = String(t.tag_pattern || '');
-            const cleanCode = rawPattern.replace(/[\[\]()|]/g, '').trim();
+            const cleanCode = rawPattern.replace(/[\[\]()|:]/g, '').trim();
             const label = `${t.flag_emoji || ''} ${t.country_name || cleanCode} (${cleanCode})`.trim();
             return `<option value="${this.escapeHtml(cleanCode)}">${this.escapeHtml(label)}</option>`;
         }).join('');
@@ -160,7 +193,10 @@ export class CustomGroupAvailableChannels extends BaseComponent {
                         <option value="">Alle landen/tags</option>
                         ${tagOptions}
                     </select>
-                    <input type="search" id="dbFilterQuery" placeholder="Zoek kanaalnaam..." style="flex:2;min-width:180px;min-height:44px;font-size:16px;">
+                    <select id="dbFilterSourceGroup" style="min-height:44px;font-size:16px;max-width:220px;">
+                        <option value="">Alle groepen</option>
+                    </select>
+                    <input type="search" id="dbFilterQuery" placeholder="Zoek kanaalnaam..." style="flex:2;min-width:160px;min-height:44px;font-size:16px;">
                     <select id="dbFilterStatus" style="min-height:44px;font-size:16px;">
                         <option value="all">Alle statussen</option>
                         <option value="enabled">Actief</option>
@@ -178,7 +214,7 @@ export class CustomGroupAvailableChannels extends BaseComponent {
                 <div class="avail-channels-list js-avail-list"></div>
                 <div class="avail-channels-sentinel js-avail-sentinel"></div>
                 <div class="db-avail-footer">
-                    <button type="button" class="btn btn-sm btn-load-more hidden" id="dbLoadMoreBtn" style="min-height:44px;">⬇️ Volgende 20 laden</button>
+                    <button type="button" class="btn btn-sm btn-load-more hidden" id="dbLoadMoreBtn" style="min-height:44px;">⬇️ Volgende 20 resultaten</button>
                     <div class="muted js-avail-status" style="padding:0.4rem;text-align:center;font-size:0.85rem;"></div>
                 </div>
             </div>
@@ -187,14 +223,46 @@ export class CustomGroupAvailableChannels extends BaseComponent {
         this.bindShellEvents();
     }
 
+    updateSearchButton() {
+        const btn = this.container?.querySelector('#dbFilterSearchBtn');
+        if (!btn) return;
+        if (this.searchMode === 'next') {
+            btn.textContent = '⬇️ Volgende 20 resultaten';
+            btn.disabled = false;
+        } else if (this.searchMode === 'done') {
+            btn.textContent = '✓ Alle resultaten geladen';
+            btn.disabled = true;
+        } else {
+            btn.textContent = '🔍 Zoeken';
+            btn.disabled = false;
+        }
+    }
+
     bindShellEvents() {
-        this.container.querySelector('#dbFilterSearchBtn')?.addEventListener('click', () => this.executeSearch());
+        this.container.querySelector('#dbFilterSearchBtn')?.addEventListener('click', () => {
+            if (this.searchMode === 'next') {
+                this.fetchNextBatch();
+            } else if (this.searchMode === 'search') {
+                this.executeSearch();
+            }
+        });
+
+        this.container.querySelector('#dbFilterQuery')?.addEventListener('input', () => {
+            this.resetToSearchMode();
+        });
         this.container.querySelector('#dbFilterQuery')?.addEventListener('keydown', e => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 this.executeSearch();
             }
         });
+
+        ['#dbFilterCountryTag', '#dbFilterSourceGroup', '#dbFilterStatus', '#dbFilterCategory'].forEach(sel => {
+            this.container.querySelector(sel)?.addEventListener('change', () => {
+                this.resetToSearchMode();
+            });
+        });
+
         this.container.querySelector('#dbLoadMoreBtn')?.addEventListener('click', () => this.fetchNextBatch());
     }
 
@@ -211,11 +279,16 @@ export class CustomGroupAvailableChannels extends BaseComponent {
                 : '<span class="badge badge-epg-none" title="Geen EPG">Geen EPG</span>';
             const btnClass = inGroup ? 'btn-avail-remove' : 'btn-avail-add';
             const btnText = inGroup ? 'Verwijderen' : '+ Toevoegen';
+            const displayName = ch.display_name || ch.tvg_name || '';
+            const rawTvgName = ch.tvg_name || '';
 
             return `
                 <div class="avail-channel-row" data-cid="${ch.id}">
                     <div class="avail-channel-info">
-                        <span class="avail-channel-name">${this.escapeHtml(ch.display_name || ch.tvg_name || '')}</span>
+                        <div class="avail-channel-names">
+                            <span class="avail-channel-name">${this.escapeHtml(displayName)}</span>
+                            ${rawTvgName ? `<span class="avail-channel-raw-name muted">${this.escapeHtml(rawTvgName)}</span>` : ''}
+                        </div>
                         <span class="badge badge-group-source">${this.escapeHtml(ch.group_display_name || '')}</span>
                         ${epgBadge}
                     </div>
@@ -280,7 +353,7 @@ export class CustomGroupAvailableChannels extends BaseComponent {
                 statusEl.textContent = 'Geen compatibele kanalen gevonden voor de huidige filters.';
             } else {
                 statusEl.textContent = this.hasMore
-                    ? 'Scroll omlaag of klik op "Volgende 20 laden"'
+                    ? 'Scroll omlaag of klik op "Volgende 20 resultaten"'
                     : `Alle ${this.items.length} resultaten geladen`;
             }
         }

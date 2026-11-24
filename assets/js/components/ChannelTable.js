@@ -2,7 +2,7 @@ import { BaseComponent } from '../core/BaseComponent.js';
 
 export class ChannelTable extends BaseComponent {
     render() {
-        const { channels = [], isAllChannelsView = false, targetMemberIds = [], targetGroupName = '' } = this.state;
+        const { channels = [], isAllChannelsView = false, isCustomGroup = false, targetMemberIds = [], targetGroupName = '' } = this.state;
         const memberSet = new Set((Array.isArray(targetMemberIds) ? targetMemberIds : []).map(Number));
         this.container.innerHTML = channels.map(c => {
             const rawName = c.custom_name || c.tvg_name;
@@ -32,6 +32,7 @@ export class ChannelTable extends BaseComponent {
                         ${isMember ? `<span class="badge badge-in-group" title="Reeds toegevoegd aan deze groep">✓ In ${this.escapeHtml(targetGroupName)}</span>` : ''}
                         <button type="button" class="btn btn-sm ch-use-original ${!hasCustomName ? 'btn-primary' : ''}" title="Originele naam gebruiken" style="min-height:44px;min-width:44px;flex-shrink:0;">↩️</button>
                         <button type="button" class="btn btn-sm ch-use-custom ${hasCustomName ? 'btn-primary' : ''}" data-emoji="${this.escapeHtml(emojiPrefix)}" title="Custom naam incl. vlag/symbool gebruiken" style="min-height:44px;min-width:44px;flex-shrink:0;">${this.escapeHtml(emojiPrefix || '✏️')}</button>
+                        ${isCustomGroup && !isAllChannelsView ? `<button type="button" class="btn btn-xs-danger ch-remove-from-custom" title="Verwijder uit custom groep" style="flex-shrink:0;">🗑️ Verwijderen</button>` : ''}
                     </div>
                 </td>
             </tr>
@@ -75,6 +76,9 @@ export class ChannelTable extends BaseComponent {
                     ? `${emojiPrefix} ${val}`.trim()
                     : val;
                 this.props.onUpdate?.(id, { custom_name: finalName });
+            });
+            tr.querySelector('.ch-remove-from-custom')?.addEventListener('click', () => {
+                if (this.props.onRemoveFromCustomGroup) this.props.onRemoveFromCustomGroup(id);
             });
         });
     }

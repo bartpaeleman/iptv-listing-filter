@@ -452,14 +452,15 @@ final class ChannelRepository extends BaseRepository
             $where[] = 'c.is_enabled = 0';
         }
 
-        $cleanTag = trim($countryTag, "[]()| \t\n\r");
+        $cleanTag = trim($countryTag, "[]()|: \t\n\r");
         if ($cleanTag !== '') {
             $pPipeEnd = '%' . $cleanTag . '|%';
             $pPipeStart = '%|' . $cleanTag . '%';
             $pBracket = '%[' . $cleanTag . ']%';
             $pParen = '%(' . $cleanTag . ')%';
-            $where[] = '(c.tvg_name LIKE :t1 OR c.tvg_name LIKE :t2 OR c.tvg_name LIKE :t3 OR c.tvg_name LIKE :t4
-                         OR g.original_name LIKE :t5 OR g.original_name LIKE :t6 OR g.original_name LIKE :t7 OR g.original_name LIKE :t8)';
+            $pColon = '%' . $cleanTag . ':%';
+            $where[] = '(c.tvg_name LIKE :t1 OR c.tvg_name LIKE :t2 OR c.tvg_name LIKE :t3 OR c.tvg_name LIKE :t4 OR c.tvg_name LIKE :t9
+                         OR g.original_name LIKE :t5 OR g.original_name LIKE :t6 OR g.original_name LIKE :t7 OR g.original_name LIKE :t8 OR g.original_name LIKE :t10)';
             $params[':t1'] = $pPipeEnd;
             $params[':t2'] = $pPipeStart;
             $params[':t3'] = $pBracket;
@@ -468,6 +469,8 @@ final class ChannelRepository extends BaseRepository
             $params[':t6'] = $pPipeStart;
             $params[':t7'] = $pBracket;
             $params[':t8'] = $pParen;
+            $params[':t9'] = $pColon;
+            $params[':t10'] = $pColon;
         }
 
         $cleanQuery = trim($query);
@@ -511,11 +514,30 @@ final class ChannelRepository extends BaseRepository
         }
         unset($row);
 
+        $compatibleGroups = [];
+        if ($offset === 0) {
+            $catPlaceholders2 = [];
+            $cgParams = [];
+            foreach ($allowedCategories as $idx => $catVal) {
+                $key = ":cgcat_{$idx}";
+                $catPlaceholders2[] = $key;
+                $cgParams[$key] = $catVal;
+            }
+            $cgSql = "SELECT id, COALESCE(NULLIF(custom_name, ''), original_name) AS name
+                      FROM m3u_groups
+                      WHERE is_custom = 0 AND COALESCE(category, 'Live TV') IN (" . implode(', ', $catPlaceholders2) . ')
+                      ORDER BY name ASC';
+            $cgStmt = $this->pdo->prepare($cgSql);
+            $cgStmt->execute($cgParams);
+            $compatibleGroups = $cgStmt->fetchAll();
+        }
+
         return [
             'items' => $rows,
             'has_more' => $hasMore,
             'next_offset' => $offset + count($rows),
             'allowed_categories' => $allowedCategories,
+            'compatible_groups' => $compatibleGroups,
         ];
     }
 }
