@@ -665,15 +665,14 @@ final class ChannelController extends BaseController
         $sourceGroupId = isset($_GET['source_group_id']) && $_GET['source_group_id'] !== ''
             ? (int) $_GET['source_group_id']
             : null;
-        $limit = (int) ($_GET['limit'] ?? 50);
+        $limit = (int) ($_GET['limit'] ?? 20);
         $offset = (int) ($_GET['offset'] ?? 0);
         $category = (string) ($_GET['category'] ?? '');
         $status = (string) ($_GET['status'] ?? 'all');
-        $countryTagId = (string) ($_GET['country_tag_id'] ?? '');
-        $hasEpg = (string) ($_GET['has_epg'] ?? '');
+        $countryTag = (string) ($_GET['country_tag'] ?? '');
 
         $repo = new ChannelRepository();
-        $result = $repo->searchCompatibleChannels($customGroupId, $q, $sourceGroupId, $limit, $offset, $category, $status, $countryTagId, $hasEpg);
+        $result = $repo->searchCompatibleChannels($customGroupId, $q, $sourceGroupId, $limit, $offset, $category, $status, $countryTag);
         $this->jsonSuccess($result);
     }
 

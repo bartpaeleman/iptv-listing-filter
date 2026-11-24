@@ -7,11 +7,13 @@ export class CustomGroupAvailableChannels extends BaseComponent {
         this.toast = toast;
         this.onChanged = onChanged || (() => {});
         this.customGroupId = null;
+        this.customGroupCategory = 'Live TV';
+        this.countryTags = [];
         this.filters = {
             q: '',
-            country_tag_id: '',
+            country_tag: '',
             status: 'all',
-            has_epg: 'all',
+            category: '',
         };
         this.items = [];
         this.seenIds = new Set();
@@ -21,11 +23,19 @@ export class CustomGroupAvailableChannels extends BaseComponent {
         this.observer = null;
     }
 
-    async mount(customGroupId, filters = {}) {
+    async mount(customGroupId, { category = 'Live TV', countryTags = [] } = {}) {
         this.customGroupId = Number(customGroupId);
-        this.filters = { ...this.filters, ...filters };
+        this.customGroupCategory = category || 'Live TV';
+        this.countryTags = Array.isArray(countryTags) ? countryTags : [];
+        this.filters = {
+            q: '',
+            country_tag: '',
+            status: 'all',
+            category: '',
+        };
         this.container?.classList.remove('hidden');
-        await this.reload();
+        this.renderShell();
+        await this.executeSearch();
     }
 
     unmount() {
@@ -37,12 +47,6 @@ export class CustomGroupAvailableChannels extends BaseComponent {
             this.container.innerHTML = '';
             this.container.classList.add('hidden');
         }
-    }
-
-    async setFilters(filters = {}) {
-        if (!this.customGroupId) return;
-        this.filters = { ...this.filters, ...filters };
-        await this.reload();
     }
 
     markChannelMembership(channelId, inCustomGroup) {
@@ -68,27 +72,46 @@ export class CustomGroupAvailableChannels extends BaseComponent {
         }
     }
 
-    async reload() {
+    getAllowedCategories() {
+        if (this.customGroupCategory === 'Film') return ['Film'];
+        if (this.customGroupCategory === 'TV Series') return ['TV Series'];
+        return ['Live TV', 'Sport', 'Animatie', 'Muziek', 'Adult'];
+    }
+
+    async executeSearch() {
+        this.readFilterInputs();
         this.offset = 0;
         this.hasMore = false;
         this.items = [];
         this.seenIds.clear();
-        this.renderShell();
+        const listEl = this.container?.querySelector('.js-avail-list');
+        if (listEl) listEl.innerHTML = '';
         await this.fetchNextBatch();
+    }
+
+    readFilterInputs() {
+        const tagEl = this.container?.querySelector('#dbFilterCountryTag');
+        const qEl = this.container?.querySelector('#dbFilterQuery');
+        const statusEl = this.container?.querySelector('#dbFilterStatus');
+        const catEl = this.container?.querySelector('#dbFilterCategory');
+        if (tagEl) this.filters.country_tag = tagEl.value;
+        if (qEl) this.filters.q = qEl.value.trim();
+        if (statusEl) this.filters.status = statusEl.value;
+        if (catEl) this.filters.category = catEl.value;
     }
 
     async fetchNextBatch() {
         if (!this.customGroupId || this.isLoading) return;
         this.isLoading = true;
-        this.updateStatusText('Kanalen laden...');
+        this.updateFooter();
 
         const params = {
             custom_group_id: this.customGroupId,
             q: this.filters.q || '',
-            country_tag_id: this.filters.country_tag_id || '',
+            country_tag: this.filters.country_tag || '',
             status: this.filters.status || 'all',
-            has_epg: this.filters.has_epg && this.filters.has_epg !== 'all' ? this.filters.has_epg : '',
-            limit: 50,
+            category: this.filters.category || '',
+            limit: 20,
             offset: this.offset,
         };
 
@@ -109,11 +132,7 @@ export class CustomGroupAvailableChannels extends BaseComponent {
             this.appendRows(newRows);
         } finally {
             this.isLoading = false;
-            this.updateStatusText(
-                this.items.length === 0
-                    ? 'Geen compatibele kanalen gevonden voor de huidige filters.'
-                    : (this.hasMore ? 'Scroll omlaag voor meer...' : `${this.items.length} kanalen geladen`)
-            );
+            this.updateFooter();
             this.setupObserver();
         }
     }
@@ -121,17 +140,62 @@ export class CustomGroupAvailableChannels extends BaseComponent {
     renderShell() {
         if (!this.container) return;
         this.disconnectObserver();
+
+        const tagOptions = this.countryTags.map(t => {
+            const rawPattern = String(t.tag_pattern || '');
+            const cleanCode = rawPattern.replace(/[\[\]()|]/g, '').trim();
+            const label = `${t.flag_emoji || ''} ${t.country_name || cleanCode} (${cleanCode})`.trim();
+            return `<option value="${this.escapeHtml(cleanCode)}">${this.escapeHtml(label)}</option>`;
+        }).join('');
+
+        const allowedCats = this.getAllowedCategories();
+        const catOptions = allowedCats.length > 1
+            ? `<option value="">Alle Live categorieën</option>` + allowedCats.map(c => `<option value="${c}">${c}</option>`).join('')
+            : allowedCats.map(c => `<option value="${c}">${c}</option>`).join('');
+
         this.container.innerHTML = `
             <div class="avail-channels-section">
+                <div class="db-channel-filter-bar">
+                    <select id="dbFilterCountryTag" style="min-height:44px;font-size:16px;">
+                        <option value="">Alle landen/tags</option>
+                        ${tagOptions}
+                    </select>
+                    <input type="search" id="dbFilterQuery" placeholder="Zoek kanaalnaam..." style="flex:2;min-width:180px;min-height:44px;font-size:16px;">
+                    <select id="dbFilterStatus" style="min-height:44px;font-size:16px;">
+                        <option value="all">Alle statussen</option>
+                        <option value="enabled">Actief</option>
+                        <option value="disabled">Inactief</option>
+                    </select>
+                    <select id="dbFilterCategory" style="min-height:44px;font-size:16px;">
+                        ${catOptions}
+                    </select>
+                    <button type="button" class="btn btn-sm btn-primary" id="dbFilterSearchBtn" style="min-height:44px;">🔍 Zoeken</button>
+                </div>
                 <div class="avail-channels-header">
                     <strong>Beschikbare compatibele kanalen (database)</strong>
-                    <span class="muted js-avail-count" style="font-size:0.85rem;"></span>
+                    <span class="muted js-avail-count" style="font-size:0.85rem;">0 kanalen geladen</span>
                 </div>
                 <div class="avail-channels-list js-avail-list"></div>
                 <div class="avail-channels-sentinel js-avail-sentinel"></div>
-                <div class="muted js-avail-status" style="padding:0.5rem;text-align:center;font-size:0.85rem;"></div>
+                <div class="db-avail-footer">
+                    <button type="button" class="btn btn-sm btn-load-more hidden" id="dbLoadMoreBtn" style="min-height:44px;">⬇️ Volgende 20 laden</button>
+                    <div class="muted js-avail-status" style="padding:0.4rem;text-align:center;font-size:0.85rem;"></div>
+                </div>
             </div>
         `;
+
+        this.bindShellEvents();
+    }
+
+    bindShellEvents() {
+        this.container.querySelector('#dbFilterSearchBtn')?.addEventListener('click', () => this.executeSearch());
+        this.container.querySelector('#dbFilterQuery')?.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.executeSearch();
+            }
+        });
+        this.container.querySelector('#dbLoadMoreBtn')?.addEventListener('click', () => this.fetchNextBatch());
     }
 
     appendRows(rows) {
@@ -166,11 +230,6 @@ export class CustomGroupAvailableChannels extends BaseComponent {
             btn?.addEventListener('click', () => this.handleToggle(btn));
             listEl.appendChild(rowEl);
         }
-
-        const countEl = this.container?.querySelector('.js-avail-count');
-        if (countEl) {
-            countEl.textContent = `${this.items.length} getoond`;
-        }
     }
 
     async handleToggle(btn) {
@@ -201,9 +260,30 @@ export class CustomGroupAvailableChannels extends BaseComponent {
         }
     }
 
-    updateStatusText(text) {
-        const el = this.container?.querySelector('.js-avail-status');
-        if (el) el.textContent = text;
+    updateFooter() {
+        const countEl = this.container?.querySelector('.js-avail-count');
+        const statusEl = this.container?.querySelector('.js-avail-status');
+        const loadMoreBtn = this.container?.querySelector('#dbLoadMoreBtn');
+
+        if (countEl) {
+            countEl.textContent = this.hasMore
+                ? `${this.items.length} kanalen geladen`
+                : `Alle ${this.items.length} resultaten geladen`;
+        }
+        if (loadMoreBtn) {
+            loadMoreBtn.classList.toggle('hidden', !this.hasMore || this.isLoading);
+        }
+        if (statusEl) {
+            if (this.isLoading) {
+                statusEl.textContent = 'Kanalen laden...';
+            } else if (this.items.length === 0) {
+                statusEl.textContent = 'Geen compatibele kanalen gevonden voor de huidige filters.';
+            } else {
+                statusEl.textContent = this.hasMore
+                    ? 'Scroll omlaag of klik op "Volgende 20 laden"'
+                    : `Alle ${this.items.length} resultaten geladen`;
+            }
+        }
     }
 
     disconnectObserver() {

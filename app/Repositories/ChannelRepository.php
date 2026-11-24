@@ -401,44 +401,49 @@ final class ChannelRepository extends BaseRepository
         int $customGroupId,
         string $query = '',
         ?int $sourceGroupId = null,
-        int $limit = 50,
+        int $limit = 20,
         int $offset = 0,
         string $category = '',
         string $status = 'all',
-        string $countryTagId = '',
-        string $hasEpg = ''
+        string $countryTag = ''
     ): array {
-        $grpStmt = $this->pdo->prepare('SELECT content_type FROM m3u_groups WHERE id = ? AND is_custom = 1 LIMIT 1');
+        $grpStmt = $this->pdo->prepare('SELECT category FROM m3u_groups WHERE id = ? AND is_custom = 1 LIMIT 1');
         $grpStmt->execute([$customGroupId]);
-        $targetContentType = $grpStmt->fetchColumn();
-        if ($targetContentType === false) {
-            return ['items' => [], 'has_more' => false, 'next_offset' => 0, 'compatible_groups' => []];
+        $targetCategory = $grpStmt->fetchColumn();
+        if ($targetCategory === false) {
+            return ['items' => [], 'has_more' => false, 'next_offset' => 0, 'allowed_categories' => []];
         }
-        $targetContentType = (string) $targetContentType;
+        $targetCategory = (string) $targetCategory;
+
+        $allowedCategories = match ($targetCategory) {
+            'Film' => ['Film'],
+            'TV Series' => ['TV Series'],
+            default => ['Live TV', 'Sport', 'Animatie', 'Muziek', 'Adult'],
+        };
 
         $limit = max(1, min(100, $limit));
         $offset = max(0, $offset);
 
-        $where = [
-            'g.is_custom = 0',
-            'g.content_type = :ct',
-            'c.content_type = :cct',
-        ];
-        $params = [
-            ':cgid' => $customGroupId,
-            ':ct' => $targetContentType,
-            ':cct' => $targetContentType,
-        ];
+        $where = ['g.is_custom = 0'];
+        $params = [':cgid' => $customGroupId];
+
+        $cleanCategory = trim($category);
+        if ($cleanCategory !== '' && in_array($cleanCategory, $allowedCategories, true)) {
+            $where[] = "COALESCE(g.category, 'Live TV') = :selectedCategory";
+            $params[':selectedCategory'] = $cleanCategory;
+        } else {
+            $catPlaceholders = [];
+            foreach ($allowedCategories as $idx => $catVal) {
+                $key = ":acat_{$idx}";
+                $catPlaceholders[] = $key;
+                $params[$key] = $catVal;
+            }
+            $where[] = "COALESCE(g.category, 'Live TV') IN (" . implode(', ', $catPlaceholders) . ')';
+        }
 
         if ($sourceGroupId !== null && $sourceGroupId > 0) {
             $where[] = 'c.group_id = :sgid';
             $params[':sgid'] = $sourceGroupId;
-        }
-
-        $cleanCategory = trim($category);
-        if ($cleanCategory !== '') {
-            $where[] = 'g.category = :cat';
-            $params[':cat'] = $cleanCategory;
         }
 
         if ($status === 'enabled') {
@@ -447,38 +452,30 @@ final class ChannelRepository extends BaseRepository
             $where[] = 'c.is_enabled = 0';
         }
 
-        if ($countryTagId === 'untagged') {
-            $where[] = 'c.country_tag_id IS NULL';
-        } elseif ($countryTagId !== '' && ctype_digit($countryTagId)) {
-            $ctIdInt = (int) $countryTagId;
-            $tagStmt = $this->pdo->prepare('SELECT tag_pattern FROM country_tags WHERE id = ? LIMIT 1');
-            $tagStmt->execute([$ctIdInt]);
-            $tagPattern = $tagStmt->fetchColumn();
-            if ($tagPattern !== false && trim((string) $tagPattern) !== '') {
-                $patLike = '%' . trim((string) $tagPattern) . '%';
-                $where[] = '(c.country_tag_id = :ctid OR c.tvg_name LIKE :tagPat1 OR g.original_name LIKE :tagPat2)';
-                $params[':ctid'] = $ctIdInt;
-                $params[':tagPat1'] = $patLike;
-                $params[':tagPat2'] = $patLike;
-            } else {
-                $where[] = 'c.country_tag_id = :ctid';
-                $params[':ctid'] = $ctIdInt;
-            }
-        }
-
-        if ($hasEpg === 'yes') {
-            $where[] = "c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> ''";
-        } elseif ($hasEpg === 'no') {
-            $where[] = "(c.epg_channel_id IS NULL OR c.epg_channel_id = '')";
+        $cleanTag = trim($countryTag, "[]()| \t\n\r");
+        if ($cleanTag !== '') {
+            $pPipeEnd = '%' . $cleanTag . '|%';
+            $pPipeStart = '%|' . $cleanTag . '%';
+            $pBracket = '%[' . $cleanTag . ']%';
+            $pParen = '%(' . $cleanTag . ')%';
+            $where[] = '(c.tvg_name LIKE :t1 OR c.tvg_name LIKE :t2 OR c.tvg_name LIKE :t3 OR c.tvg_name LIKE :t4
+                         OR g.original_name LIKE :t5 OR g.original_name LIKE :t6 OR g.original_name LIKE :t7 OR g.original_name LIKE :t8)';
+            $params[':t1'] = $pPipeEnd;
+            $params[':t2'] = $pPipeStart;
+            $params[':t3'] = $pBracket;
+            $params[':t4'] = $pParen;
+            $params[':t5'] = $pPipeEnd;
+            $params[':t6'] = $pPipeStart;
+            $params[':t7'] = $pBracket;
+            $params[':t8'] = $pParen;
         }
 
         $cleanQuery = trim($query);
         if ($cleanQuery !== '') {
-            $where[] = "(LOWER(c.tvg_name) LIKE :q1 OR LOWER(COALESCE(c.custom_name, '')) LIKE :q2 OR LOWER(g.original_name) LIKE :q3)";
+            $where[] = "(LOWER(c.tvg_name) LIKE :q1 OR LOWER(COALESCE(c.custom_name, '')) LIKE :q2)";
             $like = '%' . mb_strtolower($cleanQuery) . '%';
             $params[':q1'] = $like;
             $params[':q2'] = $like;
-            $params[':q3'] = $like;
         }
 
         $whereSql = implode(' AND ', $where);
@@ -514,23 +511,11 @@ final class ChannelRepository extends BaseRepository
         }
         unset($row);
 
-        $compatibleGroups = [];
-        if ($offset === 0) {
-            $cgStmt = $this->pdo->prepare(
-                'SELECT id, COALESCE(NULLIF(custom_name, \'\'), original_name) AS name
-                 FROM m3u_groups
-                 WHERE is_custom = 0 AND content_type = ?
-                 ORDER BY name ASC'
-            );
-            $cgStmt->execute([$targetContentType]);
-            $compatibleGroups = $cgStmt->fetchAll();
-        }
-
         return [
             'items' => $rows,
             'has_more' => $hasMore,
             'next_offset' => $offset + count($rows),
-            'compatible_groups' => $compatibleGroups,
+            'allowed_categories' => $allowedCategories,
         ];
     }
 }

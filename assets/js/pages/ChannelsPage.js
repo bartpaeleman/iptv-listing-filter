@@ -473,7 +473,7 @@ export class ChannelsPage extends BaseComponent {
                             <button class="btn btn-sm" id="bulkDisableChannelsBtn">Selectie Uit</button>
                         </div>
                     </div>
-                    <div class="toolbar" style="flex-wrap:wrap;">
+                    <div class="toolbar" id="channelsFilterToolbar" style="flex-wrap:wrap;">
                         <input type="search" id="channelSearchInput" placeholder="Zoek kanaalnaam..." style="flex:2;min-width:180px;">
                         <select id="channelCountryFilter" style="flex:1;min-width:140px;"><option value="">Alle landen/tags</option></select>
                         <select id="channelStatusFilter" style="flex:1;min-width:120px;">
@@ -1078,27 +1078,25 @@ export class ChannelsPage extends BaseComponent {
 
         const tableWrap = document.getElementById('channelsTableWrap');
         const toolsMount = document.getElementById('groupChannelToolsMount');
+        const filterToolbar = document.getElementById('channelsFilterToolbar');
         if (isCustom && this.isCustomAddMode) {
             tableWrap?.classList.add('hidden');
             toolsMount?.classList.add('hidden');
+            filterToolbar?.classList.add('hidden');
         } else {
             tableWrap?.classList.remove('hidden');
             toolsMount?.classList.remove('hidden');
+            filterToolbar?.classList.remove('hidden');
         }
 
         if (isCustom && selected) {
             this.syncBanner?.setData(Number(selected.id), selected.sync_diff_json || null);
             if (this.isCustomAddMode) {
-                const filters = {
-                    q: document.getElementById('channelSearchInput')?.value || '',
-                    country_tag_id: document.getElementById('channelCountryFilter')?.value || '',
-                    status: document.getElementById('channelStatusFilter')?.value || 'all',
-                    has_epg: document.getElementById('channelEpgFilter')?.value || 'all',
-                };
-                if (this.availableChannels?.customGroupId === Number(selected.id)) {
-                    await this.availableChannels.setFilters(filters);
-                } else {
-                    await this.availableChannels?.mount(Number(selected.id), filters);
+                if (this.availableChannels?.customGroupId !== Number(selected.id)) {
+                    await this.availableChannels?.mount(Number(selected.id), {
+                        category: selected.category || 'Live TV',
+                        countryTags: this.countryTags || [],
+                    });
                 }
             } else {
                 this.availableChannels?.unmount();
