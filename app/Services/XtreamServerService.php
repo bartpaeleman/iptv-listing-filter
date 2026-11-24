@@ -135,7 +135,7 @@ final class XtreamServerService
                     FROM channels c
                     INNER JOIN m3u_groups g ON g.id = c.group_id
                     WHERE g.is_custom = 0 AND g.is_enabled = 1 AND c.is_enabled = 1
-                      AND COALESCE(g.category, 'Live TV') NOT IN ('Film', 'TV Series'){$catFilter}
+                      AND COALESCE(g.category, 'Live TV') NOT IN ('Film', 'TV Series')
 
                     UNION ALL
 
@@ -147,50 +147,48 @@ final class XtreamServerService
                     INNER JOIN m3u_groups g ON g.id = cgc.custom_group_id
                     INNER JOIN channels c ON c.id = cgc.channel_id
                     WHERE g.is_custom = 1 AND g.is_enabled = 1 AND c.is_enabled = 1 AND cgc.is_ignored = 0
-                      AND COALESCE(g.category, 'Live TV') NOT IN ('Film', 'TV Series'){$catFilter}
+                      AND COALESCE(g.category, 'Live TV') NOT IN ('Film', 'TV Series')
                 ) AS live_rows
                 ORDER BY is_custom_entry DESC, {$groupOrder}, ch_num ASC, ch_sort ASC, id ASC";
 
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
+        $stmt = $this->pdo->query($sql);
         $rows = $stmt->fetchAll();
 
-        $categoryIdsByStream = [];
-        foreach ($rows as $r) {
-            $sid = (int) $r['id'];
-            $gid = (string) $r['group_id'];
-            if (!isset($categoryIdsByStream[$sid])) {
-                $categoryIdsByStream[$sid] = [];
-            }
-            if (!in_array($gid, $categoryIdsByStream[$sid], true)) {
-                $categoryIdsByStream[$sid][] = $gid;
+        $grouped = [];
+        $num = 1;
+        foreach ($rows as $row) {
+            $streamId = (int) $row['id'];
+            $gid = (int) $row['group_id'];
+            if (!isset($grouped[$streamId])) {
+                $epgId = trim((string) ($row['epg_channel_id'] ?: $row['tvg_id'] ?: ''));
+                $name = ChannelNameCleanerService::stripQualityTags((string) ($row['custom_name'] ?: $row['tvg_name'] ?: 'Channel'));
+                $grouped[$streamId] = [
+                    'num' => $row['channel_number'] !== null ? (int) $row['channel_number'] : $num,
+                    'name' => $name,
+                    'stream_type' => 'live',
+                    'stream_id' => $streamId,
+                    'stream_icon' => (string) ($row['tvg_logo'] ?? ''),
+                    'epg_channel_id' => $epgId,
+                    'added' => '0',
+                    'category_id' => (string) $gid,
+                    'category_ids' => [$gid],
+                    'custom_sid' => '',
+                    'tv_archive' => 0,
+                    'direct_source' => '',
+                    'tv_archive_duration' => 0,
+                ];
+                $num++;
+            } elseif (!in_array($gid, $grouped[$streamId]['category_ids'], true)) {
+                $grouped[$streamId]['category_ids'][] = $gid;
             }
         }
 
-        $streams = [];
-        $num = 1;
-        foreach ($rows as $row) {
-            $epgId = (string) ($row['epg_channel_id'] ?: $row['tvg_id'] ?: '');
-            $name = ChannelNameCleanerService::stripQualityTags((string) ($row['custom_name'] ?: $row['tvg_name'] ?: 'Channel'));
-            $streamId = (int) $row['id'];
-            $gid = (string) $row['group_id'];
-
-            $streams[] = [
-                'num' => $row['channel_number'] !== null ? (int) $row['channel_number'] : $num,
-                'name' => $name,
-                'stream_type' => 'live',
-                'stream_id' => $streamId,
-                'stream_icon' => (string) ($row['tvg_logo'] ?? ''),
-                'epg_channel_id' => $epgId,
-                'added' => '0',
-                'category_id' => $gid,
-                'category_ids' => $categoryIdsByStream[$streamId] ?? [$gid],
-                'custom_sid' => '',
-                'tv_archive' => 0,
-                'direct_source' => '',
-                'tv_archive_duration' => 0,
-            ];
-            $num++;
+        $streams = array_values($grouped);
+        if ($categoryId !== null && $categoryId > 0) {
+            $streams = array_values(array_filter(
+                $streams,
+                static fn(array $item): bool => in_array($categoryId, $item['category_ids'], true)
+            ));
         }
 
         return $streams;
