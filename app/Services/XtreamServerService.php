@@ -126,10 +126,10 @@ final class XtreamServerService
             $params = [$categoryId, $categoryId];
         }
 
-        $sql = "SELECT id, group_id, tvg_id, tvg_name, tvg_logo, custom_name, channel_number, epg_channel_id
+        $sql = "SELECT id, group_id, tvg_id, tvg_name, tvg_logo, custom_name, channel_number, epg_channel_id, is_custom_entry
                 FROM (
                     SELECT c.id, c.group_id, c.tvg_id, c.tvg_name, c.tvg_logo, c.custom_name,
-                           c.channel_number, c.epg_channel_id,
+                           c.channel_number, c.epg_channel_id, 0 AS is_custom_entry,
                            g.original_name AS g_name, g.import_order AS g_import_order, g.id AS g_id,
                            COALESCE(c.channel_number, 999999) AS ch_num, c.sort_order AS ch_sort
                     FROM channels c
@@ -140,7 +140,7 @@ final class XtreamServerService
                     UNION ALL
 
                     SELECT c.id, g.id AS group_id, c.tvg_id, c.tvg_name, c.tvg_logo, c.custom_name,
-                           cgc.sort_order AS channel_number, c.epg_channel_id,
+                           cgc.sort_order AS channel_number, c.epg_channel_id, 1 AS is_custom_entry,
                            COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS g_name, g.import_order AS g_import_order, g.id AS g_id,
                            0 AS ch_num, cgc.sort_order AS ch_sort
                     FROM custom_group_channels cgc
@@ -149,17 +149,31 @@ final class XtreamServerService
                     WHERE g.is_custom = 1 AND g.is_enabled = 1 AND c.is_enabled = 1 AND cgc.is_ignored = 0
                       AND COALESCE(g.category, 'Live TV') NOT IN ('Film', 'TV Series'){$catFilter}
                 ) AS live_rows
-                ORDER BY {$groupOrder}, ch_num ASC, ch_sort ASC, id ASC";
+                ORDER BY is_custom_entry DESC, {$groupOrder}, ch_num ASC, ch_sort ASC, id ASC";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        $categoryIdsByStream = [];
+        foreach ($rows as $r) {
+            $sid = (int) $r['id'];
+            $gid = (string) $r['group_id'];
+            if (!isset($categoryIdsByStream[$sid])) {
+                $categoryIdsByStream[$sid] = [];
+            }
+            if (!in_array($gid, $categoryIdsByStream[$sid], true)) {
+                $categoryIdsByStream[$sid][] = $gid;
+            }
+        }
 
         $streams = [];
         $num = 1;
-        while ($row = $stmt->fetch()) {
+        foreach ($rows as $row) {
             $epgId = (string) ($row['epg_channel_id'] ?: $row['tvg_id'] ?: '');
             $name = ChannelNameCleanerService::stripQualityTags((string) ($row['custom_name'] ?: $row['tvg_name'] ?: 'Channel'));
             $streamId = (int) $row['id'];
+            $gid = (string) $row['group_id'];
 
             $streams[] = [
                 'num' => $row['channel_number'] !== null ? (int) $row['channel_number'] : $num,
@@ -169,7 +183,8 @@ final class XtreamServerService
                 'stream_icon' => (string) ($row['tvg_logo'] ?? ''),
                 'epg_channel_id' => $epgId,
                 'added' => '0',
-                'category_id' => (string) $row['group_id'],
+                'category_id' => $gid,
+                'category_ids' => $categoryIdsByStream[$streamId] ?? [$gid],
                 'custom_sid' => '',
                 'tv_archive' => 0,
                 'direct_source' => '',
@@ -249,7 +264,15 @@ final class XtreamServerService
             "SELECT c.stream_url
              FROM channels c
              INNER JOIN m3u_groups g ON g.id = c.group_id
-             WHERE c.id = ? AND g.is_enabled = 1 AND c.is_enabled = 1
+             WHERE c.id = ? AND c.is_enabled = 1
+               AND (
+                   g.is_enabled = 1
+                   OR EXISTS (
+                       SELECT 1 FROM custom_group_channels cgc
+                       INNER JOIN m3u_groups cg ON cg.id = cgc.custom_group_id
+                       WHERE cgc.channel_id = c.id AND cgc.is_ignored = 0 AND cg.is_custom = 1 AND cg.is_enabled = 1
+                   )
+               )
              LIMIT 1"
         );
         $stmt->execute([$streamId]);
