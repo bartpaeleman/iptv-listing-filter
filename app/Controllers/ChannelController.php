@@ -340,13 +340,25 @@ final class ChannelController extends BaseController
         $search = trim((string) ($input['search'] ?? ''));
 
         $repo = new ChannelRepository();
-        $repo->bulkSetEnabled($enable, $ids, $groupId, $search);
-        $viewCache = new ViewCacheService();
+        $isCustomGroup = false;
         if ($groupId !== null && $groupId > 0) {
-            $repo->normalizeActiveGroupNumbers($groupId);
-            $viewCache->invalidateGroupChannels($groupId);
-        } else {
+            $cgRow = (new \App\Repositories\CustomGroupRepository())->findById($groupId);
+            $isCustomGroup = $cgRow !== null && (int) ($cgRow['is_custom'] ?? 0) === 1;
+        }
+
+        if ($isCustomGroup && $ids !== []) {
+            $repo->bulkSetEnabled($enable, $ids, null, '');
+            $viewCache = new ViewCacheService();
             $viewCache->invalidateAll();
+        } else {
+            $repo->bulkSetEnabled($enable, $ids, $groupId, $search);
+            $viewCache = new ViewCacheService();
+            if ($groupId !== null && $groupId > 0) {
+                $repo->normalizeActiveGroupNumbers($groupId);
+                $viewCache->invalidateGroupChannels($groupId);
+            } else {
+                $viewCache->invalidateAll();
+            }
         }
         $viewCache->invalidateGroupsCache();
         $viewCache->invalidateDashboardStats();

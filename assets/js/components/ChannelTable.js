@@ -14,7 +14,11 @@ export class ChannelTable extends BaseComponent {
 
             let customActionBtn = '';
             if (isCustomGroup && !isAllChannelsView) {
-                customActionBtn = `<button type="button" class="btn-icon-remove ch-remove-from-custom" title="Verwijder uit custom groep">−</button>`;
+                customActionBtn = `<button type="button" class="btn-icon-remove ch-remove-from-custom" title="Verwijderen uit custom groep">−</button>`;
+            } else if (!isCustomGroup && !isAllChannelsView && targetGroupId) {
+                customActionBtn = isMember
+                    ? `<span class="badge badge-in-group" title="Reeds in ${this.escapeHtml(targetGroupName)}">✓</span><button type="button" class="btn-icon-remove ch-toggle-target-custom" data-in-group="1" title="Verwijderen uit ${this.escapeHtml(targetGroupName)}">−</button>`
+                    : `<button type="button" class="btn-icon-add ch-toggle-target-custom" data-in-group="0" title="Toevoegen aan ${this.escapeHtml(targetGroupName)}">+</button>`;
             }
 
             return `
@@ -34,7 +38,6 @@ export class ChannelTable extends BaseComponent {
                     <div style="display:flex;align-items:center;gap:0.4rem;">
                         ${emojiPrefix ? `<span class="ch-emoji-prefix" title="${this.escapeHtml(c.tvg_name || '')}">${this.escapeHtml(emojiPrefix)}</span>` : ''}
                         <input type="text" class="ch-name" value="${this.escapeHtml(cleanName)}" title="Origineel: ${this.escapeHtml(c.tvg_name || '')}">
-                        ${isMember ? `<span class="badge badge-in-group" title="Reeds toegevoegd aan deze groep">✓ In ${this.escapeHtml(targetGroupName)}</span>` : ''}
                         <button type="button" class="btn btn-sm ch-use-original ${!hasCustomName ? 'btn-primary' : ''}" title="Originele naam gebruiken" style="min-height:44px;min-width:44px;flex-shrink:0;">↩️</button>
                         <button type="button" class="btn btn-sm ch-use-custom ${hasCustomName ? 'btn-primary' : ''}" data-emoji="${this.escapeHtml(emojiPrefix)}" title="Custom naam incl. vlag/symbool gebruiken" style="min-height:44px;min-width:44px;flex-shrink:0;">${this.escapeHtml(emojiPrefix || '✏️')}</button>
                         ${customActionBtn}

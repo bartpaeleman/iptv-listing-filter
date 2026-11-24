@@ -581,8 +581,20 @@ export class ChannelsPage extends BaseComponent {
 
         this.channelTable = new ChannelTable('#channelsTableRoot', {
             onUpdate: async (id, payload) => {
-                await this.props.api.post('update_channel', { id, ...payload });
+                const isCustom = Boolean(this.channelTable?.state?.isCustomGroup);
+                const res = await this.props.api.post('update_channel', {
+                    id,
+                    group_id: this.selectedGroupId || 0,
+                    is_custom: isCustom ? 1 : 0,
+                    ...payload,
+                });
                 this.props.toast.show('Kanaal bijgewerkt');
+                if (Array.isArray(res?.items)) {
+                    this.channelTable.setState({ channels: res.items });
+                } else {
+                    await this.loadChannels();
+                    await this.loadGroupsOnly?.();
+                }
             },
             onRemoveFromCustomGroup: async id => {
                 if (!this.selectedGroupId) return;
