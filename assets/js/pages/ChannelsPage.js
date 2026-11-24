@@ -465,6 +465,7 @@ export class ChannelsPage extends BaseComponent {
                             <button type="button" class="btn btn-sm hidden" id="adoptGroupNameBtn" title="Huidige weergavenaam (incl. vlag/emoji) opslaan als custom naam">❐</button>
                             <button type="button" class="btn btn-sm hidden" id="editGroupNameBtn" title="Groepsnaam aanpassen">✏️</button>
                             <button type="button" class="btn btn-sm hidden" id="convertToCustomBtn" title="Zet deze provider-groep om naar een bewerkbare custom groep">🛠️ Omzetten naar custom groep</button>
+                            <button type="button" class="btn btn-sm btn-primary hidden" id="openCustomChannelPickerBtn" style="min-height:44px;">➕ Kanalen toevoegen uit database</button>
                             <button type="button" class="btn btn-sm btn-danger hidden" id="deleteCustomGroupBtn" title="Verwijder custom groep">🗑️ Verwijder custom groep</button>
                             <button type="button" class="btn btn-sm btn-danger hidden" id="removeFromCustomGroupBtn" title="Verwijder geselecteerde kanalen uit deze custom groep">🗑️ Verwijder uit groep</button>
                             <button class="btn btn-sm" id="manageCountryTagsBtn">🏷️ Landen & Tags Beheren</button>
@@ -493,7 +494,7 @@ export class ChannelsPage extends BaseComponent {
                     </div>
                     <div id="customGroupSyncBannerRoot" class="hidden"></div>
                     <div id="groupChannelToolsMount"></div>
-                    <div class="table-wrap">
+                    <div class="table-wrap" id="channelsTableWrap">
                         <table class="data-table">
                             <thead id="channelsTableHead">
                                 <tr>
@@ -989,6 +990,15 @@ export class ChannelsPage extends BaseComponent {
             await this.load();
         });
 
+        document.getElementById('openCustomChannelPickerBtn')?.addEventListener('click', async () => {
+            if (!this.selectedGroupId) return;
+            this.isCustomAddMode = !this.isCustomAddMode;
+            await this.updateCustomGroupUi();
+            if (!this.isCustomAddMode) {
+                await this.loadChannels();
+            }
+        });
+
         document.getElementById('deleteCustomGroupBtn')?.addEventListener('click', async () => {
             if (!this.selectedGroupId) return;
             if (!confirm('Weet je zeker dat je deze custom groep wilt verwijderen?')) return;
@@ -1055,21 +1065,43 @@ export class ChannelsPage extends BaseComponent {
         document.getElementById('deleteCustomGroupBtn')?.classList.toggle('hidden', !isCustom);
         document.getElementById('removeFromCustomGroupBtn')?.classList.toggle('hidden', !isCustom);
         if (!isCustom) {
+            this.isCustomAddMode = false;
             this.channelPicker?.close();
+        }
+
+        const pickerBtn = document.getElementById('openCustomChannelPickerBtn');
+        if (pickerBtn) {
+            pickerBtn.textContent = this.isCustomAddMode
+                ? '← Terug naar groepsinhoud'
+                : '➕ Kanalen toevoegen uit database';
+        }
+
+        const tableWrap = document.getElementById('channelsTableWrap');
+        const toolsMount = document.getElementById('groupChannelToolsMount');
+        if (isCustom && this.isCustomAddMode) {
+            tableWrap?.classList.add('hidden');
+            toolsMount?.classList.add('hidden');
+        } else {
+            tableWrap?.classList.remove('hidden');
+            toolsMount?.classList.remove('hidden');
         }
 
         if (isCustom && selected) {
             this.syncBanner?.setData(Number(selected.id), selected.sync_diff_json || null);
-            const filters = {
-                q: document.getElementById('channelSearchInput')?.value || '',
-                country_tag_id: document.getElementById('channelCountryFilter')?.value || '',
-                status: document.getElementById('channelStatusFilter')?.value || 'all',
-                has_epg: document.getElementById('channelEpgFilter')?.value || 'all',
-            };
-            if (this.availableChannels?.customGroupId === Number(selected.id)) {
-                await this.availableChannels.setFilters(filters);
+            if (this.isCustomAddMode) {
+                const filters = {
+                    q: document.getElementById('channelSearchInput')?.value || '',
+                    country_tag_id: document.getElementById('channelCountryFilter')?.value || '',
+                    status: document.getElementById('channelStatusFilter')?.value || 'all',
+                    has_epg: document.getElementById('channelEpgFilter')?.value || 'all',
+                };
+                if (this.availableChannels?.customGroupId === Number(selected.id)) {
+                    await this.availableChannels.setFilters(filters);
+                } else {
+                    await this.availableChannels?.mount(Number(selected.id), filters);
+                }
             } else {
-                await this.availableChannels?.mount(Number(selected.id), filters);
+                this.availableChannels?.unmount();
             }
         } else {
             this.syncBanner?.setData(null, null);
@@ -1116,10 +1148,14 @@ export class ChannelsPage extends BaseComponent {
             return;
         }
         const targetName = targetSelect?.options[targetSelect.selectedIndex]?.textContent || '';
-        const res = await this.props.api.get('custom_group_member_ids', { custom_group_id: targetId });
-        this.channelTable?.setState({
-            targetMemberIds: res?.member_ids || [],
-            targetGroupName: targetName,
-        });
+        try {
+            const res = await this.props.api.get('custom_group_member_ids', { custom_group_id: targetId });
+            this.channelTable?.setState({
+                targetMemberIds: res?.member_ids || [],
+                targetGroupName: targetName,
+            });
+        } catch {
+            this.channelTable?.setState({ targetMemberIds: [], targetGroupName: targetName });
+        }
     }
 }

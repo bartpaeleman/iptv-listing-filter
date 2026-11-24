@@ -450,8 +450,20 @@ final class ChannelRepository extends BaseRepository
         if ($countryTagId === 'untagged') {
             $where[] = 'c.country_tag_id IS NULL';
         } elseif ($countryTagId !== '' && ctype_digit($countryTagId)) {
-            $where[] = 'c.country_tag_id = :ctid';
-            $params[':ctid'] = (int) $countryTagId;
+            $ctIdInt = (int) $countryTagId;
+            $tagStmt = $this->pdo->prepare('SELECT tag_pattern FROM country_tags WHERE id = ? LIMIT 1');
+            $tagStmt->execute([$ctIdInt]);
+            $tagPattern = $tagStmt->fetchColumn();
+            if ($tagPattern !== false && trim((string) $tagPattern) !== '') {
+                $patLike = '%' . trim((string) $tagPattern) . '%';
+                $where[] = '(c.country_tag_id = :ctid OR c.tvg_name LIKE :tagPat1 OR g.original_name LIKE :tagPat2)';
+                $params[':ctid'] = $ctIdInt;
+                $params[':tagPat1'] = $patLike;
+                $params[':tagPat2'] = $patLike;
+            } else {
+                $where[] = 'c.country_tag_id = :ctid';
+                $params[':ctid'] = $ctIdInt;
+            }
         }
 
         if ($hasEpg === 'yes') {
@@ -462,8 +474,8 @@ final class ChannelRepository extends BaseRepository
 
         $cleanQuery = trim($query);
         if ($cleanQuery !== '') {
-            $where[] = '(c.tvg_name LIKE :q1 OR c.custom_name LIKE :q2 OR g.original_name LIKE :q3)';
-            $like = '%' . $cleanQuery . '%';
+            $where[] = "(LOWER(c.tvg_name) LIKE :q1 OR LOWER(COALESCE(c.custom_name, '')) LIKE :q2 OR LOWER(g.original_name) LIKE :q3)";
+            $like = '%' . mb_strtolower($cleanQuery) . '%';
             $params[':q1'] = $like;
             $params[':q2'] = $like;
             $params[':q3'] = $like;
