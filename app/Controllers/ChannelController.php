@@ -479,12 +479,12 @@ final class ChannelController extends BaseController
             }
             $affected = $repo->bulkSetEnabledByIds($groupId, $matchingIds, 0);
         } elseif ($mode === 'search_replace') {
-            $search = (string) ($input['search'] ?? '');
+            $search = (string) ($input['find'] ?? $input['search'] ?? '');
             if ($search === '') {
                 $this->jsonError('Zoektekst mag niet leeg zijn.', 400);
             }
-            $replace = (string) ($input['replace'] ?? '');
-            $caseSensitive = ((int) ($input['case_sensitive'] ?? 0)) === 1;
+            $replace = (string) ($input['replace'] ?? $input['replace_with'] ?? '');
+            $caseSensitive = !empty($input['case_sensitive']);
             $affected = $repo->bulkReplaceNameInGroup($groupId, $search, $replace, $caseSensitive);
         } elseif ($mode === 'adopt_all_display_names') {
             $channels = $repo->filter($groupId, '', '', false, 5000, 0, '', 'all', 'number')['items'];
