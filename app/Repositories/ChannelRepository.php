@@ -463,7 +463,11 @@ final class ChannelRepository extends BaseRepository
         $limit = max(1, min(100, $limit));
         $offset = max(0, $offset);
 
-        $where = ['g.is_custom = 0'];
+        $where = [
+            'g.is_custom = 0',
+            "LTRIM(c.tvg_name) NOT LIKE '###%'",
+            "LTRIM(COALESCE(c.custom_name, '')) NOT LIKE '###%'",
+        ];
         $params = [':cgid' => $customGroupId];
 
         $cleanCategory = trim($category);
