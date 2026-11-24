@@ -300,8 +300,8 @@ export class ChannelsPage extends BaseComponent {
                         const isMember = memberSet.has(Number(c.id));
                         const actionHtml = compatibleCustom.length > 0
                             ? (isMember
-                                ? `<button type="button" class="btn btn-xs-danger js-preview-toggle-ch" data-cid="${c.id}" data-in-group="1">Verwijderen</button>`
-                                : `<button type="button" class="btn btn-xs-success js-preview-toggle-ch" data-cid="${c.id}" data-in-group="0">+ Toevoegen</button>`)
+                                ? `<button type="button" class="btn-icon-remove js-preview-toggle-ch" data-cid="${c.id}" data-in-group="1" title="Verwijder uit custom groep">−</button>`
+                                : `<button type="button" class="btn-icon-add js-preview-toggle-ch" data-cid="${c.id}" data-in-group="0" title="Toevoegen aan custom groep">+</button>`)
                             : '';
                         return `<div class="preview-channel-row"><span>${chName}</span><div style="display:flex;align-items:center;gap:0.5rem;"><span class="muted">${on ? '✅ Aan' : '⬜ Uit'}</span>${actionHtml}</div></div>`;
                     }).join('');
@@ -336,9 +336,10 @@ export class ChannelsPage extends BaseComponent {
                                     });
                                     memberSet.delete(cid);
                                     toggleBtn.dataset.inGroup = '0';
-                                    toggleBtn.textContent = '+ Toevoegen';
-                                    toggleBtn.classList.remove('btn-xs-danger');
-                                    toggleBtn.classList.add('btn-xs-success');
+                                    toggleBtn.textContent = '+';
+                                    toggleBtn.title = 'Toevoegen aan custom groep';
+                                    toggleBtn.classList.remove('btn-icon-remove');
+                                    toggleBtn.classList.add('btn-icon-add');
                                     this.props.toast?.show('Kanaal verwijderd uit custom groep');
                                 } else {
                                     await this.props.api.post('custom_group_add_channels', {
@@ -347,9 +348,10 @@ export class ChannelsPage extends BaseComponent {
                                     });
                                     memberSet.add(cid);
                                     toggleBtn.dataset.inGroup = '1';
-                                    toggleBtn.textContent = 'Verwijderen';
-                                    toggleBtn.classList.remove('btn-xs-success');
-                                    toggleBtn.classList.add('btn-xs-danger');
+                                    toggleBtn.textContent = '−';
+                                    toggleBtn.title = 'Verwijder uit custom groep';
+                                    toggleBtn.classList.remove('btn-icon-add');
+                                    toggleBtn.classList.add('btn-icon-remove');
                                     this.props.toast?.show('Kanaal toegevoegd aan custom groep');
                                 }
                                 await this.loadGroupsOnly?.();
@@ -591,6 +593,26 @@ export class ChannelsPage extends BaseComponent {
                 this.availableChannels?.markChannelMembership(id, false);
                 this.props.toast?.show('Kanaal verwijderd uit custom groep');
                 await this.loadChannels();
+                await this.loadGroupsOnly?.();
+            },
+            onToggleTargetCustomGroup: async (id, currentlyInGroup) => {
+                const targetSelect = document.getElementById('targetCustomGroupSelect');
+                const targetId = Number(targetSelect?.value || 0);
+                if (!targetId) return;
+                if (currentlyInGroup) {
+                    await this.props.api.post('custom_group_remove_channels', {
+                        custom_group_id: targetId,
+                        channel_ids: [id],
+                    });
+                    this.props.toast?.show('Kanaal verwijderd uit custom groep');
+                } else {
+                    await this.props.api.post('custom_group_add_channels', {
+                        custom_group_id: targetId,
+                        channel_ids: [id],
+                    });
+                    this.props.toast?.show('Kanaal toegevoegd aan custom groep');
+                }
+                await this.loadTargetMemberIds();
                 await this.loadGroupsOnly?.();
             },
             onSelectionChange: count => {
@@ -1154,18 +1176,19 @@ export class ChannelsPage extends BaseComponent {
         const targetSelect = document.getElementById('targetCustomGroupSelect');
         const targetId = Number(targetSelect?.value || 0);
         if (!targetId) {
-            this.channelTable?.setState({ targetMemberIds: [], targetGroupName: '' });
+            this.channelTable?.setState({ targetGroupId: null, targetMemberIds: [], targetGroupName: '' });
             return;
         }
         const targetName = targetSelect?.options[targetSelect.selectedIndex]?.textContent || '';
         try {
             const res = await this.props.api.get('custom_group_member_ids', { custom_group_id: targetId });
             this.channelTable?.setState({
+                targetGroupId: targetId,
                 targetMemberIds: res?.member_ids || [],
                 targetGroupName: targetName,
             });
         } catch {
-            this.channelTable?.setState({ targetMemberIds: [], targetGroupName: targetName });
+            this.channelTable?.setState({ targetGroupId: targetId, targetMemberIds: [], targetGroupName: targetName });
         }
     }
 }

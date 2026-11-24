@@ -107,8 +107,10 @@ final class ChannelRepository extends BaseRepository
             $orderBy = "ORDER BY c.is_enabled DESC, {$subOrder}";
         }
 
+        $channelNumExpr = $isCustomGroup ? 'cgc.sort_order AS channel_number' : 'c.channel_number';
+
         $sql = "SELECT c.id, c.tvg_id, c.tvg_name, c.tvg_logo, c.group_id, c.custom_name,
-                       c.channel_number, c.epg_channel_id, c.epg_match_type, c.is_enabled, c.sort_order,
+                       {$channelNumExpr}, c.epg_channel_id, c.epg_match_type, c.is_enabled, c.sort_order,
                        COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS group_name,
                        g.category AS group_category,
                        ec.display_name AS epg_display_name, ec.icon_url AS epg_icon_url
@@ -133,6 +135,43 @@ final class ChannelRepository extends BaseRepository
         if ($groupId <= 0) {
             return;
         }
+        $cgStmt = $this->pdo->prepare('SELECT is_custom FROM m3u_groups WHERE id = ? LIMIT 1');
+        $cgStmt->execute([$groupId]);
+        $isCustom = (int) $cgStmt->fetchColumn() === 1;
+
+        if ($isCustom) {
+            $orderSql = match ($sortBy) {
+                'name_asc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) ASC, c.id ASC",
+                'name_desc' => "COALESCE(NULLIF(c.custom_name, ''), c.tvg_name) DESC, c.id DESC",
+                'number_desc' => 'cgc.sort_order DESC, c.id DESC',
+                default => 'cgc.sort_order ASC, c.id ASC',
+            };
+            $stmt = $this->pdo->prepare(
+                "SELECT c.id FROM custom_group_channels cgc
+                 INNER JOIN channels c ON c.id = cgc.channel_id
+                 WHERE cgc.custom_group_id = :gid AND cgc.is_ignored = 0
+                 ORDER BY c.is_enabled DESC, {$orderSql}"
+            );
+            $stmt->execute([':gid' => $groupId]);
+            $ids = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+
+            $this->pdo->beginTransaction();
+            try {
+                $upd = $this->pdo->prepare('UPDATE custom_group_channels SET sort_order = :num WHERE custom_group_id = :gid AND channel_id = :id');
+                $num = 1;
+                foreach ($ids as $id) {
+                    $upd->execute([':num' => $num++, ':gid' => $groupId, ':id' => (int) $id]);
+                }
+                $this->pdo->commit();
+            } catch (\Throwable $e) {
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->rollBack();
+                }
+                throw $e;
+            }
+            return;
+        }
+
         $orderSql = match ($sortBy) {
             'name_asc' => "COALESCE(NULLIF(custom_name, ''), tvg_name) ASC, id ASC",
             'name_desc' => "COALESCE(NULLIF(custom_name, ''), tvg_name) DESC, id DESC",

@@ -65,14 +65,16 @@ export class CustomGroupAvailableChannels extends BaseComponent {
         const btn = this.container?.querySelector(`.js-avail-toggle-btn[data-cid="${cid}"]`);
         if (btn) {
             if (inCustomGroup) {
-                btn.textContent = 'Verwijderen';
-                btn.classList.remove('btn-avail-add');
-                btn.classList.add('btn-avail-remove');
+                btn.textContent = '−';
+                btn.title = 'Verwijder uit custom groep';
+                btn.classList.remove('btn-icon-add');
+                btn.classList.add('btn-icon-remove');
                 btn.dataset.inGroup = '1';
             } else {
-                btn.textContent = '+ Toevoegen';
-                btn.classList.remove('btn-avail-remove');
-                btn.classList.add('btn-avail-add');
+                btn.textContent = '+';
+                btn.title = 'Toevoegen aan custom groep';
+                btn.classList.remove('btn-icon-remove');
+                btn.classList.add('btn-icon-add');
                 btn.dataset.inGroup = '0';
             }
         }
@@ -188,31 +190,37 @@ export class CustomGroupAvailableChannels extends BaseComponent {
 
         this.container.innerHTML = `
             <div class="avail-channels-section">
-                <div class="db-channel-filter-bar">
-                    <select id="dbFilterCountryTag" style="min-height:44px;font-size:16px;">
-                        <option value="">Alle landen/tags</option>
-                        ${tagOptions}
-                    </select>
-                    <select id="dbFilterSourceGroup" style="min-height:44px;font-size:16px;max-width:220px;">
-                        <option value="">Alle groepen</option>
-                    </select>
-                    <input type="search" id="dbFilterQuery" placeholder="Zoek kanaalnaam..." style="flex:2;min-width:160px;min-height:44px;font-size:16px;">
-                    <select id="dbFilterStatus" style="min-height:44px;font-size:16px;">
-                        <option value="all">Alle statussen</option>
-                        <option value="enabled">Actief</option>
-                        <option value="disabled">Inactief</option>
-                    </select>
-                    <select id="dbFilterCategory" style="min-height:44px;font-size:16px;">
-                        ${catOptions}
-                    </select>
-                    <button type="button" class="btn btn-sm btn-primary" id="dbFilterSearchBtn" style="min-height:44px;">🔍 Zoeken</button>
+                <div class="db-channel-filter-bar" style="flex-direction:column;align-items:stretch;">
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                        <select id="dbFilterCountryTag" style="flex:1;min-width:140px;min-height:44px;font-size:16px;">
+                            <option value="">Alle landen/tags</option>
+                            ${tagOptions}
+                        </select>
+                        <select id="dbFilterSourceGroup" style="flex:1;min-width:160px;min-height:44px;font-size:16px;">
+                            <option value="">Alle groepen</option>
+                        </select>
+                        <select id="dbFilterCategory" style="flex:1;min-width:140px;min-height:44px;font-size:16px;">
+                            ${catOptions}
+                        </select>
+                    </div>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                        <input type="search" id="dbFilterQuery" placeholder="Zoek kanaalnaam..." style="flex:2;min-width:180px;min-height:44px;font-size:16px;">
+                        <select id="dbFilterStatus" style="flex:1;min-width:130px;min-height:44px;font-size:16px;">
+                            <option value="all">Alle statussen</option>
+                            <option value="enabled">Actief</option>
+                            <option value="disabled">Inactief</option>
+                        </select>
+                        <button type="button" class="btn btn-sm btn-primary" id="dbFilterSearchBtn" style="min-height:44px;">🔍 Zoeken</button>
+                    </div>
                 </div>
                 <div class="avail-channels-header">
                     <strong>Beschikbare compatibele kanalen (database)</strong>
                     <span class="muted js-avail-count" style="font-size:0.85rem;">0 kanalen geladen</span>
                 </div>
-                <div class="avail-channels-list js-avail-list"></div>
-                <div class="avail-channels-sentinel js-avail-sentinel"></div>
+                <div class="db-results-scroll-container js-avail-scroll">
+                    <div class="avail-channels-list js-avail-list"></div>
+                    <div class="avail-channels-sentinel js-avail-sentinel"></div>
+                </div>
                 <div class="db-avail-footer">
                     <button type="button" class="btn btn-sm btn-load-more hidden" id="dbLoadMoreBtn" style="min-height:44px;">⬇️ Volgende 20 resultaten</button>
                     <div class="muted js-avail-status" style="padding:0.4rem;text-align:center;font-size:0.85rem;"></div>
@@ -277,8 +285,9 @@ export class CustomGroupAvailableChannels extends BaseComponent {
             const epgBadge = hasEpg
                 ? '<span class="badge badge-epg-ok" title="EPG gekoppeld">EPG</span>'
                 : '<span class="badge badge-epg-none" title="Geen EPG">Geen EPG</span>';
-            const btnClass = inGroup ? 'btn-avail-remove' : 'btn-avail-add';
-            const btnText = inGroup ? 'Verwijderen' : '+ Toevoegen';
+            const btnClass = inGroup ? 'btn-icon-remove' : 'btn-icon-add';
+            const btnText = inGroup ? '−' : '+';
+            const btnTitle = inGroup ? 'Verwijder uit custom groep' : 'Toevoegen aan custom groep';
             const displayName = ch.display_name || ch.tvg_name || '';
             const rawTvgName = ch.tvg_name || '';
 
@@ -292,7 +301,7 @@ export class CustomGroupAvailableChannels extends BaseComponent {
                         <span class="badge badge-group-source">${this.escapeHtml(ch.group_display_name || '')}</span>
                         ${epgBadge}
                     </div>
-                    <button type="button" class="btn btn-sm js-avail-toggle-btn ${btnClass}" data-cid="${ch.id}" data-in-group="${inGroup ? '1' : '0'}">${btnText}</button>
+                    <button type="button" class="js-avail-toggle-btn ${btnClass}" data-cid="${ch.id}" data-in-group="${inGroup ? '1' : '0'}" title="${btnTitle}">${btnText}</button>
                 </div>
             `;
         }).join('');
@@ -370,13 +379,14 @@ export class CustomGroupAvailableChannels extends BaseComponent {
         this.disconnectObserver();
         if (!this.hasMore) return;
         const sentinel = this.container?.querySelector('.js-avail-sentinel');
+        const scrollContainer = this.container?.querySelector('.js-avail-scroll');
         if (!sentinel || typeof IntersectionObserver === 'undefined') return;
 
         this.observer = new IntersectionObserver(entries => {
             if (entries.some(e => e.isIntersecting) && this.hasMore && !this.isLoading) {
                 this.fetchNextBatch();
             }
-        }, { rootMargin: '200px' });
+        }, { root: scrollContainer || null, rootMargin: '120px' });
         this.observer.observe(sentinel);
     }
 }
