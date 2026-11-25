@@ -172,12 +172,19 @@ final class EpgParserService
         $channelCount = 0;
         $progCount = 0;
         $batchSize = 0;
+        $autoMatchedBeforeProgs = false;
 
         $this->pdo->beginTransaction();
         try {
             while ($reader->read()) {
                 if ($reader->nodeType !== XMLReader::ELEMENT) {
                     continue;
+                }
+
+                if ($reader->name === 'programme' && !$autoMatchedBeforeProgs) {
+                    $autoMatchedBeforeProgs = true;
+                    (new EpgMatcherService($this->pdo))->autoMatchAllActiveUnlinked();
+                    $linkedIds = $this->loadActiveLinkedEpgIds();
                 }
 
                 if ($reader->name === 'channel') {

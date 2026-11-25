@@ -17,11 +17,12 @@ final class ChannelController extends BaseController
         $this->requireAuth();
         $contentTypes = $this->parseContentTypes((string) ($_GET['content_types'] ?? ''));
         $scope = (string) ($_GET['scope'] ?? 'active');
+        $liveOnly = isset($_GET['live_only']) && $_GET['live_only'] === '1';
         $cacheOnly = isset($_GET['cache_only']) && $_GET['cache_only'] === '1';
         $forceRefresh = isset($_GET['refresh']) && $_GET['refresh'] === '1';
         $viewCache = new ViewCacheService();
 
-        if ($scope === 'active' && !$forceRefresh) {
+        if ($scope === 'active' && !$liveOnly && !$forceRefresh) {
             $cached = $viewCache->getActiveGroups('import', $contentTypes);
             if ($cached !== null) {
                 $this->jsonSuccess($cached);
@@ -38,9 +39,31 @@ final class ChannelController extends BaseController
         $emojiService->seedDefaultsIfEmpty();
 
         $repo = new GroupRepository();
-        $groups = $scope === 'all'
-            ? $repo->allWithCounts('import', $contentTypes)
-            : $repo->activeWithCounts('import', $contentTypes);
+        if ($liveOnly) {
+            $pdo = \App\Core\Database::getInstance();
+            $groups = $pdo->query(
+                "SELECT g.*,
+                        (SELECT COUNT(*) FROM channels c WHERE c.group_id = g.id) AS total_channels,
+                        (SELECT COUNT(*) FROM channels c WHERE c.group_id = g.id AND c.is_enabled = 1) AS enabled_channels
+                 FROM m3u_groups g
+                 WHERE COALESCE(g.category, 'Live TV') NOT IN ('Film', 'TV Series')
+                   AND (
+                       g.is_enabled = 1
+                       OR EXISTS (SELECT 1 FROM channels c WHERE c.group_id = g.id AND c.is_enabled = 1)
+                       OR EXISTS (
+                           SELECT 1 FROM custom_group_channels cgc
+                           INNER JOIN m3u_groups cg ON cg.id = cgc.custom_group_id
+                           INNER JOIN channels c2 ON c2.id = cgc.channel_id
+                           WHERE c2.group_id = g.id AND cgc.is_ignored = 0 AND cg.is_custom = 1 AND cg.is_enabled = 1
+                       )
+                   )
+                 ORDER BY g.original_name ASC, g.id ASC"
+            )->fetchAll();
+        } else {
+            $groups = $scope === 'all'
+                ? $repo->allWithCounts('import', $contentTypes)
+                : $repo->activeWithCounts('import', $contentTypes);
+        }
 
         foreach ($groups as &$g) {
             $rawName = (string) (($g['custom_name'] ?? '') !== '' ? $g['custom_name'] : ($g['original_name'] ?? ''));

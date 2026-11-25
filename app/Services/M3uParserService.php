@@ -230,6 +230,7 @@ final class M3uParserService
         fclose($handle);
         $customGroupSync->relinkCustomGroupChannelsAfterSync();
         $customGroupSync->evaluateAllConvertedGroups();
+        $autoMatched += (new EpgMatcherService($this->pdo))->autoMatchAllActiveUnlinked();
         $cache->updateItemCount($sourceFile, $channelsAdded + $channelsUpdated + $channelsUnchanged);
         $this->settings->set('last_m3u_sync', $now, false);
         \App\Core\SchemaMigrator::ensureSchemaUpToDate($this->pdo);
