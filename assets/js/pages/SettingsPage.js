@@ -94,17 +94,32 @@ export class SettingsPage extends BaseComponent {
                         <span class="collapsible-card__chevron">▼</span>
                     </summary>
                     <div class="collapsible-card__body stack-form">
-                        <div class="grid-2">
-                            <label>Sync Interval (uren)
-                                <input type="number" id="settingIntervalHours" value="${s.sync_interval_hours}" min="1" max="720" required>
+                        <div class="btn-group" role="tablist" aria-label="Cronjob selectie" style="margin-bottom:0.25rem;">
+                            <button type="button" class="btn ${this.activeCronType !== 'epg' ? 'btn-primary' : ''}" data-cron-type="m3u" style="min-height:44px;">📺 M3U Kanalen Cronjob</button>
+                            <button type="button" class="btn ${this.activeCronType === 'epg' ? 'btn-primary' : ''}" data-cron-type="epg" style="min-height:44px;">📅 EPG Gids Cronjob</button>
+                        </div>
+
+                        <div id="cronFieldsM3u" class="grid-2 ${this.activeCronType === 'epg' ? 'hidden' : ''}">
+                            <label>M3U Sync Interval (uren)
+                                <input type="number" id="settingM3uIntervalHours" value="${s.sync_m3u_interval_hours ?? s.sync_interval_hours}" min="1" max="720" required>
                             </label>
-                            <label>Voorkeursuur (0-23)
-                                <input type="number" id="settingPreferredHour" value="${s.sync_preferred_hour}" min="0" max="23" required>
+                            <label>M3U Voorkeursuur (0-23)
+                                <input type="number" id="settingM3uPreferredHour" value="${s.sync_m3u_preferred_hour ?? s.sync_preferred_hour}" min="0" max="23" required>
                             </label>
                         </div>
+
+                        <div id="cronFieldsEpg" class="grid-2 ${this.activeCronType !== 'epg' ? 'hidden' : ''}">
+                            <label>EPG Sync Interval (uren)
+                                <input type="number" id="settingEpgIntervalHours" value="${s.sync_epg_interval_hours ?? 12}" min="1" max="720" required>
+                            </label>
+                            <label>EPG Voorkeursuur (0-23)
+                                <input type="number" id="settingEpgPreferredHour" value="${s.sync_epg_preferred_hour ?? 4}" min="0" max="23" required>
+                            </label>
+                        </div>
+
                         <div class="endpoint-row" style="margin-top:0.5rem;">
                             <div class="cron-instruction-line">
-                                <span>Crontab</span>
+                                <span>Crontab (<strong id="qnapCronTypeLabel">${this.activeCronType === 'epg' ? 'EPG' : 'M3U'}</strong>)</span>
                                 <span class="cron-paren-accent">(<span id="qnapCronLabel">${this.escapeHtml(initCron.label)}</span>)</span>
                             </div>
                             <div class="copy-group">
@@ -157,11 +172,29 @@ export class SettingsPage extends BaseComponent {
                 xtream_custom_epg_url: document.getElementById('settingXtreamCustomEpgUrl')?.value || '',
                 m3u_source_url: document.getElementById('settingM3uUrl')?.value || '',
                 epg_source_url: document.getElementById('settingEpgUrl')?.value || '',
-                sync_interval_hours: Number(document.getElementById('settingIntervalHours').value),
-                sync_preferred_hour: Number(document.getElementById('settingPreferredHour').value),
+                sync_m3u_interval_hours: Number(document.getElementById('settingM3uIntervalHours').value),
+                sync_m3u_preferred_hour: Number(document.getElementById('settingM3uPreferredHour').value),
+                sync_epg_interval_hours: Number(document.getElementById('settingEpgIntervalHours').value),
+                sync_epg_preferred_hour: Number(document.getElementById('settingEpgPreferredHour').value),
             });
             this.props.toast.show('Instellingen opgeslagen!');
             this.load();
+        });
+
+        this.container.querySelectorAll('[data-cron-type]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const nextType = btn.dataset.cronType === 'epg' ? 'epg' : 'm3u';
+                if (this.activeCronType === nextType) return;
+                this.activeCronType = nextType;
+                this.container.querySelectorAll('[data-cron-type]').forEach(b => {
+                    b.classList.toggle('btn-primary', b.dataset.cronType === nextType);
+                });
+                document.getElementById('cronFieldsM3u')?.classList.toggle('hidden', nextType !== 'm3u');
+                document.getElementById('cronFieldsEpg')?.classList.toggle('hidden', nextType !== 'epg');
+                const typeLabel = document.getElementById('qnapCronTypeLabel');
+                if (typeLabel) typeLabel.textContent = nextType === 'epg' ? 'EPG' : 'M3U';
+                this.loadCrontabStatus();
+            });
         });
 
         document.getElementById('copyCronBtn')?.addEventListener('click', ev => {
@@ -256,18 +289,28 @@ export class SettingsPage extends BaseComponent {
                 { value: '0 3 * * *', label: 'Dagelijks om 03:00 (0 3 * * *)' },
                 { value: 'custom', label: 'Aangepast schema' },
             ];
-            const currentExpr = st.current_schedule || '0 3 * * *';
+            const activeType = this.activeCronType === 'epg' ? 'epg' : 'm3u';
+            const job = st.jobs?.[activeType] || {
+                raw_line: st.raw_line || '',
+                current_schedule: st.current_schedule || '',
+                current_command: st.current_command || '',
+            };
+            const typeLabel = activeType === 'epg' ? 'EPG Gids' : 'M3U Kanalen';
+            const intervalElId = activeType === 'epg' ? 'settingEpgIntervalHours' : 'settingM3uIntervalHours';
+            const hourElId = activeType === 'epg' ? 'settingEpgPreferredHour' : 'settingM3uPreferredHour';
+
+            const currentExpr = job.current_schedule || document.getElementById('qnapCronInput')?.value?.split(/\s+/).slice(0, 5).join(' ') || (activeType === 'epg' ? '0 */12 * * *' : '0 3 */3 * *');
             const isPreset = presets.some(p => p.value === currentExpr);
             const selectedPreset = isPreset ? currentExpr : 'custom';
 
             box.innerHTML = `
                 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
-                    <strong>Interactief Crontab-beheer</strong>
-                    <span class="badge ${st.raw_line ? 'badge-success' : 'badge-warning'}">
-                        ${st.raw_line ? 'Actief' : 'Niet ingesteld'}
+                    <strong>Interactief Crontab-beheer (${typeLabel})</strong>
+                    <span class="badge ${job.raw_line ? 'badge-success' : 'badge-warning'}">
+                        ${job.raw_line ? 'Actief' : 'Niet ingesteld'}
                     </span>
                 </div>
-                ${st.raw_line ? `<div class="muted" style="font-size:0.85rem;">Huidige regel: <code>${this.escapeHtml(st.raw_line)}</code></div>` : ''}
+                ${job.raw_line ? `<div class="muted" style="font-size:0.85rem;">Huidige regel: <code>${this.escapeHtml(job.raw_line)}</code></div>` : ''}
                 ${!st.writable ? `
                     <div class="alert alert-warning" style="padding:0.75rem;border-radius:6px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);">
                         <p style="margin:0 0 0.5rem 0;font-size:0.88rem;">${this.escapeHtml(st.permission_hint)}</p>
@@ -291,9 +334,11 @@ export class SettingsPage extends BaseComponent {
                     <input type="text" id="cronPhpPathInput" value="${this.escapeHtml(st.default_php_path || '/usr/bin/php')}" ${!st.writable ? 'disabled' : ''}>
                 </label>
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
-                    <button type="button" class="btn btn-primary" id="saveCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>Cronjob opslaan / wijzigen</button>
-                    <button type="button" class="btn" id="testCrontabBtn" style="min-height:44px;">▶️ Cronjob nu testen</button>
-                    ${st.raw_line ? `<button type="button" class="btn btn-danger" id="deleteCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>Cronjob wissen</button>` : ''}
+                    <button type="button" class="btn btn-primary" id="saveCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>
+                        ${job.raw_line ? `💾 ${typeLabel} Cronjob bijwerken` : `➕ ${typeLabel} toevoegen aan crontab`}
+                    </button>
+                    <button type="button" class="btn" id="testCrontabBtn" style="min-height:44px;">▶️ ${typeLabel} nu testen</button>
+                    ${job.raw_line ? `<button type="button" class="btn btn-danger" id="deleteCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>🗑️ ${typeLabel} wissen uit crontab</button>` : ''}
                 </div>
             `;
 
@@ -306,8 +351,8 @@ export class SettingsPage extends BaseComponent {
                 const parts = String(expr || '').trim().split(/\s+/);
                 if (parts.length !== 5) return;
                 const [, hPart, dPart] = parts;
-                const intervalEl = document.getElementById('settingIntervalHours');
-                const hourEl = document.getElementById('settingPreferredHour');
+                const intervalEl = document.getElementById(intervalElId);
+                const hourEl = document.getElementById(hourElId);
 
                 let newInterval = null;
                 let newHour = null;
@@ -333,7 +378,10 @@ export class SettingsPage extends BaseComponent {
                 const labelEl = document.getElementById('qnapCronLabel');
                 const inputEl = document.getElementById('qnapCronInput');
                 if (labelEl) labelEl.textContent = cron.label;
-                if (inputEl && this._cronCmdBase) inputEl.value = `${expr.trim()} ${this._cronCmdBase}`;
+                if (inputEl && this._cronCmdBase) {
+                    const baseWithFlag = this._cronCmdBase.replace(/\s+--force/, ` --${activeType} --force`);
+                    inputEl.value = `${expr.trim()} ${baseWithFlag}`;
+                }
             };
 
             document.getElementById('cronPresetSelect')?.addEventListener('change', ev => {
@@ -355,21 +403,19 @@ export class SettingsPage extends BaseComponent {
                 syncFromCronExpression(val);
             });
 
-            if (st.current_schedule) {
-                syncFromCronExpression(st.current_schedule);
-            }
+            syncFromCronExpression(currentExpr);
 
             document.getElementById('saveCrontabBtn')?.addEventListener('click', async () => {
                 const schedule = document.getElementById('cronExprInput')?.value?.trim() || '';
                 const phpPath = document.getElementById('cronPhpPathInput')?.value?.trim() || '';
-                await this.props.api.post('crontab_save', { schedule, php_path: phpPath });
-                this.props.toast.show('Cronjob opgeslagen!');
+                await this.props.api.post('crontab_save', { schedule, php_path: phpPath, type: activeType });
+                this.props.toast.show(`${typeLabel} cronjob opgeslagen!`);
                 this.loadCrontabStatus();
             });
 
             document.getElementById('deleteCrontabBtn')?.addEventListener('click', async () => {
-                await this.props.api.post('crontab_delete', {});
-                this.props.toast.show('Cronjob gewist!');
+                await this.props.api.post('crontab_delete', { type: activeType });
+                this.props.toast.show(`${typeLabel} cronjob gewist!`);
                 this.loadCrontabStatus();
             });
 
@@ -379,8 +425,8 @@ export class SettingsPage extends BaseComponent {
                 btn.disabled = true;
                 btn.textContent = 'Bezig met testen...';
                 try {
-                    const res = await this.props.api.post('test_cron', {});
-                    this.props.toast.show(res?.message || 'Cronjob-test voltooid!');
+                    const res = await this.props.api.post('test_cron', { mode: activeType });
+                    this.props.toast.show(res?.message || `${typeLabel} cronjob-test voltooid!`);
                     await this.loadCrontabStatus();
                 } catch (err) {
                     this.props.toast.show(err?.message || 'Cronjob-test mislukt.', 'error');
