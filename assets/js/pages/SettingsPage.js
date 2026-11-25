@@ -334,9 +334,11 @@ export class SettingsPage extends BaseComponent {
                     <input type="text" id="cronPhpPathInput" value="${this.escapeHtml(st.default_php_path || '/usr/bin/php')}" ${!st.writable ? 'disabled' : ''}>
                 </label>
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
-                    <button type="button" class="btn btn-primary" id="saveCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>${typeLabel} Cronjob opslaan</button>
+                    <button type="button" class="btn btn-primary" id="saveCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>
+                        ${job.raw_line ? `💾 ${typeLabel} Cronjob bijwerken` : `➕ ${typeLabel} toevoegen aan crontab`}
+                    </button>
                     <button type="button" class="btn" id="testCrontabBtn" style="min-height:44px;">▶️ ${typeLabel} nu testen</button>
-                    ${job.raw_line ? `<button type="button" class="btn btn-danger" id="deleteCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>${typeLabel} Cronjob wissen</button>` : ''}
+                    ${job.raw_line ? `<button type="button" class="btn btn-danger" id="deleteCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>🗑️ ${typeLabel} wissen uit crontab</button>` : ''}
                 </div>
             `;
 
