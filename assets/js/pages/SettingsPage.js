@@ -12,6 +12,7 @@ export class SettingsPage extends BaseComponent {
             this.container.innerHTML = '<div class="card">Laden...</div>';
             return;
         }
+        this._appRoot = s.app_root || '';
 
         const base = window.location.origin + window.location.pathname.replace(/\/index\.php$/, '');
         const tok = s.output_token ? `&token=${encodeURIComponent(s.output_token)}` : '';
@@ -186,7 +187,7 @@ export class SettingsPage extends BaseComponent {
             });
         });
 
-        this._cronCmdBase = `/mnt/ext/opt/apache/bin/php ${s.app_root}/bin/sync.php >/dev/null 2>&1`;
+        this._cronCmdBase = `/mnt/ext/opt/apache/bin/php ${this._appRoot || ''}/bin/sync.php >/dev/null 2>&1`;
         const updateCronPreview = () => {
             const interval = Math.max(1, parseInt(document.getElementById('settingIntervalHours')?.value || '72', 10) || 1);
             const hour = Math.max(0, Math.min(23, parseInt(document.getElementById('settingPreferredHour')?.value || '3', 10) || 0));
