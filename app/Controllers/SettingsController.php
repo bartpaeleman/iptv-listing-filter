@@ -175,8 +175,16 @@ final class SettingsController extends BaseController
 
         try {
             $status = (new \App\Services\CrontabService())->saveJob($schedule, $phpPath);
+            \App\Services\AppLogger::log('CRON', 'INFO', 'Cronjob-instellingen opgeslagen/gewijzigd.', [
+                'schedule' => $schedule,
+                'php_path' => $phpPath,
+            ]);
             $this->jsonSuccess($status);
         } catch (\Throwable $e) {
+            \App\Services\AppLogger::log('CRON', 'ERROR', 'Opslaan van cronjob mislukt: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
             $this->jsonError($e->getMessage(), 400);
         }
     }
@@ -189,9 +197,34 @@ final class SettingsController extends BaseController
 
         try {
             $status = (new \App\Services\CrontabService())->deleteJob();
+            \App\Services\AppLogger::log('CRON', 'INFO', 'Cronjob gewist.');
             $this->jsonSuccess($status);
         } catch (\Throwable $e) {
+            \App\Services\AppLogger::log('CRON', 'ERROR', 'Wissen van cronjob mislukt: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
             $this->jsonError($e->getMessage(), 400);
+        }
+    }
+
+    public function testCron(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        try {
+            \App\Services\AppLogger::log('CRON', 'INFO', 'Handmatige cronjob-test gestart.');
+            $result = (new \App\Services\SchedulerService())->run(true);
+            \App\Services\AppLogger::log('CRON', 'SUCCESS', 'Handmatige cronjob-test voltooid.', $result);
+            $this->jsonSuccess([
+                'message' => 'Cronjob-test succesvol uitgevoerd.',
+                'result' => $result,
+            ]);
+        } catch (\Throwable $e) {
+            \App\Services\AppLogger::log('CRON', 'ERROR', sprintf('Handmatige cronjob-test mislukt: %s in %s:%d', $e->getMessage(), $e->getFile(), $e->getLine()));
+            $this->jsonError('Cronjob-test mislukt: ' . $e->getMessage(), 500);
         }
     }
 
