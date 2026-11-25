@@ -79,6 +79,7 @@ export class DashboardPage extends BaseComponent {
                             <div class="copy-group">
                                 <input type="text" id="playlistUrlInput" value="${this.escapeHtml(playlistUrl)}" readonly>
                                 <button class="btn copy-btn" data-copy="playlistUrlInput">Kopieer</button>
+                                <button type="button" class="btn btn-download" data-download="playlistUrlInput" data-filename="playlist.m3u">⬇️ Download</button>
                             </div>
                         </div>
                         <div class="endpoint-row">
@@ -86,6 +87,7 @@ export class DashboardPage extends BaseComponent {
                             <div class="copy-group">
                                 <input type="text" id="epgUrlInput" value="${this.escapeHtml(epgUrl)}" readonly>
                                 <button class="btn copy-btn" data-copy="epgUrlInput">Kopieer</button>
+                                <button type="button" class="btn btn-download" data-download="epgUrlInput" data-filename="epg.xml">⬇️ Download</button>
                             </div>
                         </div>
                     </div>
@@ -179,6 +181,23 @@ export class DashboardPage extends BaseComponent {
                 const input = document.getElementById(btn.dataset.copy);
                 if (!input) return;
                 ClipboardHelper.copyText(input.value, btn, null, this.props.toast);
+            });
+        });
+
+        this.container.querySelectorAll('.btn-download[data-download]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const input = document.getElementById(btn.dataset.download);
+                if (!input || !input.value) return;
+                const sep = input.value.includes('?') ? '&' : '?';
+                const downloadUrl = `${input.value}${sep}download=1`;
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                if (btn.dataset.filename) {
+                    link.setAttribute('download', btn.dataset.filename);
+                }
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
             });
         });
 

@@ -64,6 +64,18 @@
 .btn-sm { min-height: 44px; padding: 0 0.75rem; font-size: 0.85rem; }
 .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
 .btn-primary:hover { background: var(--primary-hover); }
+.btn-download {
+    background: #0d9488;
+    border-color: #0d9488;
+    color: #fff;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.btn-download:hover { background: #0f766e; border-color: #0f766e; color: #fff; }
 .btn-ghost { background: transparent; border-color: transparent; }
 .btn-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 

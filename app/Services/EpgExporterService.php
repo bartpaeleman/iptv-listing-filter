@@ -21,6 +21,11 @@ final class EpgExporterService
         @set_time_limit(0);
         @ini_set('display_errors', '0');
 
+        if (($_GET['download'] ?? '') === '1' && !headers_sent()) {
+            $filename = $useGzip ? 'epg.xml.gz' : 'epg.xml';
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+        }
+
         $deflateCtx = ($useGzip && function_exists('deflate_init'))
             ? deflate_init(ZLIB_ENCODING_GZIP, ['level' => 6])
             : false;
