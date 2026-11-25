@@ -26,6 +26,8 @@ use App\Core\EnvLoader;
 use App\Services\SchedulerService;
 
 EnvLoader::load(dirname(__DIR__) . '/.env');
+$tz = EnvLoader::get('APP_TIMEZONE', 'Europe/Brussels');
+date_default_timezone_set($tz !== '' ? $tz : 'Europe/Brussels');
 
 $force = in_array('--force', $argv, true);
 $cacheMode = in_array('--use-cache', $argv, true) ? 'cache_only' : 'force_download';

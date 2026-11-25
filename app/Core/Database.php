@@ -38,6 +38,8 @@ final class Database
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
             ]);
+            $offset = (new \DateTimeImmutable('now'))->format('P');
+            self::$instance->exec("SET time_zone = '{$offset}'");
         } catch (PDOException $e) {
             throw new RuntimeException('Databaseverbinding mislukt: ' . $e->getMessage(), 0, $e);
         }

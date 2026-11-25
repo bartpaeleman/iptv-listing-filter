@@ -34,6 +34,10 @@ use App\Security\AuthService;
 use App\Security\CsrfGuard;
 use App\Services\InstallerService;
 
+EnvLoader::load();
+$tz = EnvLoader::get('APP_TIMEZONE', 'Europe/Brussels');
+date_default_timezone_set($tz !== '' ? $tz : 'Europe/Brussels');
+
 $route = (string) ($_GET['route'] ?? 'dashboard');
 
 if ($route === 'install') {
