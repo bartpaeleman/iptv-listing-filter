@@ -48,7 +48,7 @@ class App {
                             <div class="collapsible-card__body stack-form" style="gap:0.75rem;">
                                 <div id="customGroupsBackupStatus" class="muted" style="font-size:0.9rem;">Backupstatus laden...</div>
                                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;">
-                                    <a href="index.php?route=api&action=custom_groups_backup_download" class="btn" style="min-height:44px;display:inline-flex;align-items:center;">⬇️ Download backup (custom_groups_latest.json)</a>
+                                    <a href="index.php?route=api&endpoint=custom_groups_backup_download" class="btn" style="min-height:44px;display:inline-flex;align-items:center;">⬇️ Download backup (custom_groups_latest.json)</a>
                                     <button type="button" id="restoreCustomGroupsBtn" class="btn btn-primary" style="min-height:44px;">♻️ 1-klik Herstel naar database</button>
                                     <label class="btn" style="min-height:44px;display:inline-flex;align-items:center;cursor:pointer;margin:0;">
                                         📂 Herstel vanuit lokaal JSON-bestand
