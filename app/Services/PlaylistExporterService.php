@@ -44,6 +44,7 @@ final class PlaylistExporterService
                     FROM channels c
                     INNER JOIN m3u_groups g ON g.id = c.group_id
                     WHERE g.is_custom = 0 AND g.is_enabled = 1 AND c.is_enabled = 1
+                      AND TRIM(c.tvg_name) NOT REGEXP '^#{3,}'
 
                     UNION ALL
 
@@ -56,6 +57,7 @@ final class PlaylistExporterService
                     INNER JOIN m3u_groups g ON g.id = cgc.custom_group_id
                     INNER JOIN channels c ON c.id = cgc.channel_id
                     WHERE g.is_custom = 1 AND g.is_enabled = 1 AND c.is_enabled = 1 AND cgc.is_ignored = 0
+                      AND TRIM(c.tvg_name) NOT REGEXP '^#{3,}'
                 ) AS export_rows
                 ORDER BY {$groupOrder}, ch_num ASC, ch_sort ASC, ch_id ASC";
 

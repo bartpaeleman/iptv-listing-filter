@@ -420,23 +420,89 @@ export class ChannelsPage extends BaseComponent {
             this.renderSelectGroupPrompt();
             return;
         }
+        this.channelsLimit = 100;
+        this.channelsOffset = 0;
+        this.channelsHasMore = false;
+        this.isLoadingMoreChannels = false;
+
         const params = {
             search: this.channelSearch,
             country_tag_id: document.getElementById('channelCountryFilter')?.value || '',
             status: document.getElementById('channelStatusFilter')?.value || 'all',
             has_epg: document.getElementById('channelEpgFilter')?.value || 'all',
             sort_by: this.channelSortBy,
-            limit: 150,
+            limit: this.channelsLimit,
+            offset: 0,
         };
         if (this.selectedGroupId) params.group_id = this.selectedGroupId;
         const data = await this.props.api.get('channels', params);
+        this.channelsHasMore = Boolean(data.has_more);
         this.updateChannelsTableHeader();
         this.channelTable.setState({
             channels: data.items,
             countryTags: this.countryTags || [],
             isAllChannelsView: !this.selectedGroupId,
         });
+        this.updateScrollSentinel();
+        this.setupInfiniteScroll();
         await this.updateCustomGroupUi();
+    }
+
+    async loadMoreChannels() {
+        if (this.isLoadingMoreChannels || !this.channelsHasMore || !this.hasLoadedData) {
+            return;
+        }
+        if (!this.selectedGroupId && !this.channelSearch.trim()) {
+            return;
+        }
+        this.isLoadingMoreChannels = true;
+        this.updateScrollSentinel('Meer kanalen laden...');
+        try {
+            const nextOffset = (this.channelsOffset || 0) + (this.channelsLimit || 100);
+            const params = {
+                search: this.channelSearch,
+                country_tag_id: document.getElementById('channelCountryFilter')?.value || '',
+                status: document.getElementById('channelStatusFilter')?.value || 'all',
+                has_epg: document.getElementById('channelEpgFilter')?.value || 'all',
+                sort_by: this.channelSortBy,
+                limit: this.channelsLimit || 100,
+                offset: nextOffset,
+            };
+            if (this.selectedGroupId) params.group_id = this.selectedGroupId;
+            const data = await this.props.api.get('channels', params);
+            this.channelsOffset = nextOffset;
+            this.channelsHasMore = Boolean(data.has_more);
+            this.channelTable.appendItems(data.items || []);
+        } finally {
+            this.isLoadingMoreChannels = false;
+            this.updateScrollSentinel();
+        }
+    }
+
+    updateScrollSentinel(loadingText = '') {
+        const sentinel = document.getElementById('channelsScrollSentinel');
+        if (!sentinel) return;
+        if (loadingText) {
+            sentinel.textContent = loadingText;
+        } else if (this.channelsHasMore) {
+            sentinel.textContent = 'Scroll naar beneden voor meer...';
+        } else {
+            sentinel.textContent = '';
+        }
+    }
+
+    setupInfiniteScroll() {
+        const sentinel = document.getElementById('channelsScrollSentinel');
+        if (!sentinel) return;
+        if (this.channelsObserver) {
+            this.channelsObserver.disconnect();
+        }
+        this.channelsObserver = new IntersectionObserver(entries => {
+            if (entries.some(e => e.isIntersecting)) {
+                this.loadMoreChannels();
+            }
+        }, { rootMargin: '200px' });
+        this.channelsObserver.observe(sentinel);
     }
 
     renderShell() {
@@ -507,6 +573,7 @@ export class ChannelsPage extends BaseComponent {
                             </thead>
                             <tbody id="channelsTableRoot"></tbody>
                         </table>
+                        <div id="channelsScrollSentinel" class="muted" style="height:28px;display:flex;align-items:center;justify-content:center;font-size:0.85rem;"></div>
                     </div>
                     <div id="customGroupAvailableChannelsRoot" class="hidden"></div>
                     </div>

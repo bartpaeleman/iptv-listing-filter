@@ -12,6 +12,7 @@ export class SettingsPage extends BaseComponent {
             this.container.innerHTML = '<div class="card">Laden...</div>';
             return;
         }
+        this._appRoot = s.app_root || '';
 
         const base = window.location.origin + window.location.pathname.replace(/\/index\.php$/, '');
         const tok = s.output_token ? `&token=${encodeURIComponent(s.output_token)}` : '';
@@ -89,7 +90,7 @@ export class SettingsPage extends BaseComponent {
 
                 <details class="collapsible-card">
                     <summary class="collapsible-card__header">
-                        <span>⏱️ Automatisering &amp; QNAP Crontab</span>
+                        <span>⏱️ Automatisering &amp; Crontab</span>
                         <span class="collapsible-card__chevron">▼</span>
                     </summary>
                     <div class="collapsible-card__body stack-form">
@@ -102,72 +103,19 @@ export class SettingsPage extends BaseComponent {
                             </label>
                         </div>
                         <div class="endpoint-row" style="margin-top:0.5rem;">
-                            <label>QNAP Crontab (<span id="qnapCronLabel">${this.escapeHtml(initCron.label)}</span>)</label>
+                            <div class="cron-instruction-line">
+                                <span>Crontab</span>
+                                <span class="cron-paren-accent">(<span id="qnapCronLabel">${this.escapeHtml(initCron.label)}</span>)</span>
+                            </div>
                             <div class="copy-group">
                                 <input type="text" id="qnapCronInput" value="${this.escapeHtml(cronCmd)}" readonly>
                                 <button type="button" class="btn" id="copyCronBtn">Kopieer</button>
                             </div>
                         </div>
-                    </div>
-                </details>
-
-                <details class="collapsible-card">
-                    <summary class="collapsible-card__header">
-                        <span>🔗 Uitgaande Feeds &amp; Xtream Server (IPTVX / TiviMate)</span>
-                        <span class="collapsible-card__chevron">▼</span>
-                    </summary>
-                    <div class="collapsible-card__body stack-form">
-                        <label class="checkbox-row">
-                            <input type="checkbox" id="settingEnforceLan" ${s.enforce_lan_ip ? 'checked' : ''}>
-                            <span>Beperk uitgaande feeds tot lokale LAN-subnets</span>
-                        </label>
-                        <div class="endpoint-row">
-                            <label>Uitgaand Feed Token</label>
-                            <div class="copy-group">
-                                <input type="text" id="settingOutputToken" value="${this.escapeHtml(s.output_token)}" readonly>
-                                <button type="button" class="btn" id="regenTokenBtn">Regenereer Token</button>
-                            </div>
-                        </div>
-                        <div class="grid-2">
-                            <div class="endpoint-row">
-                                <label>M3U Playlist URL</label>
-                                <div class="copy-group">
-                                    <input type="text" id="settingPlaylistUrl" value="${this.escapeHtml(playlistUrl)}" readonly>
-                                    <button type="button" class="btn copy-setting-btn" data-copy="settingPlaylistUrl">Kopieer</button>
-                                </div>
-                            </div>
-                            <div class="endpoint-row">
-                                <label>XMLTV EPG URL</label>
-                                <div class="copy-group">
-                                    <input type="text" id="settingEpgUrlOut" value="${this.escapeHtml(epgUrl)}" readonly>
-                                    <button type="button" class="btn copy-setting-btn" data-copy="settingEpgUrlOut">Kopieer</button>
-                                </div>
-                            </div>
-                        </div>
 
                         <hr style="border:none;border-top:1px solid var(--border-color, #2a2f3a);margin:0.5rem 0;">
-                        <h3 style="margin:0;font-size:1.05rem;">Uitgaande Xtream Codes Server (IPTVX / TiviMate)</h3>
-                        <label class="checkbox-row">
-                            <input type="checkbox" id="settingXtreamOutEnabled" ${s.xtream_out_enabled ? 'checked' : ''}>
-                            <span>Activeer uitgaande Xtream Codes API server</span>
-                        </label>
-                        <div class="endpoint-row">
-                            <label>Server URL</label>
-                            <div class="copy-group">
-                                <input type="text" id="settingXtreamServerUrl" value="${this.escapeHtml(base.replace(/\/+$/, ''))}" readonly>
-                                <button type="button" class="btn copy-setting-btn" data-copy="settingXtreamServerUrl">Kopieer</button>
-                            </div>
-                        </div>
-                        <div class="grid-2">
-                            <label>Uitgaande Gebruikersnaam
-                                <input type="text" id="settingXtreamOutUser" placeholder="${this.escapeHtml(s.xtream_out_username_masked || 'Gebruikersnaam (laat leeg om te behouden)')}">
-                            </label>
-                            <label>Uitgaand Wachtwoord
-                                <input type="password" id="settingXtreamOutPass" placeholder="${s.xtream_out_password_set ? '•••••••• (laat leeg om te behouden)' : 'Wachtwoord'}">
-                            </label>
-                        </div>
-                        <div>
-                            <button type="button" class="btn" id="genXtreamOutCredsBtn" style="min-height:44px;">🔑 Genereer Sterke Inloggegevens</button>
+                        <div id="crontabManagerBox" class="stack-form" style="gap:0.75rem;">
+                            <p class="muted" style="margin:0;">Crontab status laden...</p>
                         </div>
                     </div>
                 </details>
@@ -220,34 +168,9 @@ export class SettingsPage extends BaseComponent {
                 epg_source_url: document.getElementById('settingEpgUrl')?.value || '',
                 sync_interval_hours: Number(document.getElementById('settingIntervalHours').value),
                 sync_preferred_hour: Number(document.getElementById('settingPreferredHour').value),
-                enforce_lan_ip: document.getElementById('settingEnforceLan').checked,
-                xtream_out_enabled: document.getElementById('settingXtreamOutEnabled')?.checked || false,
-                xtream_out_username: document.getElementById('settingXtreamOutUser')?.value || '',
-                xtream_out_password: document.getElementById('settingXtreamOutPass')?.value || '',
             });
             this.props.toast.show('Instellingen opgeslagen!');
             this.load();
-        });
-
-        document.getElementById('genXtreamOutCredsBtn')?.addEventListener('click', () => {
-            const randHex = bytes => Array.from(crypto.getRandomValues(new Uint8Array(bytes)))
-                .map(b => b.toString(16).padStart(2, '0')).join('');
-            const userEl = document.getElementById('settingXtreamOutUser');
-            const passEl = document.getElementById('settingXtreamOutPass');
-            const enabledEl = document.getElementById('settingXtreamOutEnabled');
-            if (userEl) userEl.value = 'iptv_' + randHex(4);
-            if (passEl) {
-                passEl.type = 'text';
-                passEl.value = randHex(12);
-            }
-            if (enabledEl) enabledEl.checked = true;
-            this.props.toast.show('Nieuwe inloggegevens ingevuld. Klik op Instellingen Opslaan om te bewaren.');
-        });
-
-        document.getElementById('regenTokenBtn')?.addEventListener('click', async () => {
-            const res = await this.props.api.post('regenerate_token');
-            document.getElementById('settingOutputToken').value = res.output_token;
-            this.props.toast.show('Nieuw token gegenereerd!');
         });
 
         document.getElementById('copyCronBtn')?.addEventListener('click', ev => {
@@ -264,6 +187,7 @@ export class SettingsPage extends BaseComponent {
             });
         });
 
+        this._cronCmdBase = `/mnt/ext/opt/apache/bin/php ${this._appRoot || ''}/bin/sync.php >/dev/null 2>&1`;
         const updateCronPreview = () => {
             const interval = Math.max(1, parseInt(document.getElementById('settingIntervalHours')?.value || '72', 10) || 1);
             const hour = Math.max(0, Math.min(23, parseInt(document.getElementById('settingPreferredHour')?.value || '3', 10) || 0));
@@ -271,7 +195,11 @@ export class SettingsPage extends BaseComponent {
             const labelEl = document.getElementById('qnapCronLabel');
             const inputEl = document.getElementById('qnapCronInput');
             if (labelEl) labelEl.textContent = cron.label;
-            if (inputEl) inputEl.value = `${cron.expr} /mnt/ext/opt/apache/bin/php ${s.app_root}/bin/sync.php >/dev/null 2>&1`;
+            if (inputEl) inputEl.value = `${cron.expr} ${this._cronCmdBase}`;
+            const presetEl = document.getElementById('cronPresetSelect');
+            const exprEl = document.getElementById('cronExprInput');
+            if (presetEl) presetEl.value = 'custom';
+            if (exprEl) exprEl.value = cron.expr;
         };
         document.getElementById('settingIntervalHours')?.addEventListener('input', updateCronPreview);
         document.getElementById('settingIntervalHours')?.addEventListener('change', updateCronPreview);
@@ -341,6 +269,144 @@ export class SettingsPage extends BaseComponent {
                 }
             );
         });
+
+        this.loadCrontabStatus();
+    }
+
+    async loadCrontabStatus() {
+        const box = document.getElementById('crontabManagerBox');
+        if (!box) return;
+        try {
+            const st = await this.props.api.get('crontab_status');
+            if (!st.supported) {
+                box.innerHTML = `<p class="muted" style="margin:0;">Crontab-beheer wordt op deze server niet ondersteund.</p>`;
+                return;
+            }
+
+            const presets = [
+                { value: '0 * * * *', label: 'Elk uur (0 * * * *)' },
+                { value: '0 */6 * * *', label: 'Elke 6 uur (0 */6 * * *)' },
+                { value: '0 3 * * *', label: 'Dagelijks om 03:00 (0 3 * * *)' },
+                { value: 'custom', label: 'Aangepast schema' },
+            ];
+            const currentExpr = st.current_schedule || '0 3 * * *';
+            const isPreset = presets.some(p => p.value === currentExpr);
+            const selectedPreset = isPreset ? currentExpr : 'custom';
+
+            box.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                    <strong>Interactief Crontab-beheer</strong>
+                    <span class="badge ${st.raw_line ? 'badge-success' : 'badge-warning'}">
+                        ${st.raw_line ? 'Actief' : 'Niet ingesteld'}
+                    </span>
+                </div>
+                ${st.raw_line ? `<div class="muted" style="font-size:0.85rem;">Huidige regel: <code>${this.escapeHtml(st.raw_line)}</code></div>` : ''}
+                ${!st.writable ? `
+                    <div class="alert alert-warning" style="padding:0.75rem;border-radius:6px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);">
+                        <p style="margin:0 0 0.5rem 0;font-size:0.88rem;">${this.escapeHtml(st.permission_hint)}</p>
+                        <div class="copy-group">
+                            <input type="text" id="cronPermCmdInput" value="chmod 664 /etc/config/crontab && chgrp httpdusr /etc/config/crontab" readonly>
+                            <button type="button" class="btn btn-sm" id="copyCronPermBtn">Kopieer SSH-commando</button>
+                        </div>
+                    </div>
+                ` : ''}
+                <div class="grid-2">
+                    <label>Schema Preset
+                        <select id="cronPresetSelect" ${!st.writable ? 'disabled' : ''}>
+                            ${presets.map(p => `<option value="${this.escapeHtml(p.value)}" ${p.value === selectedPreset ? 'selected' : ''}>${this.escapeHtml(p.label)}</option>`).join('')}
+                        </select>
+                    </label>
+                    <label>Cron Expressie (5 velden)
+                        <input type="text" id="cronExprInput" value="${this.escapeHtml(currentExpr)}" ${!st.writable ? 'disabled' : ''}>
+                    </label>
+                </div>
+                <label>PHP-CLI Pad
+                    <input type="text" id="cronPhpPathInput" value="${this.escapeHtml(st.default_php_path || '/usr/bin/php')}" ${!st.writable ? 'disabled' : ''}>
+                </label>
+                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+                    <button type="button" class="btn btn-primary" id="saveCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>Cronjob opslaan / wijzigen</button>
+                    ${st.raw_line ? `<button type="button" class="btn btn-danger" id="deleteCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>Cronjob wissen</button>` : ''}
+                </div>
+            `;
+
+            document.getElementById('copyCronPermBtn')?.addEventListener('click', ev => {
+                const input = document.getElementById('cronPermCmdInput');
+                if (input) ClipboardHelper.copyText(input.value, ev.currentTarget, null, this.props.toast);
+            });
+
+            const syncFromCronExpression = (expr) => {
+                const parts = String(expr || '').trim().split(/\s+/);
+                if (parts.length !== 5) return;
+                const [, hPart, dPart] = parts;
+                const intervalEl = document.getElementById('settingIntervalHours');
+                const hourEl = document.getElementById('settingPreferredHour');
+
+                let newInterval = null;
+                let newHour = null;
+
+                if (hPart === '*' && dPart === '*') {
+                    newInterval = 1;
+                } else if (/^\*\/(\d+)$/.test(hPart) && dPart === '*') {
+                    newInterval = Math.max(1, parseInt(hPart.slice(2), 10));
+                } else if (/^\d+$/.test(hPart) && dPart === '*') {
+                    newInterval = 24;
+                    newHour = Math.max(0, Math.min(23, parseInt(hPart, 10)));
+                } else if (/^\d+$/.test(hPart) && /^\*\/(\d+)$/.test(dPart)) {
+                    newInterval = Math.max(1, parseInt(dPart.slice(2), 10)) * 24;
+                    newHour = Math.max(0, Math.min(23, parseInt(hPart, 10)));
+                }
+
+                if (newInterval !== null && intervalEl) intervalEl.value = String(newInterval);
+                if (newHour !== null && hourEl) hourEl.value = String(newHour);
+
+                const effectiveInterval = newInterval ?? (parseInt(intervalEl?.value || '72', 10) || 72);
+                const effectiveHour = newHour ?? (parseInt(hourEl?.value || '3', 10) || 3);
+                const cron = this.buildCronSchedule(effectiveInterval, effectiveHour);
+                const labelEl = document.getElementById('qnapCronLabel');
+                const inputEl = document.getElementById('qnapCronInput');
+                if (labelEl) labelEl.textContent = cron.label;
+                if (inputEl && this._cronCmdBase) inputEl.value = `${expr.trim()} ${this._cronCmdBase}`;
+            };
+
+            document.getElementById('cronPresetSelect')?.addEventListener('change', ev => {
+                const val = ev.target.value;
+                const exprInput = document.getElementById('cronExprInput');
+                if (val !== 'custom' && exprInput) {
+                    exprInput.value = val;
+                    syncFromCronExpression(val);
+                }
+            });
+
+            document.getElementById('cronExprInput')?.addEventListener('input', ev => {
+                const val = ev.target.value.trim();
+                const presetEl = document.getElementById('cronPresetSelect');
+                if (presetEl) {
+                    const hasPreset = [...presetEl.options].some(o => o.value === val);
+                    presetEl.value = hasPreset ? val : 'custom';
+                }
+                syncFromCronExpression(val);
+            });
+
+            if (st.current_schedule) {
+                syncFromCronExpression(st.current_schedule);
+            }
+
+            document.getElementById('saveCrontabBtn')?.addEventListener('click', async () => {
+                const schedule = document.getElementById('cronExprInput')?.value?.trim() || '';
+                const phpPath = document.getElementById('cronPhpPathInput')?.value?.trim() || '';
+                await this.props.api.post('crontab_save', { schedule, php_path: phpPath });
+                this.props.toast.show('Cronjob opgeslagen!');
+                this.loadCrontabStatus();
+            });
+
+            document.getElementById('deleteCrontabBtn')?.addEventListener('click', async () => {
+                await this.props.api.post('crontab_delete', {});
+                this.props.toast.show('Cronjob gewist!');
+                this.loadCrontabStatus();
+            });
+        } catch (e) {
+            box.innerHTML = `<p class="muted" style="margin:0;">Kon crontab status niet laden: ${this.escapeHtml(e.message)}</p>`;
+        }
     }
 
     buildCronSchedule(interval, hour) {
