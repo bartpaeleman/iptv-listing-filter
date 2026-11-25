@@ -34,6 +34,10 @@ use App\Security\AuthService;
 use App\Security\CsrfGuard;
 use App\Services\InstallerService;
 
+EnvLoader::load();
+$tz = EnvLoader::get('APP_TIMEZONE', 'Europe/Brussels');
+date_default_timezone_set($tz !== '' ? $tz : 'Europe/Brussels');
+
 $route = (string) ($_GET['route'] ?? 'dashboard');
 
 if ($route === 'install') {
@@ -113,6 +117,9 @@ switch ($route) {
         $router->addApiRoute('custom_group_remove_channels', ChannelController::class, 'customGroupRemoveChannels');
         $router->addApiRoute('custom_group_resolve_sync', ChannelController::class, 'customGroupResolveSync');
         $router->addApiRoute('custom_group_member_ids', ChannelController::class, 'customGroupMemberIds');
+        $router->addApiRoute('custom_groups_backup_status', ChannelController::class, 'customGroupsBackupStatus');
+        $router->addApiRoute('custom_groups_backup_download', ChannelController::class, 'customGroupsBackupDownload');
+        $router->addApiRoute('custom_groups_backup_restore', ChannelController::class, 'customGroupsBackupRestore');
         $router->addApiRoute('search_compatible_channels', ChannelController::class, 'searchCompatibleChannels');
         $router->addApiRoute('channels', ChannelController::class, 'channels');
         $router->addApiRoute('update_channel', ChannelController::class, 'updateChannel');

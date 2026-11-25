@@ -50,6 +50,10 @@ final class XtreamApiService
             $types = self::VALID_TYPES;
         }
 
+        $customSync = new CustomGroupSyncService($this->pdo);
+        $customSync->backupCustomGroupsToDisk();
+        $customSync->captureSnapshotsBeforeSync();
+
         $host = rtrim(trim((string) $this->settings->get('xtream_host', '')), '/');
         $username = trim((string) $this->settings->get('xtream_username', ''));
         $password = (string) $this->settings->get('xtream_password', '');
@@ -144,7 +148,10 @@ final class XtreamApiService
             }
         }
 
-        $this->cleanupStaleRecords($types, $importStartTime);
+        if ($totalImported > 0) {
+            $this->cleanupStaleRecords($types, $importStartTime);
+        }
+        $customSync->relinkCustomGroupChannelsAfterSync();
         $this->settings->set('last_m3u_sync', gmdate('Y-m-d H:i:s'), false);
 
         return [
@@ -321,7 +328,8 @@ final class XtreamApiService
         $delGroups = $this->pdo->prepare(
             "DELETE g FROM m3u_groups g
              LEFT JOIN channels c ON c.group_id = g.id
-             WHERE g.content_type IN ({$grpInClause})
+             WHERE g.is_custom = 0
+               AND g.content_type IN ({$grpInClause})
                AND c.id IS NULL"
         );
         $delGroups->execute($grpParams);

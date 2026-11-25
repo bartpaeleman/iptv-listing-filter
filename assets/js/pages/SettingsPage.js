@@ -19,7 +19,7 @@ export class SettingsPage extends BaseComponent {
         const playlistUrl = `${base}/index.php?route=playlist${tok}`;
         const epgUrl = `${base}/index.php?route=epg${tok}`;
         const initCron = this.buildCronSchedule(Number(s.sync_interval_hours || 72), Number(s.sync_preferred_hour || 3));
-        const cronCmd = `${initCron.expr} /mnt/ext/opt/apache/bin/php ${s.app_root}/bin/sync.php >/dev/null 2>&1`;
+        const cronCmd = `${initCron.expr} /mnt/ext/opt/apache/bin/php ${s.app_root}/bin/sync.php --force >/dev/null 2>&1`;
 
         const sourceMode = s.source_mode === 'separate_urls' ? 'separate_urls' : 'xtream';
 
@@ -187,7 +187,7 @@ export class SettingsPage extends BaseComponent {
             });
         });
 
-        this._cronCmdBase = `/mnt/ext/opt/apache/bin/php ${this._appRoot || ''}/bin/sync.php >/dev/null 2>&1`;
+        this._cronCmdBase = `/mnt/ext/opt/apache/bin/php ${this._appRoot || ''}/bin/sync.php --force >/dev/null 2>&1`;
         const updateCronPreview = () => {
             const interval = Math.max(1, parseInt(document.getElementById('settingIntervalHours')?.value || '72', 10) || 1);
             const hour = Math.max(0, Math.min(23, parseInt(document.getElementById('settingPreferredHour')?.value || '3', 10) || 0));

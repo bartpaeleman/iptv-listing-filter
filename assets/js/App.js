@@ -40,6 +40,24 @@ class App {
                             <div id="updateSqlResult" style="margin-top:1rem;"></div>
                         </div>
 
+                        <details class="admin-collapsible-section collapsible-card" style="margin-bottom:1rem;">
+                            <summary class="collapsible-card__header">
+                                <span>♻️ Custom Groepen Backup &amp; Herstel</span>
+                                <span class="collapsible-card__chevron">▼</span>
+                            </summary>
+                            <div class="collapsible-card__body stack-form" style="gap:0.75rem;">
+                                <div id="customGroupsBackupStatus" class="muted" style="font-size:0.9rem;">Backupstatus laden...</div>
+                                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;">
+                                    <a href="index.php?route=api&endpoint=custom_groups_backup_download" class="btn" style="min-height:44px;display:inline-flex;align-items:center;">⬇️ Download backup (custom_groups_latest.json)</a>
+                                    <button type="button" id="restoreCustomGroupsBtn" class="btn btn-primary" style="min-height:44px;">♻️ 1-klik Herstel naar database</button>
+                                    <label class="btn" style="min-height:44px;display:inline-flex;align-items:center;cursor:pointer;margin:0;">
+                                        📂 Herstel vanuit lokaal JSON-bestand
+                                        <input type="file" id="uploadCustomGroupsFile" accept=".json,application/json" style="display:none;">
+                                    </label>
+                                </div>
+                            </div>
+                        </details>
+
                         <div class="card">
                             <div class="card-header" style="margin-bottom:0.5rem;">
                                 <h2>Applicatie Log (<code id="appLogPath">storage/logs/app.log</code>)</h2>
@@ -110,6 +128,48 @@ class App {
                             if (resEl) resEl.innerHTML = '<div class="alert alert-success">update.sql succesvol uitgevoerd.</div>';
                         } catch (err) {
                             if (resEl) resEl.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
+                        }
+                    });
+
+                    const loadBackupStatus = async () => {
+                        const stEl = document.getElementById('customGroupsBackupStatus');
+                        if (!stEl) return;
+                        try {
+                            const st = await this.api.get('custom_groups_backup_status');
+                            if (!st.exists) {
+                                stEl.textContent = 'Nog geen automatische backup aanwezig op schijf. Klik op Download backup om er direct een te genereren.';
+                            } else {
+                                const kb = Math.max(1, Math.round((st.size_bytes || 0) / 1024));
+                                stEl.innerHTML = `Laatste backup: <strong>${esc(st.updated_at || '-')}</strong> · <strong>${st.group_count}</strong> custom groepen · <strong>${st.channel_count}</strong> kanalen (${kb} KB)`;
+                            }
+                        } catch (e) {
+                            stEl.textContent = `Kon backupstatus niet laden: ${e.message}`;
+                        }
+                    };
+                    loadBackupStatus();
+
+                    document.getElementById('restoreCustomGroupsBtn')?.addEventListener('click', () => {
+                        this.modal.confirm(
+                            'Custom Groepen Herstellen',
+                            'Weet je zeker dat je de laatste backup (custom_groups_latest.json) wilt terugzetten naar MariaDB?',
+                            async () => {
+                                const res = await this.api.post('custom_groups_backup_restore', {});
+                                this.toast.show(`Herstel voltooid: ${res.groups_restored} groepen, ${res.channels_linked} kanalen gekoppeld (${res.channels_pending} in afwachting).`);
+                                loadBackupStatus();
+                            }
+                        );
+                    });
+
+                    document.getElementById('uploadCustomGroupsFile')?.addEventListener('change', async ev => {
+                        const file = ev.target.files?.[0];
+                        if (!file) return;
+                        try {
+                            const text = await file.text();
+                            const res = await this.api.post('custom_groups_backup_restore', { json_payload: text });
+                            this.toast.show(`Herstel vanuit bestand voltooid: ${res.groups_restored} groepen, ${res.channels_linked} kanalen gekoppeld.`);
+                            loadBackupStatus();
+                        } finally {
+                            ev.target.value = '';
                         }
                     });
 
