@@ -18,8 +18,22 @@ final class EpgExporterService
 
     public function streamXmltv(bool $useGzip = false): void
     {
-        $out = static function (string $chunk) use ($useGzip): void {
-            echo $useGzip ? gzencode($chunk, 6) : $chunk;
+        @set_time_limit(0);
+        @ini_set('display_errors', '0');
+
+        $deflateCtx = ($useGzip && function_exists('deflate_init'))
+            ? deflate_init(ZLIB_ENCODING_GZIP, ['level' => 6])
+            : false;
+
+        $out = static function (string $chunk) use ($deflateCtx): void {
+            if ($deflateCtx !== false) {
+                $compressed = deflate_add($deflateCtx, $chunk, ZLIB_NO_FLUSH);
+                if ($compressed !== false && $compressed !== '') {
+                    echo $compressed;
+                }
+            } else {
+                echo $chunk;
+            }
         };
 
         $buffer = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
@@ -46,13 +60,13 @@ final class EpgExporterService
         foreach ($channelStmt->fetchAll() as $ch) {
             $id = (string) $ch['epg_id'];
             $activeIds[] = $id;
-            $name = htmlspecialchars((string) $ch['display_name'], ENT_XML1 | ENT_QUOTES, 'UTF-8');
-            $idEsc = htmlspecialchars($id, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+            $name = $this->escapeXml((string) $ch['display_name']);
+            $idEsc = $this->escapeXml($id);
 
             $buffer .= "  <channel id=\"{$idEsc}\">\n";
             $buffer .= "    <display-name>{$name}</display-name>\n";
             if (!empty($ch['icon_url'])) {
-                $iconEsc = htmlspecialchars((string) $ch['icon_url'], ENT_XML1 | ENT_QUOTES, 'UTF-8');
+                $iconEsc = $this->escapeXml((string) $ch['icon_url']);
                 $buffer .= "    <icon src=\"{$iconEsc}\" />\n";
             }
             $buffer .= "  </channel>\n";
@@ -69,19 +83,23 @@ final class EpgExporterService
             $progStmt->execute($activeIds);
 
             while ($prog = $progStmt->fetch()) {
-                $idEsc = htmlspecialchars((string) $prog['epg_id'], ENT_XML1 | ENT_QUOTES, 'UTF-8');
                 $start = $this->formatXmltvTime((string) $prog['start_utc']);
                 $stop = $this->formatXmltvTime((string) $prog['stop_utc']);
-                $title = htmlspecialchars((string) $prog['title'], ENT_XML1 | ENT_QUOTES, 'UTF-8');
+                if ($start === '' || $stop === '') {
+                    continue;
+                }
+
+                $idEsc = $this->escapeXml((string) $prog['epg_id']);
+                $title = $this->escapeXml((string) $prog['title']);
 
                 $buffer .= "  <programme start=\"{$start}\" stop=\"{$stop}\" channel=\"{$idEsc}\">\n";
                 $buffer .= "    <title>{$title}</title>\n";
                 if (!empty($prog['description'])) {
-                    $desc = htmlspecialchars((string) $prog['description'], ENT_XML1 | ENT_QUOTES, 'UTF-8');
+                    $desc = $this->escapeXml((string) $prog['description']);
                     $buffer .= "    <desc>{$desc}</desc>\n";
                 }
                 if (!empty($prog['category'])) {
-                    $cat = htmlspecialchars((string) $prog['category'], ENT_XML1 | ENT_QUOTES, 'UTF-8');
+                    $cat = $this->escapeXml((string) $prog['category']);
                     $buffer .= "    <category>{$cat}</category>\n";
                 }
                 $buffer .= "  </programme>\n";
@@ -97,6 +115,22 @@ final class EpgExporterService
         if ($buffer !== '') {
             $out($buffer);
         }
+        if ($deflateCtx !== false) {
+            $tail = deflate_add($deflateCtx, '', ZLIB_FINISH);
+            if ($tail !== false && $tail !== '') {
+                echo $tail;
+            }
+        }
+    }
+
+    private function escapeXml(string $value): string
+    {
+        $clean = @iconv('UTF-8', 'UTF-8//IGNORE', $value);
+        if ($clean === false) {
+            $clean = $value;
+        }
+        $clean = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $clean) ?? $clean;
+        return htmlspecialchars($clean, ENT_XML1 | ENT_SUBSTITUTE | ENT_QUOTES, 'UTF-8');
     }
 
     private function formatXmltvTime(string $utcDatetime): string
