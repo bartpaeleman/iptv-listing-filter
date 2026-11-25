@@ -394,6 +394,11 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; }
     user-select: none;
     font-weight: 600;
     font-size: 1.05rem;
+    transition: background-color 0.15s ease;
+}
+
+.admin-collapsible-section .collapsible-card__header:hover {
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .collapsible-card__header::-webkit-details-marker {

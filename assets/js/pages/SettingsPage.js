@@ -122,15 +122,6 @@ export class SettingsPage extends BaseComponent {
 
                 <button type="submit" class="btn btn-primary" style="min-height:44px;">Instellingen Opslaan</button>
             </form>
-
-            <div class="card" style="margin-top:1rem;">
-                <h2>Database Onderhoud</h2>
-                <p class="muted" style="margin-bottom:1rem;">Wis geïmporteerde M3U- of EPG-tabellen veilig zonder instellingen, gebruikers, emoji-regels of EPG-bronnen te verwijderen.</p>
-                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
-                    <button type="button" class="btn btn-danger" id="clearM3uTablesBtn" style="min-height:44px;">🗑️ Wis M3U Kanalen &amp; Groepen</button>
-                    <button type="button" class="btn btn-danger" id="clearEpgTablesBtn" style="min-height:44px;">🗑️ Wis EPG Data</button>
-                </div>
-            </div>
         `;
 
         this.bindEvents();
@@ -244,30 +235,6 @@ export class SettingsPage extends BaseComponent {
                 this.props.toast.show('EPG bron verwijderd');
                 this.load();
             });
-        });
-
-        document.getElementById('clearM3uTablesBtn')?.addEventListener('click', () => {
-            this.props.modal.confirm(
-                'M3U Kanalen & Groepen wissen',
-                'Weet je zeker dat je alle kanalen en groepen wilt wissen? Instellingen, gebruikers, emoji-regels, EPG-bronnen en EPG-data blijven behouden.',
-                async () => {
-                    const res = await this.props.api.post('clear_db_tables', { scope: 'm3u' });
-                    this.props.toast.show(res.message || 'M3U data gewist!');
-                    this.load();
-                }
-            );
-        });
-
-        document.getElementById('clearEpgTablesBtn')?.addEventListener('click', () => {
-            this.props.modal.confirm(
-                'EPG Data wissen',
-                'Weet je zeker dat je alle EPG-programma\'s en EPG-zenders wilt wissen? Kanalen, groepen, instellingen, gebruikers, emoji-regels en EPG-bronnen blijven behouden.',
-                async () => {
-                    const res = await this.props.api.post('clear_db_tables', { scope: 'epg' });
-                    this.props.toast.show(res.message || 'EPG data gewist!');
-                    this.load();
-                }
-            );
         });
 
         this.loadCrontabStatus();

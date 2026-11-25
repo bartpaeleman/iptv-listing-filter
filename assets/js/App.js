@@ -33,14 +33,23 @@ class App {
                     let currentFile = 'app.log';
 
                     el.innerHTML = `
-                        <div class="card" style="margin-bottom:1rem;">
-                            <h2>Admin &amp; Database Tools</h2>
-                            <p class="muted">Voer <code>database/update.sql</code> uit om eventuele openstaande database-migraties toe te passen.</p>
-                            <button type="button" id="runUpdateSqlBtn" class="btn btn-primary" style="min-height:44px;">🛠️ Voer update.sql uit</button>
-                            <div id="updateSqlResult" style="margin-top:1rem;"></div>
-                        </div>
+                        <details class="admin-collapsible-section collapsible-card">
+                            <summary class="collapsible-card__header">
+                                <span>🗄️ Admin &amp; Database Tools</span>
+                                <span class="collapsible-card__chevron">▼</span>
+                            </summary>
+                            <div class="collapsible-card__body stack-form" style="gap:0.75rem;">
+                                <p class="muted" style="margin:0;">Voer <code>database/update.sql</code> uit om eventuele openstaande database-migraties toe te passen, of wis geïmporteerde M3U- of EPG-tabellen veilig zonder instellingen, gebruikers, emoji-regels of EPG-bronnen te verwijderen.</p>
+                                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;">
+                                    <button type="button" id="runUpdateSqlBtn" class="btn btn-primary" style="min-height:44px;">🛠️ Voer update.sql uit</button>
+                                    <button type="button" class="btn btn-danger" id="clearM3uTablesBtn" style="min-height:44px;">🗑️ Wis M3U Kanalen &amp; Groepen</button>
+                                    <button type="button" class="btn btn-danger" id="clearEpgTablesBtn" style="min-height:44px;">🗑️ Wis EPG Data</button>
+                                </div>
+                                <div id="updateSqlResult"></div>
+                            </div>
+                        </details>
 
-                        <details class="admin-collapsible-section collapsible-card" style="margin-bottom:1rem;">
+                        <details class="admin-collapsible-section collapsible-card">
                             <summary class="collapsible-card__header">
                                 <span>♻️ Custom Groepen Backup &amp; Herstel</span>
                                 <span class="collapsible-card__chevron">▼</span>
@@ -58,31 +67,36 @@ class App {
                             </div>
                         </details>
 
-                        <div class="card">
-                            <div class="card-header" style="margin-bottom:0.5rem;">
-                                <h2>Applicatie Log (<code id="appLogPath">storage/logs/app.log</code>)</h2>
-                                <span id="appLogMeta" class="muted" style="font-size:0.85rem;">Laden...</span>
+                        <details id="adminAppLogSection" class="admin-collapsible-section collapsible-card">
+                            <summary class="collapsible-card__header">
+                                <span>📋 Applicatie Log (<code id="appLogPath">storage/logs/app.log</code>)</span>
+                                <span class="collapsible-card__chevron">▼</span>
+                            </summary>
+                            <div class="collapsible-card__body stack-form" style="gap:0.75rem;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                                    <span id="appLogMeta" class="muted" style="font-size:0.85rem;">Laden...</span>
+                                </div>
+                                <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
+                                    <select id="logFileSelect" aria-label="Logbestand" style="min-height:44px;font-size:16px;padding:0.25rem 0.5rem;">
+                                        <option value="app.log" selected>Applicatie Log (app.log)</option>
+                                        <option value="sync.log">Sync Log (sync.log)</option>
+                                    </select>
+                                    <button type="button" id="logFewerBtn" class="btn btn-sm" style="min-height:44px;">Minder (-10)</button>
+                                    <select id="logLinesSelect" style="min-height:44px;font-size:16px;padding:0.25rem 0.5rem;">
+                                        <option value="5">5 regels</option>
+                                        <option value="10" selected>10 regels</option>
+                                        <option value="25">25 regels</option>
+                                        <option value="50">50 regels</option>
+                                        <option value="100">100 regels</option>
+                                        <option value="250">250 regels</option>
+                                    </select>
+                                    <button type="button" id="logMoreBtn" class="btn btn-sm" style="min-height:44px;">Meer (+10)</button>
+                                    <button type="button" id="logRefreshBtn" class="btn btn-sm" style="min-height:44px;">🔄 Vernieuwen</button>
+                                    <button type="button" id="logClearBtn" class="btn btn-sm btn-danger" style="min-height:44px;">🗑️ Log wissen</button>
+                                </div>
+                                <pre id="appLogBox" class="log-viewer-box">Laden...</pre>
                             </div>
-                            <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
-                                <select id="logFileSelect" aria-label="Logbestand" style="min-height:44px;font-size:16px;padding:0.25rem 0.5rem;">
-                                    <option value="app.log" selected>Applicatie Log (app.log)</option>
-                                    <option value="sync.log">Sync Log (sync.log)</option>
-                                </select>
-                                <button type="button" id="logFewerBtn" class="btn btn-sm" style="min-height:44px;">Minder (-10)</button>
-                                <select id="logLinesSelect" style="min-height:44px;font-size:16px;padding:0.25rem 0.5rem;">
-                                    <option value="5">5 regels</option>
-                                    <option value="10" selected>10 regels</option>
-                                    <option value="25">25 regels</option>
-                                    <option value="50">50 regels</option>
-                                    <option value="100">100 regels</option>
-                                    <option value="250">250 regels</option>
-                                </select>
-                                <button type="button" id="logMoreBtn" class="btn btn-sm" style="min-height:44px;">Meer (+10)</button>
-                                <button type="button" id="logRefreshBtn" class="btn btn-sm" style="min-height:44px;">🔄 Vernieuwen</button>
-                                <button type="button" id="logClearBtn" class="btn btn-sm btn-danger" style="min-height:44px;">🗑️ Log wissen</button>
-                            </div>
-                            <pre id="appLogBox" class="log-viewer-box">Laden...</pre>
-                        </div>
+                        </details>
                     `;
 
                     const loadLogs = async () => {
@@ -128,6 +142,34 @@ class App {
                             if (resEl) resEl.innerHTML = '<div class="alert alert-success">update.sql succesvol uitgevoerd.</div>';
                         } catch (err) {
                             if (resEl) resEl.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
+                        }
+                    });
+
+                    document.getElementById('clearM3uTablesBtn')?.addEventListener('click', () => {
+                        this.modal.confirm(
+                            'M3U Kanalen & Groepen wissen',
+                            'Weet je zeker dat je alle kanalen en groepen wilt wissen? Instellingen, gebruikers, emoji-regels, EPG-bronnen en EPG-data blijven behouden.',
+                            async () => {
+                                const res = await this.api.post('clear_db_tables', { scope: 'm3u' });
+                                this.toast.show(res.message || 'M3U data gewist!');
+                            }
+                        );
+                    });
+
+                    document.getElementById('clearEpgTablesBtn')?.addEventListener('click', () => {
+                        this.modal.confirm(
+                            'EPG Data wissen',
+                            'Weet je zeker dat je alle EPG-programma\'s en EPG-zenders wilt wissen? Kanalen, groepen, instellingen, gebruikers, emoji-regels en EPG-bronnen blijven behouden.',
+                            async () => {
+                                const res = await this.api.post('clear_db_tables', { scope: 'epg' });
+                                this.toast.show(res.message || 'EPG data gewist!');
+                            }
+                        );
+                    });
+
+                    document.getElementById('adminAppLogSection')?.addEventListener('toggle', ev => {
+                        if (ev.currentTarget?.open) {
+                            loadLogs();
                         }
                     });
 
