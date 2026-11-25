@@ -34,11 +34,12 @@ final class PlaylistExporterService
             default => 'g_import_order ASC, g_id ASC',
         };
 
-        $sql = "SELECT tvg_id, tvg_name, tvg_logo, stream_url, custom_name, channel_number, epg_channel_id, group_name
+        $sql = "SELECT tvg_id, tvg_name, tvg_logo, stream_url, custom_name, channel_number, epg_channel_id, group_name, group_category
                 FROM (
                     SELECT c.tvg_id, c.tvg_name, c.tvg_logo, c.stream_url, c.custom_name,
                            c.channel_number, c.epg_channel_id,
                            COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS group_name,
+                           g.category AS group_category,
                            g.original_name AS g_name, g.import_order AS g_import_order, g.id AS g_id,
                            COALESCE(c.channel_number, 999999) AS ch_num, c.sort_order AS ch_sort, c.id AS ch_id
                     FROM channels c
@@ -51,6 +52,7 @@ final class PlaylistExporterService
                     SELECT c.tvg_id, c.tvg_name, c.tvg_logo, c.stream_url, c.custom_name,
                            cgc.sort_order AS channel_number, c.epg_channel_id,
                            COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS group_name,
+                           g.category AS group_category,
                            COALESCE(NULLIF(g.custom_name, ''), g.original_name) AS g_name, g.import_order AS g_import_order, g.id AS g_id,
                            0 AS ch_num, cgc.sort_order AS ch_sort, c.id AS ch_id
                     FROM custom_group_channels cgc
@@ -66,7 +68,10 @@ final class PlaylistExporterService
             $tvgId = trim((string) ($row['epg_channel_id'] ?: $row['tvg_id'] ?: ''));
             $name = ChannelNameCleanerService::stripQualityTags((string) ($row['custom_name'] ?: $row['tvg_name'] ?: 'Channel'));
             $logo = (string) ($row['tvg_logo'] ?? '');
-            $group = (string) ($row['group_name'] ?? 'Overig');
+            $group = $this->formatGroupTitle(
+                (string) ($row['group_name'] ?? 'Overig'),
+                (string) ($row['group_category'] ?? '')
+            );
             $chno = $row['channel_number'] !== null ? (string) (int) $row['channel_number'] : '';
 
             $attrs = [
@@ -100,6 +105,27 @@ final class PlaylistExporterService
         }
 
         return rtrim((string) EnvLoader::get('APP_URL', ''), '/');
+    }
+
+    private function formatGroupTitle(string $groupName, string $category): string
+    {
+        $groupName = trim($groupName);
+
+        if ($category === 'Film') {
+            if (preg_match('/^vod(\s*[-:|]|\s|$)/i', $groupName) === 1) {
+                return $groupName;
+            }
+            return 'VOD - ' . $groupName;
+        }
+
+        if ($category === 'TV Series') {
+            if (preg_match('/^series?(\s*[-:|]|\s|$)/i', $groupName) === 1) {
+                return $groupName;
+            }
+            return 'Series - ' . $groupName;
+        }
+
+        return $groupName;
     }
 
     private function escapeAttr(string $value): string
