@@ -51,6 +51,8 @@ final class DashboardController extends BaseController
         $xtreamOutEnabled = $settings->get('xtream_out_enabled', '0') === '1';
         $xtreamOutUser = (string) $settings->get('xtream_out_username', '');
         $xtreamOutPass = (string) $settings->get('xtream_out_password', '');
+        $enforceLanRaw = $settings->get('enforce_lan_ip', '1');
+        $enforceLanIp = !in_array(strtolower(trim((string) ($enforceLanRaw ?? ''))), ['0', 'false', ''], true);
 
         $this->jsonSuccess([
             'active_channels' => (int) ($stats['active_channels'] ?? 0),
@@ -64,11 +66,14 @@ final class DashboardController extends BaseController
             'sync_interval_hours' => (int) $settings->get('sync_interval_hours', '72'),
             'sync_preferred_hour' => (int) $settings->get('sync_preferred_hour', '3'),
             'output_token' => $settings->get('output_token', ''),
+            'enforce_lan_ip' => $enforceLanIp,
             'source_mode' => $settings->get('source_mode', 'separate_urls'),
             'app_url' => rtrim((string) EnvLoader::get('APP_URL', ''), '/'),
             'xtream_out_enabled' => $xtreamOutEnabled,
             'xtream_out_username' => $xtreamOutUser,
+            'xtream_out_username_masked' => $xtreamOutUser !== '' ? substr($xtreamOutUser, 0, 3) . '••••' : '',
             'xtream_out_password' => $xtreamOutPass,
+            'has_xtream_out_password' => $xtreamOutPass !== '',
             'logs' => $logs->recent(15),
             'cache_status' => [
                 'm3u' => $cache->getCacheInfo('m3u'),

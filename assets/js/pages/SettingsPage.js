@@ -111,67 +111,6 @@ export class SettingsPage extends BaseComponent {
                     </div>
                 </details>
 
-                <details class="collapsible-card">
-                    <summary class="collapsible-card__header">
-                        <span>🔗 Uitgaande Feeds &amp; Xtream Server (IPTVX / TiviMate)</span>
-                        <span class="collapsible-card__chevron">▼</span>
-                    </summary>
-                    <div class="collapsible-card__body stack-form">
-                        <label class="checkbox-row">
-                            <input type="checkbox" id="settingEnforceLan" ${s.enforce_lan_ip ? 'checked' : ''}>
-                            <span>Beperk uitgaande feeds tot lokale LAN-subnets</span>
-                        </label>
-                        <div class="endpoint-row">
-                            <label>Uitgaand Feed Token</label>
-                            <div class="copy-group">
-                                <input type="text" id="settingOutputToken" value="${this.escapeHtml(s.output_token)}" readonly>
-                                <button type="button" class="btn" id="regenTokenBtn">Regenereer Token</button>
-                            </div>
-                        </div>
-                        <div class="grid-2">
-                            <div class="endpoint-row">
-                                <label>M3U Playlist URL</label>
-                                <div class="copy-group">
-                                    <input type="text" id="settingPlaylistUrl" value="${this.escapeHtml(playlistUrl)}" readonly>
-                                    <button type="button" class="btn copy-setting-btn" data-copy="settingPlaylistUrl">Kopieer</button>
-                                </div>
-                            </div>
-                            <div class="endpoint-row">
-                                <label>XMLTV EPG URL</label>
-                                <div class="copy-group">
-                                    <input type="text" id="settingEpgUrlOut" value="${this.escapeHtml(epgUrl)}" readonly>
-                                    <button type="button" class="btn copy-setting-btn" data-copy="settingEpgUrlOut">Kopieer</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <hr style="border:none;border-top:1px solid var(--border-color, #2a2f3a);margin:0.5rem 0;">
-                        <h3 style="margin:0;font-size:1.05rem;">Uitgaande Xtream Codes Server (IPTVX / TiviMate)</h3>
-                        <label class="checkbox-row">
-                            <input type="checkbox" id="settingXtreamOutEnabled" ${s.xtream_out_enabled ? 'checked' : ''}>
-                            <span>Activeer uitgaande Xtream Codes API server</span>
-                        </label>
-                        <div class="endpoint-row">
-                            <label>Server URL</label>
-                            <div class="copy-group">
-                                <input type="text" id="settingXtreamServerUrl" value="${this.escapeHtml(base.replace(/\/+$/, ''))}" readonly>
-                                <button type="button" class="btn copy-setting-btn" data-copy="settingXtreamServerUrl">Kopieer</button>
-                            </div>
-                        </div>
-                        <div class="grid-2">
-                            <label>Uitgaande Gebruikersnaam
-                                <input type="text" id="settingXtreamOutUser" placeholder="${this.escapeHtml(s.xtream_out_username_masked || 'Gebruikersnaam (laat leeg om te behouden)')}">
-                            </label>
-                            <label>Uitgaand Wachtwoord
-                                <input type="password" id="settingXtreamOutPass" placeholder="${s.xtream_out_password_set ? '•••••••• (laat leeg om te behouden)' : 'Wachtwoord'}">
-                            </label>
-                        </div>
-                        <div>
-                            <button type="button" class="btn" id="genXtreamOutCredsBtn" style="min-height:44px;">🔑 Genereer Sterke Inloggegevens</button>
-                        </div>
-                    </div>
-                </details>
-
                 <button type="submit" class="btn btn-primary" style="min-height:44px;">Instellingen Opslaan</button>
             </form>
 
@@ -220,34 +159,9 @@ export class SettingsPage extends BaseComponent {
                 epg_source_url: document.getElementById('settingEpgUrl')?.value || '',
                 sync_interval_hours: Number(document.getElementById('settingIntervalHours').value),
                 sync_preferred_hour: Number(document.getElementById('settingPreferredHour').value),
-                enforce_lan_ip: document.getElementById('settingEnforceLan').checked,
-                xtream_out_enabled: document.getElementById('settingXtreamOutEnabled')?.checked || false,
-                xtream_out_username: document.getElementById('settingXtreamOutUser')?.value || '',
-                xtream_out_password: document.getElementById('settingXtreamOutPass')?.value || '',
             });
             this.props.toast.show('Instellingen opgeslagen!');
             this.load();
-        });
-
-        document.getElementById('genXtreamOutCredsBtn')?.addEventListener('click', () => {
-            const randHex = bytes => Array.from(crypto.getRandomValues(new Uint8Array(bytes)))
-                .map(b => b.toString(16).padStart(2, '0')).join('');
-            const userEl = document.getElementById('settingXtreamOutUser');
-            const passEl = document.getElementById('settingXtreamOutPass');
-            const enabledEl = document.getElementById('settingXtreamOutEnabled');
-            if (userEl) userEl.value = 'iptv_' + randHex(4);
-            if (passEl) {
-                passEl.type = 'text';
-                passEl.value = randHex(12);
-            }
-            if (enabledEl) enabledEl.checked = true;
-            this.props.toast.show('Nieuwe inloggegevens ingevuld. Klik op Instellingen Opslaan om te bewaren.');
-        });
-
-        document.getElementById('regenTokenBtn')?.addEventListener('click', async () => {
-            const res = await this.props.api.post('regenerate_token');
-            document.getElementById('settingOutputToken').value = res.output_token;
-            this.props.toast.show('Nieuw token gegenereerd!');
         });
 
         document.getElementById('copyCronBtn')?.addEventListener('click', ev => {

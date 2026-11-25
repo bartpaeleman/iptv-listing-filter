@@ -117,8 +117,39 @@ export class DashboardPage extends BaseComponent {
                         </div>
                     </div>
                     ` : `
-                    <p class="muted" style="margin:0;">Uitgaande Xtream Codes server is nog niet geactiveerd of geconfigureerd. Klik op <strong>⚙️ XTream Instellen</strong> om inloggegevens aan te maken.</p>
+                    <p class="muted" style="margin:0;">Uitgaande Xtream Codes server is nog niet geactiveerd of geconfigureerd. Gebruik de instellingen hieronder om inloggegevens aan te maken.</p>
                     `}
+
+                    <hr style="border:none;border-top:1px solid var(--border-color, #2a2f3a);margin:1rem 0;">
+                    <div class="stack-form" style="gap:0.75rem;">
+                        <label class="checkbox-row">
+                            <input type="checkbox" id="dashEnforceLan" ${d.enforce_lan_ip ? 'checked' : ''}>
+                            <span>Beperk uitgaande feeds tot lokale LAN-subnets</span>
+                        </label>
+                        <div class="endpoint-row">
+                            <label>Uitgaand Feed Token</label>
+                            <div class="copy-group">
+                                <input type="text" id="dashOutputToken" value="${this.escapeHtml(d.output_token || '')}" readonly>
+                                <button type="button" class="btn" id="dashRegenTokenBtn" style="min-height:44px;">Regenereer Token</button>
+                            </div>
+                        </div>
+                        <label class="checkbox-row">
+                            <input type="checkbox" id="dashXtreamOutEnabled" ${d.xtream_out_enabled ? 'checked' : ''}>
+                            <span>Xtream Codes Server inschakelen</span>
+                        </label>
+                        <div class="grid-2">
+                            <label>Uitgaande Gebruikersnaam
+                                <input type="text" id="dashXtreamOutUser" placeholder="${this.escapeHtml(d.xtream_out_username_masked || 'Gebruikersnaam (laat leeg om te behouden)')}">
+                            </label>
+                            <label>Uitgaand Wachtwoord
+                                <input type="password" id="dashXtreamOutPass" placeholder="${d.has_xtream_out_password ? '•••••••• (laat leeg om te behouden)' : 'Wachtwoord'}">
+                            </label>
+                        </div>
+                        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+                            <button type="button" class="btn" id="dashGenXtreamOutCredsBtn" style="min-height:44px;">🔑 Genereer Sterke Inloggegevens</button>
+                            <button type="button" class="btn btn-primary" id="dashSaveOutboundBtn" style="min-height:44px;">Uitgaande Instellingen Opslaan</button>
+                        </div>
+                    </div>
                 </div>
             </details>
 
@@ -171,6 +202,46 @@ export class DashboardPage extends BaseComponent {
 
         document.getElementById('goToXtreamSettingsBtn')?.addEventListener('click', () => {
             document.querySelector('[data-page="settings"], [data-tab="settings"]')?.click();
+        });
+
+        const saveOutboundSettings = async (reload = false) => {
+            await this.props.api.post('save_settings', {
+                enforce_lan_ip: document.getElementById('dashEnforceLan')?.checked ?? true,
+                xtream_out_enabled: document.getElementById('dashXtreamOutEnabled')?.checked ?? false,
+                xtream_out_username: document.getElementById('dashXtreamOutUser')?.value || '',
+                xtream_out_password: document.getElementById('dashXtreamOutPass')?.value || '',
+            });
+            this.props.toast.show('Uitgaande instellingen opgeslagen!');
+            if (reload) {
+                await this.load();
+            }
+        };
+
+        document.getElementById('dashEnforceLan')?.addEventListener('change', () => saveOutboundSettings(false));
+        document.getElementById('dashXtreamOutEnabled')?.addEventListener('change', () => saveOutboundSettings(true));
+        document.getElementById('dashSaveOutboundBtn')?.addEventListener('click', () => saveOutboundSettings(true));
+
+        document.getElementById('dashGenXtreamOutCredsBtn')?.addEventListener('click', () => {
+            const randHex = bytes => Array.from(crypto.getRandomValues(new Uint8Array(bytes)))
+                .map(b => b.toString(16).padStart(2, '0')).join('');
+            const userEl = document.getElementById('dashXtreamOutUser');
+            const passEl = document.getElementById('dashXtreamOutPass');
+            const enabledEl = document.getElementById('dashXtreamOutEnabled');
+            if (userEl) userEl.value = 'iptv_' + randHex(4);
+            if (passEl) {
+                passEl.type = 'text';
+                passEl.value = randHex(12);
+            }
+            if (enabledEl) enabledEl.checked = true;
+            this.props.toast.show('Nieuwe inloggegevens ingevuld. Klik op Uitgaande Instellingen Opslaan om te bewaren.');
+        });
+
+        document.getElementById('dashRegenTokenBtn')?.addEventListener('click', async () => {
+            const res = await this.props.api.post('regenerate_token');
+            const tokenEl = document.getElementById('dashOutputToken');
+            if (tokenEl) tokenEl.value = res.output_token;
+            this.props.toast.show('Nieuw token gegenereerd!');
+            await this.load();
         });
 
         const mount = document.getElementById('dashboardProgressMount');
