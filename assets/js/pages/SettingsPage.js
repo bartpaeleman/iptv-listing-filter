@@ -289,7 +289,6 @@ export class SettingsPage extends BaseComponent {
                 { value: '0 3 * * *', label: 'Dagelijks om 03:00 (0 3 * * *)' },
                 { value: 'custom', label: 'Aangepast schema' },
             ];
-            const currentExpr = st.current_schedule || '0 3 * * *';
             const activeType = this.activeCronType === 'epg' ? 'epg' : 'm3u';
             const job = st.jobs?.[activeType] || {
                 raw_line: st.raw_line || '',
