@@ -1,6 +1,7 @@
 import { BaseComponent } from '../core/BaseComponent.js';
 import { ClipboardHelper } from '../core/ClipboardHelper.js';
 import { SyncProgressPanel } from '../components/SyncProgressPanel.js';
+import { SyncLogViewer } from '../components/SyncLogViewer.js';
 
 export class DashboardPage extends BaseComponent {
     async load() {
@@ -163,26 +164,13 @@ export class DashboardPage extends BaseComponent {
                         <span class="muted" style="font-size:0.85rem;">Recente synchronisaties</span>
                         <button type="button" id="btn-clear-sync-logs" class="btn btn-sm">🗑️ Log leegmaken</button>
                     </div>
-                    <div class="table-wrap">
-                        <table class="data-table">
-                            <thead><tr><th>Tijd</th><th>Type</th><th>Status</th><th>Bericht</th></tr></thead>
-                            <tbody id="syncLogsBody">
-                                ${(d.logs || []).length > 0 ? (d.logs || []).map(l => `
-                                    <tr>
-                                        <td>${this.escapeHtml(l.created_at)}</td>
-                                        <td>${this.escapeHtml(String(l.sync_type).toUpperCase())}</td>
-                                        <td><span class="badge ${l.status === 'success' ? 'badge-success' : 'badge-warning'}">${this.escapeHtml(l.status)}</span></td>
-                                        <td>${this.escapeHtml(l.message)}</td>
-                                    </tr>
-                                `).join('') : '<tr><td colspan="4" class="muted">Nog geen sync-logs aanwezig</td></tr>'}
-                            </tbody>
-                        </table>
-                    </div>
+                    <div id="syncLogViewerContainer"></div>
                 </div>
             </details>
         `;
 
         this.bindEvents();
+        this.loadSyncLogViewer();
     }
 
     bindEvents() {
@@ -298,21 +286,25 @@ export class DashboardPage extends BaseComponent {
         document.getElementById('btn-clear-sync-logs')?.addEventListener('click', async () => {
             if (!confirm('Weet je zeker dat je alle sync-logs wilt verwijderen?')) return;
             const res = await this.props.api.post('clear_sync_logs');
+            await this.props.api.post('clear_app_logs', { file: 'sync.log' });
             this.renderSyncLogs([]);
             this.props.toast.show(res?.message || 'Sync log is leeggemaakt');
         });
     }
 
-    renderSyncLogs(logs) {
-        const tbody = document.getElementById('syncLogsBody');
-        if (!tbody) return;
-        tbody.innerHTML = (logs || []).length > 0 ? logs.map(l => `
-            <tr>
-                <td>${this.escapeHtml(l.created_at)}</td>
-                <td>${this.escapeHtml(String(l.sync_type).toUpperCase())}</td>
-                <td><span class="badge ${l.status === 'success' ? 'badge-success' : 'badge-warning'}">${this.escapeHtml(l.status)}</span></td>
-                <td>${this.escapeHtml(l.message)}</td>
-            </tr>
-        `).join('') : '<tr><td colspan="4" class="muted">Nog geen sync-logs aanwezig</td></tr>';
+    async loadSyncLogViewer() {
+        const container = document.getElementById('syncLogViewerContainer');
+        if (!container) return;
+        this.syncLogViewer = new SyncLogViewer(container, { lines: [] });
+        try {
+            const res = await this.props.api.get('app_logs?file=sync.log&lines=100');
+            this.syncLogViewer.setLines(res?.lines || []);
+        } catch {
+            this.syncLogViewer.setLines([]);
+        }
+    }
+
+    renderSyncLogs() {
+        this.loadSyncLogViewer();
     }
 }

@@ -292,6 +292,7 @@ export class SettingsPage extends BaseComponent {
                 </label>
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
                     <button type="button" class="btn btn-primary" id="saveCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>Cronjob opslaan / wijzigen</button>
+                    <button type="button" class="btn" id="testCrontabBtn" style="min-height:44px;">▶️ Cronjob nu testen</button>
                     ${st.raw_line ? `<button type="button" class="btn btn-danger" id="deleteCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>Cronjob wissen</button>` : ''}
                 </div>
             `;
@@ -370,6 +371,23 @@ export class SettingsPage extends BaseComponent {
                 await this.props.api.post('crontab_delete', {});
                 this.props.toast.show('Cronjob gewist!');
                 this.loadCrontabStatus();
+            });
+
+            document.getElementById('testCrontabBtn')?.addEventListener('click', async ev => {
+                const btn = ev.currentTarget;
+                const origText = btn.textContent;
+                btn.disabled = true;
+                btn.textContent = 'Bezig met testen...';
+                try {
+                    const res = await this.props.api.post('test_cron', {});
+                    this.props.toast.show(res?.message || 'Cronjob-test voltooid!');
+                    await this.loadCrontabStatus();
+                } catch (err) {
+                    this.props.toast.show(err?.message || 'Cronjob-test mislukt.', 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = origText;
+                }
             });
         } catch (e) {
             box.innerHTML = `<p class="muted" style="margin:0;">Kon crontab status niet laden: ${this.escapeHtml(e.message)}</p>`;

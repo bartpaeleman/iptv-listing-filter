@@ -48,6 +48,12 @@ final class SchedulerService
         $progress->reset();
         $result = ['ran' => true];
 
+        AppLogger::log('CRON', 'INFO', 'SchedulerService gestart.', [
+            'force' => $force,
+            'mode' => $mode,
+            'cache_mode' => $cacheMode,
+        ]);
+
         try {
             if ($mode === 'all' || $mode === 'epg') {
                 $progress->update('running', 'parse_epg', 10, 'EPG bronnen synchroniseren...', [], 'Start EPG synchronisatie');
@@ -82,10 +88,16 @@ final class SchedulerService
             }
 
             $progress->update('completed', 'done', 100, 'Synchronisatie voltooid!', [], 'Synchronisatie voltooid');
+            AppLogger::log('CRON', 'SUCCESS', 'SchedulerService succesvol afgerond.', [
+                'mode' => $mode,
+                'm3u' => $result['m3u'] ?? null,
+                'epg' => $result['epg'] ?? null,
+            ]);
         } catch (\Throwable $e) {
             $progress->update('error', 'done', 100, 'Fout: ' . $e->getMessage(), [], 'Fout: ' . $e->getMessage());
             $this->logs->addLog($mode, 'error', $e->getMessage(), []);
             $this->writeFileLog($mode, 'error', $e->getMessage(), []);
+            AppLogger::log('CRON', 'ERROR', sprintf('%s in %s:%d', $e->getMessage(), $e->getFile(), $e->getLine()));
             throw $e;
         }
 
