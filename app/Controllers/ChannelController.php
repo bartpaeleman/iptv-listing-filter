@@ -222,7 +222,7 @@ final class ChannelController extends BaseController
         $activeOnly = isset($_GET['active_only']) && $_GET['active_only'] === '1';
         $countryTagId = trim((string) ($_GET['country_tag_id'] ?? ''));
         $status = (string) ($_GET['status'] ?? 'all');
-        $limit = min(200, max(10, (int) ($_GET['limit'] ?? 100)));
+        $limit = min(250, max(1, (int) ($_GET['limit'] ?? 100)));
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
         $sortBy = in_array(
             $_GET['sort_by'] ?? 'number',
@@ -232,7 +232,7 @@ final class ChannelController extends BaseController
         $contentTypes = $this->parseContentTypes((string) ($_GET['content_types'] ?? ''));
         $liveOnly = isset($_GET['live_only']) && $_GET['live_only'] === '1';
 
-        $isDefaultGroupView = ($groupId !== null && $groupId > 0 && $search === '' && $epgStatus === '' && !$activeOnly && $countryTagId === '' && $status === 'all' && $sortBy === 'number' && $offset === 0 && $limit >= 150 && !$liveOnly);
+        $isDefaultGroupView = ($groupId !== null && $groupId > 0 && $search === '' && $epgStatus === '' && !$activeOnly && $countryTagId === '' && $status === 'all' && $sortBy === 'number' && $offset === 0 && $limit === 100 && !$liveOnly);
         $viewCache = new ViewCacheService();
         if ($isDefaultGroupView) {
             $cached = $viewCache->getGroupChannels($groupId);
@@ -264,6 +264,12 @@ final class ChannelController extends BaseController
             }
             unset($ch);
         }
+
+        $items = isset($res['items']) && is_array($res['items']) ? $res['items'] : [];
+        $total = (int) ($res['total'] ?? 0);
+        $res['offset'] = $offset;
+        $res['limit'] = $limit;
+        $res['has_more'] = ($offset + count($items)) < $total;
 
         if ($isDefaultGroupView) {
             $viewCache->setGroupChannels($groupId, $res);

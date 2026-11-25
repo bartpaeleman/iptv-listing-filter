@@ -186,6 +186,7 @@ export class SettingsPage extends BaseComponent {
             });
         });
 
+        this._cronCmdBase = `/mnt/ext/opt/apache/bin/php ${s.app_root}/bin/sync.php >/dev/null 2>&1`;
         const updateCronPreview = () => {
             const interval = Math.max(1, parseInt(document.getElementById('settingIntervalHours')?.value || '72', 10) || 1);
             const hour = Math.max(0, Math.min(23, parseInt(document.getElementById('settingPreferredHour')?.value || '3', 10) || 0));
@@ -193,7 +194,11 @@ export class SettingsPage extends BaseComponent {
             const labelEl = document.getElementById('qnapCronLabel');
             const inputEl = document.getElementById('qnapCronInput');
             if (labelEl) labelEl.textContent = cron.label;
-            if (inputEl) inputEl.value = `${cron.expr} /mnt/ext/opt/apache/bin/php ${s.app_root}/bin/sync.php >/dev/null 2>&1`;
+            if (inputEl) inputEl.value = `${cron.expr} ${this._cronCmdBase}`;
+            const presetEl = document.getElementById('cronPresetSelect');
+            const exprEl = document.getElementById('cronExprInput');
+            if (presetEl) presetEl.value = 'custom';
+            if (exprEl) exprEl.value = cron.expr;
         };
         document.getElementById('settingIntervalHours')?.addEventListener('input', updateCronPreview);
         document.getElementById('settingIntervalHours')?.addEventListener('change', updateCronPreview);
@@ -328,13 +333,62 @@ export class SettingsPage extends BaseComponent {
                 if (input) ClipboardHelper.copyText(input.value, ev.currentTarget, null, this.props.toast);
             });
 
+            const syncFromCronExpression = (expr) => {
+                const parts = String(expr || '').trim().split(/\s+/);
+                if (parts.length !== 5) return;
+                const [, hPart, dPart] = parts;
+                const intervalEl = document.getElementById('settingIntervalHours');
+                const hourEl = document.getElementById('settingPreferredHour');
+
+                let newInterval = null;
+                let newHour = null;
+
+                if (hPart === '*' && dPart === '*') {
+                    newInterval = 1;
+                } else if (/^\*\/(\d+)$/.test(hPart) && dPart === '*') {
+                    newInterval = Math.max(1, parseInt(hPart.slice(2), 10));
+                } else if (/^\d+$/.test(hPart) && dPart === '*') {
+                    newInterval = 24;
+                    newHour = Math.max(0, Math.min(23, parseInt(hPart, 10)));
+                } else if (/^\d+$/.test(hPart) && /^\*\/(\d+)$/.test(dPart)) {
+                    newInterval = Math.max(1, parseInt(dPart.slice(2), 10)) * 24;
+                    newHour = Math.max(0, Math.min(23, parseInt(hPart, 10)));
+                }
+
+                if (newInterval !== null && intervalEl) intervalEl.value = String(newInterval);
+                if (newHour !== null && hourEl) hourEl.value = String(newHour);
+
+                const effectiveInterval = newInterval ?? (parseInt(intervalEl?.value || '72', 10) || 72);
+                const effectiveHour = newHour ?? (parseInt(hourEl?.value || '3', 10) || 3);
+                const cron = this.buildCronSchedule(effectiveInterval, effectiveHour);
+                const labelEl = document.getElementById('qnapCronLabel');
+                const inputEl = document.getElementById('qnapCronInput');
+                if (labelEl) labelEl.textContent = cron.label;
+                if (inputEl && this._cronCmdBase) inputEl.value = `${expr.trim()} ${this._cronCmdBase}`;
+            };
+
             document.getElementById('cronPresetSelect')?.addEventListener('change', ev => {
                 const val = ev.target.value;
                 const exprInput = document.getElementById('cronExprInput');
                 if (val !== 'custom' && exprInput) {
                     exprInput.value = val;
+                    syncFromCronExpression(val);
                 }
             });
+
+            document.getElementById('cronExprInput')?.addEventListener('input', ev => {
+                const val = ev.target.value.trim();
+                const presetEl = document.getElementById('cronPresetSelect');
+                if (presetEl) {
+                    const hasPreset = [...presetEl.options].some(o => o.value === val);
+                    presetEl.value = hasPreset ? val : 'custom';
+                }
+                syncFromCronExpression(val);
+            });
+
+            if (st.current_schedule) {
+                syncFromCronExpression(st.current_schedule);
+            }
 
             document.getElementById('saveCrontabBtn')?.addEventListener('click', async () => {
                 const schedule = document.getElementById('cronExprInput')?.value?.trim() || '';
