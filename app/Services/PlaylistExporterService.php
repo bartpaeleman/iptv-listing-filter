@@ -22,6 +22,10 @@ final class PlaylistExporterService
 
     public function streamPlaylist(string $sortMode = 'import'): void
     {
+        if (($_GET['download'] ?? '') === '1' && !headers_sent()) {
+            header('Content-Disposition: attachment; filename="playlist.m3u"');
+        }
+
         $appUrl = $this->resolveBaseUrl();
         $token = (string) $this->settings->get('output_token', '');
         $epgUrl = $appUrl . '/index.php?route=epg' . ($token !== '' ? '&token=' . urlencode($token) : '');
