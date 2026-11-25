@@ -50,6 +50,10 @@ final class SettingsController extends BaseController
             'epg_source_url_masked' => $epg !== '' ? substr($epg, 0, 36) . (strlen($epg) > 36 ? '••••' : '') : '',
             'sync_interval_hours' => (int) $settings->get('sync_interval_hours', '72'),
             'sync_preferred_hour' => (int) $settings->get('sync_preferred_hour', '3'),
+            'sync_m3u_interval_hours' => (int) $settings->get('sync_m3u_interval_hours', $settings->get('sync_interval_hours', '72') ?? '72'),
+            'sync_m3u_preferred_hour' => (int) $settings->get('sync_m3u_preferred_hour', $settings->get('sync_preferred_hour', '3') ?? '3'),
+            'sync_epg_interval_hours' => (int) $settings->get('sync_epg_interval_hours', '12'),
+            'sync_epg_preferred_hour' => (int) $settings->get('sync_epg_preferred_hour', '4'),
             'enforce_lan_ip' => $settings->get('enforce_lan_ip', '1') === '1',
             'output_token' => $settings->get('output_token', ''),
             'app_root' => dirname(__DIR__, 2),
@@ -131,6 +135,23 @@ final class SettingsController extends BaseController
             $hour = max(0, min(23, (int) $input['sync_preferred_hour']));
             $settings->set('sync_preferred_hour', (string) $hour, false);
         }
+        if (isset($input['sync_m3u_interval_hours'])) {
+            $val = (string) max(1, (int) $input['sync_m3u_interval_hours']);
+            $settings->set('sync_m3u_interval_hours', $val, false);
+            $settings->set('sync_interval_hours', $val, false);
+        }
+        if (isset($input['sync_m3u_preferred_hour'])) {
+            $hour = (string) max(0, min(23, (int) $input['sync_m3u_preferred_hour']));
+            $settings->set('sync_m3u_preferred_hour', $hour, false);
+            $settings->set('sync_preferred_hour', $hour, false);
+        }
+        if (isset($input['sync_epg_interval_hours'])) {
+            $settings->set('sync_epg_interval_hours', (string) max(1, (int) $input['sync_epg_interval_hours']), false);
+        }
+        if (isset($input['sync_epg_preferred_hour'])) {
+            $hour = max(0, min(23, (int) $input['sync_epg_preferred_hour']));
+            $settings->set('sync_epg_preferred_hour', (string) $hour, false);
+        }
         if (isset($input['enforce_lan_ip'])) {
             $settings->set('enforce_lan_ip', $input['enforce_lan_ip'] ? '1' : '0', false);
         }
@@ -172,16 +193,19 @@ final class SettingsController extends BaseController
 
         $schedule = trim((string) ($input['schedule'] ?? ''));
         $phpPath = trim((string) ($input['php_path'] ?? ''));
+        $type = trim((string) ($input['type'] ?? 'm3u'));
 
         try {
-            $status = (new \App\Services\CrontabService())->saveJob($schedule, $phpPath);
+            $status = (new \App\Services\CrontabService())->saveJob($schedule, $phpPath, $type);
             \App\Services\AppLogger::log('CRON', 'INFO', 'Cronjob-instellingen opgeslagen/gewijzigd.', [
+                'type' => $type,
                 'schedule' => $schedule,
                 'php_path' => $phpPath,
             ]);
             $this->jsonSuccess($status);
         } catch (\Throwable $e) {
             \App\Services\AppLogger::log('CRON', 'ERROR', 'Opslaan van cronjob mislukt: ' . $e->getMessage(), [
+                'type' => $type,
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
             ]);
@@ -195,9 +219,11 @@ final class SettingsController extends BaseController
         $input = $this->getJsonInput();
         $this->verifyCsrf($input);
 
+        $type = trim((string) ($input['type'] ?? 'm3u'));
+
         try {
-            $status = (new \App\Services\CrontabService())->deleteJob();
-            \App\Services\AppLogger::log('CRON', 'INFO', 'Cronjob gewist.');
+            $status = (new \App\Services\CrontabService())->deleteJob($type);
+            \App\Services\AppLogger::log('CRON', 'INFO', 'Cronjob gewist.', ['type' => $type]);
             $this->jsonSuccess($status);
         } catch (\Throwable $e) {
             \App\Services\AppLogger::log('CRON', 'ERROR', 'Wissen van cronjob mislukt: ' . $e->getMessage(), [

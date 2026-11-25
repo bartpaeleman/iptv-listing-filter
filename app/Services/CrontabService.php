@@ -17,22 +17,31 @@ final class CrontabService
         $writable = $this->isWritable($backend);
 
         $lines = $this->readCrontabLines($backend);
-        $rawLine = '';
-        $currentSchedule = '';
-        $currentCommand = '';
+        $jobs = [
+            'm3u' => ['raw_line' => '', 'current_schedule' => '', 'current_command' => ''],
+            'epg' => ['raw_line' => '', 'current_schedule' => '', 'current_command' => ''],
+        ];
 
         foreach ($lines as $line) {
             $trimmed = trim($line);
             if ($trimmed === '' || str_starts_with($trimmed, '#')) {
                 continue;
             }
-            if (str_contains($trimmed, self::SYNC_MARKER)) {
-                $rawLine = $trimmed;
+            if (!str_contains($trimmed, self::SYNC_MARKER)) {
+                continue;
+            }
+            $type = null;
+            if (str_contains($trimmed, '--m3u')) {
+                $type = 'm3u';
+            } elseif (str_contains($trimmed, '--epg')) {
+                $type = 'epg';
+            }
+            if ($type !== null && $jobs[$type]['raw_line'] === '') {
+                $jobs[$type]['raw_line'] = $trimmed;
                 if (preg_match('/^(\S+\s+\S+\s+\S+\s+\S+\s+\S+)\s+(.+)$/', $trimmed, $m)) {
-                    $currentSchedule = $m[1];
-                    $currentCommand = $m[2];
+                    $jobs[$type]['current_schedule'] = $m[1];
+                    $jobs[$type]['current_command'] = $m[2];
                 }
-                break;
             }
         }
 
@@ -49,17 +58,22 @@ final class CrontabService
             'supported' => $backend !== 'none',
             'writable' => $writable,
             'backend' => $backend,
-            'current_schedule' => $currentSchedule,
-            'current_command' => $currentCommand,
-            'raw_line' => $rawLine,
+            'jobs' => $jobs,
+            'current_schedule' => $jobs['m3u']['current_schedule'],
+            'current_command' => $jobs['m3u']['current_command'],
+            'raw_line' => $jobs['m3u']['raw_line'],
             'default_php_path' => $defaultPhp,
             'script_path' => $scriptPath,
             'permission_hint' => $permissionHint,
         ];
     }
 
-    public function saveJob(string $schedule, string $phpPath): array
+    public function saveJob(string $schedule, string $phpPath, string $type = 'm3u'): array
     {
+        if (!in_array($type, ['m3u', 'epg'], true)) {
+            throw new \InvalidArgumentException('Ongeldig cronjob-type. Gebruik m3u of epg.');
+        }
+
         $schedule = trim(preg_replace('/\s+/', ' ', $schedule) ?? '');
         if (!$this->isValidCronSchedule($schedule)) {
             throw new \InvalidArgumentException('Ongeldige cron-expressie. Gebruik 5 velden (bijv. 0 */6 * * *).');
@@ -76,7 +90,8 @@ final class CrontabService
         }
 
         $scriptPath = $status['script_path'];
-        $newLine = sprintf('%s %s %s --force >/dev/null 2>&1', $schedule, $phpPath, $scriptPath);
+        $typeFlag = '--' . $type;
+        $newLine = sprintf('%s %s %s %s --force >/dev/null 2>&1', $schedule, $phpPath, $scriptPath, $typeFlag);
 
         $backend = $status['backend'];
         $lines = $this->readCrontabLines($backend);
@@ -84,7 +99,12 @@ final class CrontabService
         $replaced = false;
 
         foreach ($lines as $line) {
-            if (str_contains($line, self::SYNC_MARKER) && !str_starts_with(trim($line), '#')) {
+            $trimmed = trim($line);
+            $isTarget = str_contains($line, self::SYNC_MARKER)
+                && str_contains($line, $typeFlag)
+                && !str_starts_with($trimmed, '#');
+
+            if ($isTarget) {
                 if (!$replaced) {
                     $updated[] = $newLine;
                     $replaced = true;
@@ -102,17 +122,22 @@ final class CrontabService
         return $this->getStatus();
     }
 
-    public function deleteJob(): array
+    public function deleteJob(string $type = 'm3u'): array
     {
+        if (!in_array($type, ['m3u', 'epg'], true)) {
+            throw new \InvalidArgumentException('Ongeldig cronjob-type. Gebruik m3u of epg.');
+        }
+
         $status = $this->getStatus();
         if (!$status['writable']) {
             throw new \RuntimeException($status['permission_hint'] ?: 'Geen schrijfrechten voor crontab.');
         }
 
+        $typeFlag = '--' . $type;
         $backend = $status['backend'];
         $lines = $this->readCrontabLines($backend);
-        $filtered = array_values(array_filter($lines, static function (string $line): bool {
-            return !(str_contains($line, self::SYNC_MARKER) && !str_starts_with(trim($line), '#'));
+        $filtered = array_values(array_filter($lines, static function (string $line) use ($typeFlag): bool {
+            return !(str_contains($line, self::SYNC_MARKER) && str_contains($line, $typeFlag) && !str_starts_with(trim($line), '#'));
         }));
 
         $this->writeCrontabLines($backend, $filtered);
