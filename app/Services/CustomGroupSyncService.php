@@ -159,4 +159,127 @@ final class CustomGroupSyncService
             $this->pdo->prepare('UPDATE m3u_groups SET sync_diff_json = NULL WHERE id = ?')->execute([$customGroupId]);
         }
     }
+
+    public function backupCustomGroupsToDisk(): void
+    {
+        $groups = $this->pdo->query(
+            'SELECT id, original_name, custom_name, category, content_type, is_enabled, sort_order, source_group_id
+             FROM m3u_groups
+             WHERE is_custom = 1
+             ORDER BY id ASC'
+        )->fetchAll();
+
+        $channelsStmt = $this->pdo->prepare(
+            'SELECT cgc.channel_id, cgc.channel_tvg_name, cgc.channel_tvg_id, cgc.source_group_name,
+                    cgc.saved_epg_channel_id, cgc.saved_custom_name, cgc.sort_order, cgc.is_ignored,
+                    c.tvg_name, c.tvg_id, c.epg_channel_id, c.custom_name, g.original_name AS live_source_group_name
+             FROM custom_group_channels cgc
+             LEFT JOIN channels c ON c.id = cgc.channel_id
+             LEFT JOIN m3u_groups g ON g.id = c.group_id
+             WHERE cgc.custom_group_id = ?
+             ORDER BY cgc.sort_order ASC, cgc.id ASC'
+        );
+
+        $payload = [
+            'created_at' => date('c'),
+            'groups' => [],
+        ];
+
+        foreach ($groups as $grp) {
+            $channelsStmt->execute([(int) $grp['id']]);
+            $grp['channels'] = $channelsStmt->fetchAll();
+            $payload['groups'][] = $grp;
+        }
+
+        $backupDir = dirname(__DIR__, 2) . '/storage/backups';
+        if (!is_dir($backupDir)) {
+            @mkdir($backupDir, 0775, true);
+        }
+
+        $target = $backupDir . '/custom_groups_latest.json';
+        $tmp = $target . '.tmp';
+        $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json !== false && @file_put_contents($tmp, $json, LOCK_EX) !== false) {
+            @rename($tmp, $target);
+        }
+    }
+
+    public function captureSnapshotsBeforeSync(): void
+    {
+        $this->pdo->exec(
+            "UPDATE custom_group_channels cgc
+             INNER JOIN channels c ON c.id = cgc.channel_id
+             LEFT JOIN m3u_groups g ON g.id = c.group_id
+             SET cgc.channel_tvg_name = c.tvg_name,
+                 cgc.channel_tvg_id = c.tvg_id,
+                 cgc.source_group_name = COALESCE(g.original_name, cgc.source_group_name),
+                 cgc.saved_epg_channel_id = CASE WHEN c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> '' THEN c.epg_channel_id ELSE cgc.saved_epg_channel_id END,
+                 cgc.saved_custom_name = CASE WHEN c.custom_name IS NOT NULL AND c.custom_name <> '' THEN c.custom_name ELSE cgc.saved_custom_name END"
+        );
+    }
+
+    public function relinkCustomGroupChannelsAfterSync(): void
+    {
+        $orphans = $this->pdo->query(
+            "SELECT id, channel_tvg_name, source_group_name, saved_epg_channel_id, saved_custom_name
+             FROM custom_group_channels
+             WHERE channel_id IS NULL AND channel_tvg_name <> ''"
+        )->fetchAll();
+
+        if ($orphans === []) {
+            return;
+        }
+
+        $exactStmt = $this->pdo->prepare(
+            'SELECT c.id, c.epg_channel_id, c.custom_name
+             FROM channels c
+             INNER JOIN m3u_groups g ON g.id = c.group_id
+             WHERE c.tvg_name = ? AND g.original_name = ?
+             LIMIT 1'
+        );
+        $fallbackStmt = $this->pdo->prepare(
+            'SELECT c.id, c.epg_channel_id, c.custom_name
+             FROM channels c
+             WHERE c.tvg_name = ?
+             LIMIT 1'
+        );
+        $relinkStmt = $this->pdo->prepare('UPDATE IGNORE custom_group_channels SET channel_id = ? WHERE id = ?');
+        $restoreChannelStmt = $this->pdo->prepare(
+            "UPDATE channels
+             SET epg_channel_id = CASE WHEN (epg_channel_id IS NULL OR epg_channel_id = '') AND ? IS NOT NULL AND ? <> '' THEN ? ELSE epg_channel_id END,
+                 custom_name = CASE WHEN (custom_name IS NULL OR custom_name = '') AND ? IS NOT NULL AND ? <> '' THEN ? ELSE custom_name END
+             WHERE id = ?"
+        );
+
+        foreach ($orphans as $row) {
+            $tvgName = (string) $row['channel_tvg_name'];
+            $srcGroup = (string) $row['source_group_name'];
+            $match = false;
+
+            if ($srcGroup !== '') {
+                $exactStmt->execute([$tvgName, $srcGroup]);
+                $match = $exactStmt->fetch();
+            }
+            if (!$match) {
+                $fallbackStmt->execute([$tvgName]);
+                $match = $fallbackStmt->fetch();
+            }
+            if (!$match) {
+                continue;
+            }
+
+            $cid = (int) $match['id'];
+            $relinkStmt->execute([$cid, (int) $row['id']]);
+
+            $savedEpg = $row['saved_epg_channel_id'];
+            $savedCustom = $row['saved_custom_name'];
+            if (($savedEpg !== null && $savedEpg !== '') || ($savedCustom !== null && $savedCustom !== '')) {
+                $restoreChannelStmt->execute([
+                    $savedEpg, $savedEpg, $savedEpg,
+                    $savedCustom, $savedCustom, $savedCustom,
+                    $cid,
+                ]);
+            }
+        }
+    }
 }

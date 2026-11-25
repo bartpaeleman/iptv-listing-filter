@@ -44,19 +44,24 @@ CREATE TABLE IF NOT EXISTS `m3u_groups` (
 CREATE TABLE IF NOT EXISTS `custom_group_channels` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `custom_group_id` INT UNSIGNED NOT NULL,
-    `channel_id` INT UNSIGNED NOT NULL,
+    `channel_id` INT UNSIGNED NULL,
+    `channel_tvg_name` VARCHAR(255) NOT NULL DEFAULT '',
+    `channel_tvg_id` VARCHAR(255) NULL,
+    `source_group_name` VARCHAR(255) NOT NULL DEFAULT '',
+    `saved_epg_channel_id` VARCHAR(255) NULL,
+    `saved_custom_name` VARCHAR(255) NULL,
     `sort_order` INT UNSIGNED NOT NULL DEFAULT 0,
     `is_ignored` TINYINT(1) NOT NULL DEFAULT 0,
     `added_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_custom_group_channel` (`custom_group_id`, `channel_id`),
     KEY `idx_cgc_group_sort` (`custom_group_id`, `sort_order`),
-    CONSTRAINT `fk_cgc_custom_group`
+    CONSTRAINT `fk_cgc_group_cascade`
         FOREIGN KEY (`custom_group_id`) REFERENCES `m3u_groups` (`id`)
         ON DELETE CASCADE,
-    CONSTRAINT `fk_cgc_channel`
+    CONSTRAINT `fk_cgc_channel_setnull`
         FOREIGN KEY (`channel_id`) REFERENCES `channels` (`id`)
-        ON DELETE CASCADE
+        ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `group_category_rules` (

@@ -26,7 +26,7 @@ final class SchemaMigrator
                 "SELECT COUNT(*) FROM information_schema.tables
                  WHERE table_schema = DATABASE() AND table_name IN ('epg_sources', 'country_tags', 'emoji_rules')"
             )->fetchColumn();
-            $flag = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'schema_integrity_v7' LIMIT 1")->fetchColumn();
+            $flag = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'schema_integrity_v9' LIMIT 1")->fetchColumn();
             if ($tblCount === 3 && (string) $flag === '1') {
                 return;
             }
@@ -189,23 +189,77 @@ final class SchemaMigrator
             "CREATE TABLE IF NOT EXISTS `custom_group_channels` (
                 `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `custom_group_id` INT UNSIGNED NOT NULL,
-                `channel_id` INT UNSIGNED NOT NULL,
+                `channel_id` INT UNSIGNED NULL,
+                `channel_tvg_name` VARCHAR(255) NOT NULL DEFAULT '',
+                `channel_tvg_id` VARCHAR(255) NULL,
+                `source_group_name` VARCHAR(255) NOT NULL DEFAULT '',
+                `saved_epg_channel_id` VARCHAR(255) NULL,
+                `saved_custom_name` VARCHAR(255) NULL,
                 `sort_order` INT UNSIGNED NOT NULL DEFAULT 0,
                 `is_ignored` TINYINT(1) NOT NULL DEFAULT 0,
                 `added_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (`id`),
                 UNIQUE KEY `uq_custom_group_channel` (`custom_group_id`, `channel_id`),
                 KEY `idx_cgc_group_sort` (`custom_group_id`, `sort_order`),
-                CONSTRAINT `fk_cgc_custom_group`
+                CONSTRAINT `fk_cgc_group_cascade`
                     FOREIGN KEY (`custom_group_id`) REFERENCES `m3u_groups` (`id`)
                     ON DELETE CASCADE,
-                CONSTRAINT `fk_cgc_channel`
+                CONSTRAINT `fk_cgc_channel_setnull`
                     FOREIGN KEY (`channel_id`) REFERENCES `channels` (`id`)
-                    ON DELETE CASCADE
+                    ON DELETE SET NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
 
-        $pdo->exec("INSERT INTO settings (setting_key, setting_value, is_encrypted) VALUES ('schema_integrity_v8', '1', 0) ON DUPLICATE KEY UPDATE setting_value = '1'");
+        foreach ([
+            'channel_tvg_name' => "VARCHAR(255) NOT NULL DEFAULT '' AFTER `channel_id`",
+            'channel_tvg_id' => "VARCHAR(255) NULL AFTER `channel_tvg_name`",
+            'source_group_name' => "VARCHAR(255) NOT NULL DEFAULT '' AFTER `channel_tvg_id`",
+            'saved_epg_channel_id' => "VARCHAR(255) NULL AFTER `source_group_name`",
+            'saved_custom_name' => "VARCHAR(255) NULL AFTER `saved_epg_channel_id`",
+        ] as $col => $def) {
+            if (!self::columnExists($pdo, 'custom_group_channels', $col)) {
+                $pdo->exec("ALTER TABLE `custom_group_channels` ADD COLUMN `{$col}` {$def}");
+            }
+        }
+
+        $cascadeFks = $pdo->query(
+            "SELECT rc.CONSTRAINT_NAME
+             FROM information_schema.REFERENTIAL_CONSTRAINTS rc
+             INNER JOIN information_schema.KEY_COLUMN_USAGE kcu
+               ON kcu.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA
+              AND kcu.TABLE_NAME = rc.TABLE_NAME
+              AND kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
+             WHERE rc.CONSTRAINT_SCHEMA = DATABASE()
+               AND rc.TABLE_NAME = 'custom_group_channels'
+               AND rc.DELETE_RULE = 'CASCADE'
+               AND kcu.COLUMN_NAME = 'channel_id'"
+        )->fetchAll(\PDO::FETCH_COLUMN);
+
+        foreach ($cascadeFks as $fkName) {
+            $safeFk = preg_replace('/[^a-zA-Z0-9_]/', '', (string) $fkName);
+            if ($safeFk !== '') {
+                $pdo->exec("ALTER TABLE `custom_group_channels` DROP FOREIGN KEY `{$safeFk}`");
+            }
+        }
+
+        $pdo->exec('ALTER TABLE `custom_group_channels` MODIFY COLUMN `channel_id` INT UNSIGNED NULL');
+
+        $hasSetNullFk = (int) $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.REFERENTIAL_CONSTRAINTS
+             WHERE CONSTRAINT_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'custom_group_channels'
+               AND CONSTRAINT_NAME = 'fk_cgc_channel_setnull'"
+        )->fetchColumn();
+
+        if ($hasSetNullFk === 0) {
+            $pdo->exec(
+                'ALTER TABLE `custom_group_channels`
+                 ADD CONSTRAINT `fk_cgc_channel_setnull`
+                 FOREIGN KEY (`channel_id`) REFERENCES `channels` (`id`) ON DELETE SET NULL'
+            );
+        }
+
+        $pdo->exec("INSERT INTO settings (setting_key, setting_value, is_encrypted) VALUES ('schema_integrity_v9', '1', 0) ON DUPLICATE KEY UPDATE setting_value = '1'");
     }
 
     private static function columnExists(PDO $pdo, string $table, string $column): bool

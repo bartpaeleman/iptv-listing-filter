@@ -37,6 +37,9 @@ final class M3uParserService
         @set_time_limit(0);
         @ini_set('memory_limit', '512M');
         \App\Core\SchemaMigrator::ensureSchemaUpToDate($this->pdo);
+        $customSync = new CustomGroupSyncService($this->pdo);
+        $customSync->backupCustomGroupsToDisk();
+        $customSync->captureSnapshotsBeforeSync();
 
         $cache = new FeedCacheService($this->settings);
         $cacheInfo = $cache->getCacheInfo('m3u');
@@ -211,11 +214,14 @@ final class M3uParserService
                 $touchIds = [];
             }
 
-            $delStmt = $this->pdo->prepare('DELETE FROM channels WHERE last_seen_at IS NULL OR last_seen_at < :seen');
-            $delStmt->execute([':seen' => $now]);
-            $channelsDeleted = $delStmt->rowCount();
+            if ($processed > 0) {
+                $delStmt = $this->pdo->prepare('DELETE FROM channels WHERE last_seen_at IS NULL OR last_seen_at < :seen');
+                $delStmt->execute([':seen' => $now]);
+                $channelsDeleted = $delStmt->rowCount();
+            }
 
             $this->pdo->commit();
+            (new CustomGroupSyncService($this->pdo))->relinkCustomGroupChannelsAfterSync();
         } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
@@ -228,6 +234,9 @@ final class M3uParserService
         $cache->updateItemCount($sourceFile, $channelsAdded + $channelsUpdated + $channelsUnchanged);
         $this->settings->set('last_m3u_sync', $now, false);
         \App\Core\SchemaMigrator::ensureSchemaUpToDate($this->pdo);
+        $customSync = new CustomGroupSyncService($this->pdo);
+        $customSync->backupCustomGroupsToDisk();
+        $customSync->captureSnapshotsBeforeSync();
         $groupTagsUpdated = (new GroupCategoryService())->classifyUnlockedGroups($this->pdo);
         if ($groupTagsUpdated > 0 && $progress !== null) {
             $progress->update('m3u', 'Classificeren', 98, "{$groupTagsUpdated} groep-tag(s) nieuw/bijgewerkt");
