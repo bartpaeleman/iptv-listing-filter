@@ -282,4 +282,197 @@ final class CustomGroupSyncService
             }
         }
     }
+
+    public function getLatestBackupInfo(): array
+    {
+        $path = dirname(__DIR__, 2) . '/storage/backups/custom_groups_latest.json';
+        if (!is_file($path) || !is_readable($path)) {
+            return [
+                'exists' => false,
+                'filename' => 'custom_groups_latest.json',
+                'updated_at' => null,
+                'size_bytes' => 0,
+                'group_count' => 0,
+                'channel_count' => 0,
+            ];
+        }
+
+        $size = (int) (@filesize($path) ?: 0);
+        $mtime = @filemtime($path);
+        $updatedAt = $mtime ? date('Y-m-d H:i:s', $mtime) : null;
+        $raw = (string) @file_get_contents($path);
+        $decoded = json_decode($raw, true);
+
+        $groups = is_array($decoded['groups'] ?? null) ? $decoded['groups'] : [];
+        $channelCount = 0;
+        foreach ($groups as $g) {
+            if (is_array($g['channels'] ?? null)) {
+                $channelCount += count($g['channels']);
+            }
+        }
+
+        return [
+            'exists' => true,
+            'filename' => 'custom_groups_latest.json',
+            'updated_at' => $updatedAt,
+            'size_bytes' => $size,
+            'group_count' => count($groups),
+            'channel_count' => $channelCount,
+        ];
+    }
+
+    public function restoreCustomGroupsFromJson(string $rawJson): array
+    {
+        $decoded = json_decode($rawJson, true);
+        if (!is_array($decoded) || !isset($decoded['groups']) || !is_array($decoded['groups'])) {
+            throw new \InvalidArgumentException('Ongeldig backup JSON-formaat: veld "groups" ontbreekt.');
+        }
+
+        $groupsRestored = 0;
+        $channelsLinked = 0;
+        $channelsPending = 0;
+
+        $findGroupStmt = $this->pdo->prepare('SELECT id FROM m3u_groups WHERE original_name = ? AND is_custom = 1 LIMIT 1');
+        $checkSourceIdStmt = $this->pdo->prepare('SELECT id FROM m3u_groups WHERE id = ? LIMIT 1');
+        $insertGroupStmt = $this->pdo->prepare(
+            'INSERT INTO m3u_groups (original_name, custom_name, category, category_locked, content_type, is_enabled, sort_order, is_custom, source_group_id)
+             VALUES (?, ?, ?, 1, ?, ?, ?, 1, ?)'
+        );
+        $updateGroupStmt = $this->pdo->prepare(
+            'UPDATE m3u_groups
+             SET custom_name = ?, category = ?, category_locked = 1, content_type = ?, is_enabled = ?, sort_order = ?, source_group_id = ?
+             WHERE id = ?'
+        );
+
+        $exactChannelStmt = $this->pdo->prepare(
+            'SELECT c.id FROM channels c INNER JOIN m3u_groups g ON g.id = c.group_id WHERE c.tvg_name = ? AND g.original_name = ? LIMIT 1'
+        );
+        $fallbackChannelStmt = $this->pdo->prepare('SELECT id FROM channels WHERE tvg_name = ? LIMIT 1');
+
+        $upsertCgcStmt = $this->pdo->prepare(
+            'INSERT INTO custom_group_channels
+                (custom_group_id, channel_id, channel_tvg_name, channel_tvg_id, source_group_name, saved_epg_channel_id, saved_custom_name, sort_order, is_ignored)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                sort_order = VALUES(sort_order),
+                is_ignored = VALUES(is_ignored),
+                channel_tvg_name = VALUES(channel_tvg_name),
+                channel_tvg_id = VALUES(channel_tvg_id),
+                source_group_name = VALUES(source_group_name),
+                saved_epg_channel_id = COALESCE(VALUES(saved_epg_channel_id), saved_epg_channel_id),
+                saved_custom_name = COALESCE(VALUES(saved_custom_name), saved_custom_name)'
+        );
+
+        $restoreChannelMetaStmt = $this->pdo->prepare(
+            "UPDATE channels
+             SET epg_channel_id = CASE WHEN (epg_channel_id IS NULL OR epg_channel_id = '') AND ? IS NOT NULL AND ? <> '' THEN ? ELSE epg_channel_id END,
+                 custom_name = CASE WHEN (custom_name IS NULL OR custom_name = '') AND ? IS NOT NULL AND ? <> '' THEN ? ELSE custom_name END
+             WHERE id = ?"
+        );
+
+        $this->pdo->beginTransaction();
+        try {
+            foreach ($decoded['groups'] as $grp) {
+                if (!is_array($grp) || empty($grp['original_name'])) {
+                    continue;
+                }
+                $origName = (string) $grp['original_name'];
+                $customName = isset($grp['custom_name']) ? (string) $grp['custom_name'] : null;
+                $category = (string) ($grp['category'] ?? 'Live TV');
+                $contentType = (string) ($grp['content_type'] ?? 'live');
+                $isEnabled = (int) ($grp['is_enabled'] ?? 1);
+                $sortOrder = (int) ($grp['sort_order'] ?? 0);
+
+                $sourceGroupId = null;
+                if (!empty($grp['source_group_id'])) {
+                    $checkSourceIdStmt->execute([(int) $grp['source_group_id']]);
+                    if ($checkSourceIdStmt->fetchColumn()) {
+                        $sourceGroupId = (int) $grp['source_group_id'];
+                    }
+                }
+
+                $findGroupStmt->execute([$origName]);
+                $existingId = $findGroupStmt->fetchColumn();
+
+                if ($existingId) {
+                    $customGroupId = (int) $existingId;
+                    $updateGroupStmt->execute([$customName, $category, $contentType, $isEnabled, $sortOrder, $sourceGroupId, $customGroupId]);
+                } else {
+                    $insertGroupStmt->execute([$origName, $customName, $category, $contentType, $isEnabled, $sortOrder, $sourceGroupId]);
+                    $customGroupId = (int) $this->pdo->lastInsertId();
+                }
+                $groupsRestored++;
+
+                $channels = is_array($grp['channels'] ?? null) ? $grp['channels'] : [];
+                foreach ($channels as $ch) {
+                    if (!is_array($ch)) {
+                        continue;
+                    }
+                    $tvgName = (string) ($ch['channel_tvg_name'] ?? $ch['tvg_name'] ?? '');
+                    $tvgId = $ch['channel_tvg_id'] ?? $ch['tvg_id'] ?? null;
+                    $srcGroupName = (string) ($ch['source_group_name'] ?? $ch['live_source_group_name'] ?? '');
+                    $savedEpg = $ch['saved_epg_channel_id'] ?? $ch['epg_channel_id'] ?? null;
+                    $savedCustom = $ch['saved_custom_name'] ?? $ch['custom_name'] ?? null;
+                    $chSort = (int) ($ch['sort_order'] ?? 0);
+                    $isIgnored = (int) ($ch['is_ignored'] ?? 0);
+
+                    $channelId = null;
+                    if ($tvgName !== '' && $srcGroupName !== '') {
+                        $exactChannelStmt->execute([$tvgName, $srcGroupName]);
+                        $found = $exactChannelStmt->fetchColumn();
+                        if ($found) {
+                            $channelId = (int) $found;
+                        }
+                    }
+                    if ($channelId === null && $tvgName !== '') {
+                        $fallbackChannelStmt->execute([$tvgName]);
+                        $found = $fallbackChannelStmt->fetchColumn();
+                        if ($found) {
+                            $channelId = (int) $found;
+                        }
+                    }
+
+                    $upsertCgcStmt->execute([
+                        $customGroupId,
+                        $channelId,
+                        $tvgName,
+                        $tvgId !== null ? (string) $tvgId : null,
+                        $srcGroupName,
+                        $savedEpg !== null ? (string) $savedEpg : null,
+                        $savedCustom !== null ? (string) $savedCustom : null,
+                        $chSort,
+                        $isIgnored,
+                    ]);
+
+                    if ($channelId !== null) {
+                        $channelsLinked++;
+                        if (($savedEpg !== null && $savedEpg !== '') || ($savedCustom !== null && $savedCustom !== '')) {
+                            $restoreChannelMetaStmt->execute([
+                                $savedEpg, $savedEpg, $savedEpg,
+                                $savedCustom, $savedCustom, $savedCustom,
+                                $channelId,
+                            ]);
+                        }
+                    } else {
+                        $channelsPending++;
+                    }
+                }
+            }
+
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+
+        (new ViewCacheService())->invalidateAll();
+
+        return [
+            'groups_restored' => $groupsRestored,
+            'channels_linked' => $channelsLinked,
+            'channels_pending' => $channelsPending,
+        ];
+    }
 }

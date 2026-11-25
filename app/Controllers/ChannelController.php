@@ -706,6 +706,57 @@ final class ChannelController extends BaseController
         $this->jsonSuccess($result);
     }
 
+    public function customGroupsBackupStatus(): void
+    {
+        $this->requireAuth();
+        $this->jsonSuccess((new \App\Services\CustomGroupSyncService())->getLatestBackupInfo());
+    }
+
+    public function customGroupsBackupDownload(): void
+    {
+        $this->requireAuth();
+        $service = new \App\Services\CustomGroupSyncService();
+        $path = dirname(__DIR__, 2) . '/storage/backups/custom_groups_latest.json';
+        if (!is_file($path)) {
+            $service->backupCustomGroupsToDisk();
+        }
+        if (!is_file($path) || !is_readable($path)) {
+            $this->jsonError('Backupbestand kon niet worden gegenereerd.', 500);
+        }
+
+        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Disposition: attachment; filename="custom_groups_latest.json"');
+        header('Content-Length: ' . (string) filesize($path));
+        readfile($path);
+        exit;
+    }
+
+    public function customGroupsBackupRestore(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $rawJson = isset($input['json_payload']) && is_string($input['json_payload']) && trim($input['json_payload']) !== ''
+            ? $input['json_payload']
+            : null;
+
+        if ($rawJson === null) {
+            $path = dirname(__DIR__, 2) . '/storage/backups/custom_groups_latest.json';
+            if (!is_file($path) || !is_readable($path)) {
+                $this->jsonError('Geen backupbestand (custom_groups_latest.json) gevonden op de server.', 404);
+            }
+            $rawJson = (string) file_get_contents($path);
+        }
+
+        try {
+            $res = (new \App\Services\CustomGroupSyncService())->restoreCustomGroupsFromJson($rawJson);
+            $this->jsonSuccess($res);
+        } catch (\Throwable $e) {
+            $this->jsonError($e->getMessage(), 400);
+        }
+    }
+
     /**
      * @return array<int, string>
      */
