@@ -262,7 +262,23 @@ final class EpgParserService
     private function loadActiveLinkedEpgIds(): array
     {
         $stmt = $this->pdo->query(
-            "SELECT DISTINCT epg_channel_id FROM channels WHERE is_enabled = 1 AND epg_channel_id IS NOT NULL AND epg_channel_id <> ''"
+            "SELECT DISTINCT c.epg_channel_id
+             FROM channels c
+             LEFT JOIN m3u_groups g ON g.id = c.group_id
+             WHERE c.epg_channel_id IS NOT NULL
+               AND c.epg_channel_id <> ''
+               AND (
+                   (c.is_enabled = 1 AND g.is_custom = 0 AND g.is_enabled = 1)
+                   OR EXISTS (
+                       SELECT 1
+                       FROM custom_group_channels cgc
+                       INNER JOIN m3u_groups cg ON cg.id = cgc.custom_group_id
+                       WHERE cgc.channel_id = c.id
+                         AND cgc.is_ignored = 0
+                         AND cg.is_custom = 1
+                         AND cg.is_enabled = 1
+                   )
+               )"
         );
         $ids = [];
         foreach ($stmt->fetchAll() as $row) {
