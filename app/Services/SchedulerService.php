@@ -73,6 +73,8 @@ final class SchedulerService
                     $result['m3u'] = $m3uStats;
                     $this->logs->addLog('m3u', 'success', 'Xtream API synchronisatie voltooid.', $m3uStats);
                     $this->writeFileLog('m3u', 'success', 'Xtream API synchronisatie voltooid.', $m3uStats);
+
+                    $this->cacheXtreamM3uSnapshot((int) ($m3uStats['imported'] ?? 0));
                 } else {
                     $m3uStats = (new M3uParserService($this->pdo, $this->settings))->sync(null, $cacheMode, $mode === 'm3u' ? $cacheFilename : null);
                     $result['m3u'] = $m3uStats;
@@ -90,6 +92,29 @@ final class SchedulerService
         }
 
         return $result;
+    }
+
+    private function cacheXtreamM3uSnapshot(int $channelCount): void
+    {
+        try {
+            $host = trim((string) $this->settings->get('xtream_host', ''));
+            $user = trim((string) $this->settings->get('xtream_username', ''));
+            $pass = (string) $this->settings->get('xtream_password', '');
+            $outputParams = trim((string) $this->settings->get('xtream_output_params', 'type=m3u_plus&output=ts'));
+            if ($host === '' || $user === '' || $pass === '') {
+                return;
+            }
+            $m3uUrl = XtreamUrlBuilder::buildM3uPlusUrl($host, $user, $pass, $outputParams);
+            $tmpFile = dirname(__DIR__, 2) . '/storage/cache/m3u_xtream_snapshot.tmp';
+            (new \App\Core\HttpClient())->downloadToFile($m3uUrl, $tmpFile, 180);
+            $cache = new FeedCacheService($this->settings);
+            $cachedFile = $cache->storeFromTempFile('m3u', $tmpFile, 'xtream_m3u');
+            if ($channelCount > 0) {
+                $cache->updateItemCount($cachedFile, $channelCount);
+            }
+        } catch (\Throwable $e) {
+            $this->logs->addLog('m3u', 'warning', 'Lokale M3U-cache snapshot mislukt: ' . $e->getMessage(), []);
+        }
     }
 
     private function validateSourceConfiguration(string $cacheMode): void

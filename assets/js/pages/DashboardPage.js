@@ -8,6 +8,21 @@ export class DashboardPage extends BaseComponent {
         this.setState({ data: d });
     }
 
+    formatRelativeAge(ageMinutes) {
+        const mins = Number(ageMinutes);
+        if (!Number.isFinite(mins) || mins < 1) {
+            return 'zojuist';
+        }
+        if (mins < 60) {
+            return `${Math.floor(mins)} min geleden`;
+        }
+        if (mins < 1440) {
+            return `${Math.floor(mins / 60)} uur geleden`;
+        }
+        const days = Math.floor(mins / 1440);
+        return `${days} ${days === 1 ? 'dag' : 'dagen'} geleden`;
+    }
+
     render() {
         const d = this.state.data;
         if (!d) {
@@ -54,9 +69,9 @@ export class DashboardPage extends BaseComponent {
                     </div>
                 </div>
                 <p class="muted" style="font-size:0.85rem;margin:0 0 0.5rem 0;">
-                    Lokale M3U cache: ${d.cache_status?.m3u?.exists ? `${this.escapeHtml(d.cache_status.m3u.size_formatted)} — ${d.cache_status.m3u.age_minutes} min geleden` : 'Geen'}
+                    Lokale M3U cache: ${d.cache_status?.m3u?.exists ? `${this.escapeHtml(d.cache_status.m3u.size_formatted)} — ${this.formatRelativeAge(d.cache_status.m3u.age_minutes)}` : 'Geen'}
                     &nbsp;|&nbsp;
-                    Lokale EPG cache: ${d.cache_status?.epg?.exists ? `${this.escapeHtml(d.cache_status.epg.size_formatted)} — ${d.cache_status.epg.age_minutes} min geleden` : 'Geen'}
+                    Lokale EPG cache: ${d.cache_status?.epg?.exists ? `${this.escapeHtml(d.cache_status.epg.size_formatted)} — ${this.formatRelativeAge(d.cache_status.epg.age_minutes)}` : 'Geen'}
                 </p>
                 <div id="dashboardProgressMount"></div>
                 <div id="syncStatusBanner" class="sync-banner hidden"></div>
