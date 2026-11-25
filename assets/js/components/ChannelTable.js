@@ -5,10 +5,22 @@ export class ChannelTable extends BaseComponent {
         const { channels = [], isAllChannelsView = false, isCustomGroup = false, targetGroupId = null, targetMemberIds = [], targetGroupName = '' } = this.state;
         const memberSet = new Set((Array.isArray(targetMemberIds) ? targetMemberIds : []).map(Number));
         this.container.innerHTML = channels.map(c => {
+            const tvgTrimmed = (c.tvg_name || '').trim();
+            if (/^#{3,}/.test(tvgTrimmed)) {
+                const label = tvgTrimmed.replace(/^#+\s*/, '').replace(/\s*#+$/, '') || tvgTrimmed;
+                const colSpan = isAllChannelsView ? 3 : 4;
+                return `
+                <tr class="channel-group-header-row">
+                    <td colspan="${colSpan}"><span class="channel-group-header-label">${this.escapeHtml(label)}</span></td>
+                </tr>`;
+            }
+
             const rawName = c.custom_name || c.tvg_name;
             const cleanName = c.clean_name || rawName;
+            const originalCleanName = c.original_clean_name || c.tvg_name || '';
             const emojiPrefix = c.emoji_prefix || '';
             const hasCustomName = Boolean(c.custom_name && String(c.custom_name).trim() !== '');
+            const showOriginalRef = hasCustomName && originalCleanName.trim() !== '' && String(cleanName).trim() !== originalCleanName.trim();
             const isEnabled = Boolean(Number(c.is_enabled));
             const isMember = !isAllChannelsView && memberSet.has(Number(c.id));
 
@@ -34,14 +46,15 @@ export class ChannelTable extends BaseComponent {
                     ? `<input type="number" class="ch-num" value="${c.channel_number ?? ''}" style="width:76px;font-size:16px;min-height:44px;">`
                     : `<input type="text" class="ch-num" value="-" disabled style="width:76px;font-size:16px;min-height:44px;text-align:center;opacity:0.5;" title="Kanaal is uitgeschakeld">`
                 }</td>
-                <td>
-                    <div style="display:flex;align-items:center;gap:0.4rem;">
+                <td style="min-width:0;">
+                    <div style="display:flex;align-items:center;gap:0.4rem;min-width:0;">
                         ${emojiPrefix ? `<span class="ch-emoji-prefix" title="${this.escapeHtml(c.tvg_name || '')}">${this.escapeHtml(emojiPrefix)}</span>` : ''}
-                        <input type="text" class="ch-name" value="${this.escapeHtml(cleanName)}" title="Origineel: ${this.escapeHtml(c.tvg_name || '')}">
+                        <input type="text" class="ch-name" value="${this.escapeHtml(cleanName)}" title="Origineel: ${this.escapeHtml(c.tvg_name || '')}" style="min-width:0;">
                         <button type="button" class="btn btn-sm ch-use-original ${!hasCustomName ? 'btn-primary' : ''}" title="Originele naam gebruiken" style="min-height:44px;min-width:44px;flex-shrink:0;">↩️</button>
                         <button type="button" class="btn btn-sm ch-use-custom ${hasCustomName ? 'btn-primary' : ''}" data-emoji="${this.escapeHtml(emojiPrefix)}" title="Custom naam incl. vlag/symbool gebruiken" style="min-height:44px;min-width:44px;flex-shrink:0;">${this.escapeHtml(emojiPrefix || '✏️')}</button>
                         ${customActionBtn}
                     </div>
+                    ${showOriginalRef ? `<div class="ch-original-ref" title="${this.escapeHtml(originalCleanName)}">Origineel: ${this.escapeHtml(originalCleanName)}</div>` : ''}
                 </td>
             </tr>
         `;

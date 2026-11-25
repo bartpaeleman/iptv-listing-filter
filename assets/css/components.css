@@ -879,3 +879,46 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; }
     padding: 0.35rem;
     background: rgba(0, 0, 0, 0.12);
 }
+
+/* Original channel name reference & ### section headers */
+.ch-original-ref {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.78rem;
+    opacity: 0.72;
+    margin-top: 2px;
+}
+
+.channel-group-header-row td {
+    background: var(--bg-elevated, rgba(255, 255, 255, 0.04));
+    padding: 0.55rem 0.75rem;
+    border-top: 1px solid var(--border-color, #2a2f3a);
+    border-bottom: 1px solid var(--border-color, #2a2f3a);
+}
+
+.channel-group-header-label {
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--accent-color, #38bdf8);
+}
+
+/* Crontab instruction single-line & parenthesis accent */
+.cron-instruction-line {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    white-space: nowrap;
+    font-size: 0.88rem;
+}
+
+.cron-paren-accent {
+    color: var(--accent-color, #38bdf8);
+    font-weight: 600;
+}

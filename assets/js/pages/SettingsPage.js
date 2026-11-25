@@ -89,7 +89,7 @@ export class SettingsPage extends BaseComponent {
 
                 <details class="collapsible-card">
                     <summary class="collapsible-card__header">
-                        <span>⏱️ Automatisering &amp; QNAP Crontab</span>
+                        <span>⏱️ Automatisering &amp; Crontab</span>
                         <span class="collapsible-card__chevron">▼</span>
                     </summary>
                     <div class="collapsible-card__body stack-form">
@@ -102,11 +102,19 @@ export class SettingsPage extends BaseComponent {
                             </label>
                         </div>
                         <div class="endpoint-row" style="margin-top:0.5rem;">
-                            <label>QNAP Crontab (<span id="qnapCronLabel">${this.escapeHtml(initCron.label)}</span>)</label>
+                            <div class="cron-instruction-line">
+                                <span>Crontab</span>
+                                <span class="cron-paren-accent">(<span id="qnapCronLabel">${this.escapeHtml(initCron.label)}</span>)</span>
+                            </div>
                             <div class="copy-group">
                                 <input type="text" id="qnapCronInput" value="${this.escapeHtml(cronCmd)}" readonly>
                                 <button type="button" class="btn" id="copyCronBtn">Kopieer</button>
                             </div>
+                        </div>
+
+                        <hr style="border:none;border-top:1px solid var(--border-color, #2a2f3a);margin:0.5rem 0;">
+                        <div id="crontabManagerBox" class="stack-form" style="gap:0.75rem;">
+                            <p class="muted" style="margin:0;">Crontab status laden...</p>
                         </div>
                     </div>
                 </details>
@@ -255,6 +263,95 @@ export class SettingsPage extends BaseComponent {
                 }
             );
         });
+
+        this.loadCrontabStatus();
+    }
+
+    async loadCrontabStatus() {
+        const box = document.getElementById('crontabManagerBox');
+        if (!box) return;
+        try {
+            const st = await this.props.api.get('crontab_status');
+            if (!st.supported) {
+                box.innerHTML = `<p class="muted" style="margin:0;">Crontab-beheer wordt op deze server niet ondersteund.</p>`;
+                return;
+            }
+
+            const presets = [
+                { value: '0 * * * *', label: 'Elk uur (0 * * * *)' },
+                { value: '0 */6 * * *', label: 'Elke 6 uur (0 */6 * * *)' },
+                { value: '0 3 * * *', label: 'Dagelijks om 03:00 (0 3 * * *)' },
+                { value: 'custom', label: 'Aangepast schema' },
+            ];
+            const currentExpr = st.current_schedule || '0 3 * * *';
+            const isPreset = presets.some(p => p.value === currentExpr);
+            const selectedPreset = isPreset ? currentExpr : 'custom';
+
+            box.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                    <strong>Interactief Crontab-beheer</strong>
+                    <span class="badge ${st.raw_line ? 'badge-success' : 'badge-warning'}">
+                        ${st.raw_line ? 'Actief' : 'Niet ingesteld'}
+                    </span>
+                </div>
+                ${st.raw_line ? `<div class="muted" style="font-size:0.85rem;">Huidige regel: <code>${this.escapeHtml(st.raw_line)}</code></div>` : ''}
+                ${!st.writable ? `
+                    <div class="alert alert-warning" style="padding:0.75rem;border-radius:6px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);">
+                        <p style="margin:0 0 0.5rem 0;font-size:0.88rem;">${this.escapeHtml(st.permission_hint)}</p>
+                        <div class="copy-group">
+                            <input type="text" id="cronPermCmdInput" value="chmod 664 /etc/config/crontab && chgrp httpdusr /etc/config/crontab" readonly>
+                            <button type="button" class="btn btn-sm" id="copyCronPermBtn">Kopieer SSH-commando</button>
+                        </div>
+                    </div>
+                ` : ''}
+                <div class="grid-2">
+                    <label>Schema Preset
+                        <select id="cronPresetSelect" ${!st.writable ? 'disabled' : ''}>
+                            ${presets.map(p => `<option value="${this.escapeHtml(p.value)}" ${p.value === selectedPreset ? 'selected' : ''}>${this.escapeHtml(p.label)}</option>`).join('')}
+                        </select>
+                    </label>
+                    <label>Cron Expressie (5 velden)
+                        <input type="text" id="cronExprInput" value="${this.escapeHtml(currentExpr)}" ${!st.writable ? 'disabled' : ''}>
+                    </label>
+                </div>
+                <label>PHP-CLI Pad
+                    <input type="text" id="cronPhpPathInput" value="${this.escapeHtml(st.default_php_path || '/usr/bin/php')}" ${!st.writable ? 'disabled' : ''}>
+                </label>
+                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+                    <button type="button" class="btn btn-primary" id="saveCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>Cronjob opslaan / wijzigen</button>
+                    ${st.raw_line ? `<button type="button" class="btn btn-danger" id="deleteCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>Cronjob wissen</button>` : ''}
+                </div>
+            `;
+
+            document.getElementById('copyCronPermBtn')?.addEventListener('click', ev => {
+                const input = document.getElementById('cronPermCmdInput');
+                if (input) ClipboardHelper.copyText(input.value, ev.currentTarget, null, this.props.toast);
+            });
+
+            document.getElementById('cronPresetSelect')?.addEventListener('change', ev => {
+                const val = ev.target.value;
+                const exprInput = document.getElementById('cronExprInput');
+                if (val !== 'custom' && exprInput) {
+                    exprInput.value = val;
+                }
+            });
+
+            document.getElementById('saveCrontabBtn')?.addEventListener('click', async () => {
+                const schedule = document.getElementById('cronExprInput')?.value?.trim() || '';
+                const phpPath = document.getElementById('cronPhpPathInput')?.value?.trim() || '';
+                await this.props.api.post('crontab_save', { schedule, php_path: phpPath });
+                this.props.toast.show('Cronjob opgeslagen!');
+                this.loadCrontabStatus();
+            });
+
+            document.getElementById('deleteCrontabBtn')?.addEventListener('click', async () => {
+                await this.props.api.post('crontab_delete', {});
+                this.props.toast.show('Cronjob gewist!');
+                this.loadCrontabStatus();
+            });
+        } catch (e) {
+            box.innerHTML = `<p class="muted" style="margin:0;">Kon crontab status niet laden: ${this.escapeHtml(e.message)}</p>`;
+        }
     }
 
     buildCronSchedule(interval, hour) {

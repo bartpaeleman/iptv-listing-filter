@@ -158,6 +158,43 @@ final class SettingsController extends BaseController
         $this->jsonSuccess(['output_token' => $newToken]);
     }
 
+    public function crontabStatus(): void
+    {
+        $this->requireAuth();
+        $this->jsonSuccess((new \App\Services\CrontabService())->getStatus());
+    }
+
+    public function crontabSave(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $schedule = trim((string) ($input['schedule'] ?? ''));
+        $phpPath = trim((string) ($input['php_path'] ?? ''));
+
+        try {
+            $status = (new \App\Services\CrontabService())->saveJob($schedule, $phpPath);
+            $this->jsonSuccess($status);
+        } catch (\Throwable $e) {
+            $this->jsonError($e->getMessage(), 400);
+        }
+    }
+
+    public function crontabDelete(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        try {
+            $status = (new \App\Services\CrontabService())->deleteJob();
+            $this->jsonSuccess($status);
+        } catch (\Throwable $e) {
+            $this->jsonError($e->getMessage(), 400);
+        }
+    }
+
     public function saveEpgSource(): void
     {
         $this->requireAuth();

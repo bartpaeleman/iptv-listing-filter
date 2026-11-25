@@ -135,6 +135,7 @@ final class XtreamServerService
                     FROM channels c
                     INNER JOIN m3u_groups g ON g.id = c.group_id
                     WHERE g.is_custom = 0 AND g.is_enabled = 1 AND c.is_enabled = 1
+                      AND TRIM(c.tvg_name) NOT REGEXP '^#{3,}'
                       AND COALESCE(g.category, 'Live TV') NOT IN ('Film', 'TV Series')
 
                     UNION ALL
@@ -147,6 +148,7 @@ final class XtreamServerService
                     INNER JOIN m3u_groups g ON g.id = cgc.custom_group_id
                     INNER JOIN channels c ON c.id = cgc.channel_id
                     WHERE g.is_custom = 1 AND g.is_enabled = 1 AND c.is_enabled = 1 AND cgc.is_ignored = 0
+                      AND TRIM(c.tvg_name) NOT REGEXP '^#{3,}'
                       AND COALESCE(g.category, 'Live TV') NOT IN ('Film', 'TV Series')
                 ) AS live_rows
                 ORDER BY is_custom_entry DESC, {$groupOrder}, ch_num ASC, ch_sort ASC, id ASC";

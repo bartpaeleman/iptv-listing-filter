@@ -133,6 +133,9 @@ switch ($route) {
         $router->addApiRoute('get_settings', SettingsController::class, 'get');
         $router->addApiRoute('save_settings', SettingsController::class, 'save');
         $router->addApiRoute('regenerate_token', SettingsController::class, 'regenerateToken');
+        $router->addApiRoute('crontab_status', SettingsController::class, 'crontabStatus');
+        $router->addApiRoute('crontab_save', SettingsController::class, 'crontabSave');
+        $router->addApiRoute('crontab_delete', SettingsController::class, 'crontabDelete');
         $router->addApiRoute('save_epg_source', SettingsController::class, 'saveEpgSource');
         $router->addApiRoute('toggle_epg_source', SettingsController::class, 'toggleEpgSource');
         $router->addApiRoute('delete_epg_source', SettingsController::class, 'deleteEpgSource');
