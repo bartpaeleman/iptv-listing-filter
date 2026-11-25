@@ -76,7 +76,7 @@ final class CrontabService
         }
 
         $scriptPath = $status['script_path'];
-        $newLine = sprintf('%s %s %s', $schedule, $phpPath, $scriptPath);
+        $newLine = sprintf('%s %s %s --force >/dev/null 2>&1', $schedule, $phpPath, $scriptPath);
 
         $backend = $status['backend'];
         $lines = $this->readCrontabLines($backend);
