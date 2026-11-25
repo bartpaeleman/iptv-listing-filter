@@ -50,6 +50,9 @@ final class XtreamApiService
             $types = self::VALID_TYPES;
         }
 
+        $customGroupSync = new CustomGroupSyncService($this->pdo);
+        $customGroupSync->captureSnapshotsBeforeSync();
+
         $host = rtrim(trim((string) $this->settings->get('xtream_host', '')), '/');
         $username = trim((string) $this->settings->get('xtream_username', ''));
         $password = (string) $this->settings->get('xtream_password', '');
@@ -145,6 +148,8 @@ final class XtreamApiService
         }
 
         $this->cleanupStaleRecords($types, $importStartTime);
+        $customGroupSync->relinkCustomGroupChannelsAfterSync();
+        $customGroupSync->evaluateAllConvertedGroups();
         $this->settings->set('last_m3u_sync', gmdate('Y-m-d H:i:s'), false);
 
         return [

@@ -107,12 +107,16 @@ final class CustomGroupRepository extends BaseRepository
 
             if ($channelIds !== []) {
                 $insertCh = $this->pdo->prepare(
-                    'INSERT IGNORE INTO custom_group_channels (custom_group_id, channel_id, sort_order, is_ignored)
-                     VALUES (?, ?, ?, 0)'
+                    'INSERT IGNORE INTO custom_group_channels
+                     (custom_group_id, channel_id, sort_order, is_ignored, channel_tvg_name, channel_tvg_id, source_group_name, saved_epg_channel_id, saved_custom_name)
+                     SELECT ?, c.id, ?, 0, c.tvg_name, c.tvg_id, g.original_name, c.epg_channel_id, c.custom_name
+                     FROM channels c
+                     LEFT JOIN m3u_groups g ON g.id = c.group_id
+                     WHERE c.id = ?'
                 );
                 $order = 1;
                 foreach ($channelIds as $cid) {
-                    $insertCh->execute([$customGroupId, (int) $cid, $order]);
+                    $insertCh->execute([$customGroupId, $order, (int) $cid]);
                     $order++;
                 }
             }
@@ -206,13 +210,17 @@ final class CustomGroupRepository extends BaseRepository
         $nextOrder = (int) $maxOrderStmt->fetchColumn() + 1;
 
         $insertStmt = $this->pdo->prepare(
-            'INSERT IGNORE INTO custom_group_channels (custom_group_id, channel_id, sort_order, is_ignored)
-             VALUES (?, ?, ?, 0)'
+            'INSERT IGNORE INTO custom_group_channels
+             (custom_group_id, channel_id, sort_order, is_ignored, channel_tvg_name, channel_tvg_id, source_group_name, saved_epg_channel_id, saved_custom_name)
+             SELECT ?, c.id, ?, 0, c.tvg_name, c.tvg_id, g.original_name, c.epg_channel_id, c.custom_name
+             FROM channels c
+             LEFT JOIN m3u_groups g ON g.id = c.group_id
+             WHERE c.id = ?'
         );
 
         $added = 0;
         foreach ($validIds as $cid) {
-            $insertStmt->execute([$customGroupId, $cid, $nextOrder]);
+            $insertStmt->execute([$customGroupId, $nextOrder, $cid]);
             if ($insertStmt->rowCount() > 0) {
                 $added++;
                 $nextOrder++;

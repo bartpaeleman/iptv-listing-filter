@@ -44,7 +44,12 @@ CREATE TABLE IF NOT EXISTS `m3u_groups` (
 CREATE TABLE IF NOT EXISTS `custom_group_channels` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `custom_group_id` INT UNSIGNED NOT NULL,
-    `channel_id` INT UNSIGNED NOT NULL,
+    `channel_id` INT UNSIGNED NULL DEFAULT NULL,
+    `channel_tvg_name` VARCHAR(255) NULL DEFAULT NULL,
+    `channel_tvg_id` VARCHAR(255) NULL DEFAULT NULL,
+    `source_group_name` VARCHAR(255) NULL DEFAULT NULL,
+    `saved_epg_channel_id` VARCHAR(255) NULL DEFAULT NULL,
+    `saved_custom_name` VARCHAR(255) NULL DEFAULT NULL,
     `sort_order` INT UNSIGNED NOT NULL DEFAULT 0,
     `is_ignored` TINYINT(1) NOT NULL DEFAULT 0,
     `added_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -56,7 +61,7 @@ CREATE TABLE IF NOT EXISTS `custom_group_channels` (
         ON DELETE CASCADE,
     CONSTRAINT `fk_cgc_channel`
         FOREIGN KEY (`channel_id`) REFERENCES `channels` (`id`)
-        ON DELETE CASCADE
+        ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `group_category_rules` (

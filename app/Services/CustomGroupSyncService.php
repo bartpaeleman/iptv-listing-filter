@@ -124,12 +124,16 @@ final class CustomGroupSyncService
             $nextOrder = (int) $maxOrderStmt->fetchColumn() + 1;
 
             $ins = $this->pdo->prepare(
-                'INSERT INTO custom_group_channels (custom_group_id, channel_id, sort_order, is_ignored)
-                 VALUES (?, ?, ?, 0)
+                'INSERT INTO custom_group_channels
+                 (custom_group_id, channel_id, sort_order, is_ignored, channel_tvg_name, channel_tvg_id, source_group_name, saved_epg_channel_id, saved_custom_name)
+                 SELECT ?, c.id, ?, 0, c.tvg_name, c.tvg_id, g.original_name, c.epg_channel_id, c.custom_name
+                 FROM channels c
+                 LEFT JOIN m3u_groups g ON g.id = c.group_id
+                 WHERE c.id = ?
                  ON DUPLICATE KEY UPDATE is_ignored = 0'
             );
             foreach ($cleanAdd as $cid) {
-                $ins->execute([$customGroupId, $cid, $nextOrder]);
+                $ins->execute([$customGroupId, $nextOrder, $cid]);
                 $nextOrder++;
             }
         }
@@ -158,5 +162,107 @@ final class CustomGroupSyncService
         } else {
             $this->pdo->prepare('UPDATE m3u_groups SET sync_diff_json = NULL WHERE id = ?')->execute([$customGroupId]);
         }
+    }
+
+    public function captureSnapshotsBeforeSync(): void
+    {
+        $this->pdo->exec(
+            'UPDATE custom_group_channels cgc
+             INNER JOIN channels c ON c.id = cgc.channel_id
+             LEFT JOIN m3u_groups g ON g.id = c.group_id
+             SET cgc.channel_tvg_name = c.tvg_name,
+                 cgc.channel_tvg_id = c.tvg_id,
+                 cgc.source_group_name = g.original_name,
+                 cgc.saved_epg_channel_id = CASE WHEN c.epg_channel_id IS NOT NULL AND c.epg_channel_id <> "" THEN c.epg_channel_id ELSE cgc.saved_epg_channel_id END,
+                 cgc.saved_custom_name = CASE WHEN c.custom_name IS NOT NULL AND c.custom_name <> "" THEN c.custom_name ELSE cgc.saved_custom_name END
+             WHERE cgc.channel_id IS NOT NULL'
+        );
+    }
+
+    /**
+     * @return array{relinked: int, epg_restored: int, name_restored: int}
+     */
+    public function relinkCustomGroupChannelsAfterSync(): array
+    {
+        $orphans = $this->pdo->query(
+            'SELECT id, custom_group_id, channel_tvg_name, source_group_name, saved_epg_channel_id, saved_custom_name
+             FROM custom_group_channels
+             WHERE channel_id IS NULL AND channel_tvg_name IS NOT NULL AND channel_tvg_name <> ""'
+        )->fetchAll();
+
+        if ($orphans === []) {
+            return ['relinked' => 0, 'epg_restored' => 0, 'name_restored' => 0];
+        }
+
+        $exactStmt = $this->pdo->prepare(
+            'SELECT c.id, c.epg_channel_id, c.custom_name
+             FROM channels c
+             INNER JOIN m3u_groups g ON g.id = c.group_id
+             WHERE c.tvg_name = ? AND g.original_name = ?
+             LIMIT 1'
+        );
+        $fallbackStmt = $this->pdo->prepare(
+            'SELECT c.id, c.epg_channel_id, c.custom_name
+             FROM channels c
+             INNER JOIN m3u_groups g ON g.id = c.group_id
+             WHERE c.tvg_name = ?
+             ORDER BY (g.category = \'Live TV\') DESC, c.id ASC
+             LIMIT 1'
+        );
+        $relinkStmt = $this->pdo->prepare('UPDATE custom_group_channels SET channel_id = ? WHERE id = ?');
+        $restoreEpgStmt = $this->pdo->prepare('UPDATE channels SET epg_channel_id = ? WHERE id = ? AND (epg_channel_id IS NULL OR epg_channel_id = "")');
+        $restoreNameStmt = $this->pdo->prepare('UPDATE channels SET custom_name = ? WHERE id = ? AND (custom_name IS NULL OR custom_name = "")');
+
+        $relinked = 0;
+        $epgRestored = 0;
+        $nameRestored = 0;
+
+        foreach ($orphans as $row) {
+            $tvgName = (string) $row['channel_tvg_name'];
+            $srcGroup = (string) ($row['source_group_name'] ?? '');
+            $match = false;
+
+            if ($srcGroup !== '') {
+                $exactStmt->execute([$tvgName, $srcGroup]);
+                $match = $exactStmt->fetch();
+            }
+            if ($match === false) {
+                $fallbackStmt->execute([$tvgName]);
+                $match = $fallbackStmt->fetch();
+            }
+            if ($match === false) {
+                continue;
+            }
+
+            $newChannelId = (int) $match['id'];
+            try {
+                $relinkStmt->execute([$newChannelId, (int) $row['id']]);
+                $relinked++;
+            } catch (\PDOException) {
+                continue;
+            }
+
+            $savedEpg = (string) ($row['saved_epg_channel_id'] ?? '');
+            if ($savedEpg !== '' && empty($match['epg_channel_id'])) {
+                $restoreEpgStmt->execute([$savedEpg, $newChannelId]);
+                if ($restoreEpgStmt->rowCount() > 0) {
+                    $epgRestored++;
+                }
+            }
+
+            $savedName = (string) ($row['saved_custom_name'] ?? '');
+            if ($savedName !== '' && empty($match['custom_name'])) {
+                $restoreNameStmt->execute([$savedName, $newChannelId]);
+                if ($restoreNameStmt->rowCount() > 0) {
+                    $nameRestored++;
+                }
+            }
+        }
+
+        return [
+            'relinked' => $relinked,
+            'epg_restored' => $epgRestored,
+            'name_restored' => $nameRestored,
+        ];
     }
 }

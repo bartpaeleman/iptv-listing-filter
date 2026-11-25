@@ -38,6 +38,9 @@ final class M3uParserService
         @ini_set('memory_limit', '512M');
         \App\Core\SchemaMigrator::ensureSchemaUpToDate($this->pdo);
 
+        $customGroupSync = new CustomGroupSyncService($this->pdo);
+        $customGroupSync->captureSnapshotsBeforeSync();
+
         $cache = new FeedCacheService($this->settings);
         $cacheInfo = $cache->getCacheInfo('m3u');
 
@@ -225,6 +228,8 @@ final class M3uParserService
         }
 
         fclose($handle);
+        $customGroupSync->relinkCustomGroupChannelsAfterSync();
+        $customGroupSync->evaluateAllConvertedGroups();
         $cache->updateItemCount($sourceFile, $channelsAdded + $channelsUpdated + $channelsUnchanged);
         $this->settings->set('last_m3u_sync', $now, false);
         \App\Core\SchemaMigrator::ensureSchemaUpToDate($this->pdo);
