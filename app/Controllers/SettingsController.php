@@ -216,9 +216,18 @@ final class SettingsController extends BaseController
         $phpPath = trim((string) ($input['php_cli_path'] ?? $input['php_path'] ?? ''));
         $intervalHours = isset($input['interval_hours']) ? max(1, (int) $input['interval_hours']) : null;
         $preferredHour = isset($input['preferred_hour']) ? max(0, min(23, (int) $input['preferred_hour'])) : null;
+        $elevation = [
+            'auth_mode' => trim((string) ($input['auth_mode'] ?? '')),
+            'ssh_user' => trim((string) ($input['ssh_user'] ?? 'admin')),
+            'ssh_password' => (string) ($input['ssh_password'] ?? ''),
+        ];
+        unset($input['ssh_password']);
 
+        $hadPassword = ($elevation['ssh_password'] ?? '') !== '';
         try {
-            $status = (new \App\Services\CrontabService())->saveJob($schedule, $phpPath, $type);
+            $status = (new \App\Services\CrontabService())->saveJob($schedule, $phpPath, $type, $elevation);
+            $elevation['ssh_password'] = '';
+            unset($elevation);
 
             $settings = new SettingsRepository();
             if ($intervalHours !== null) {
@@ -248,13 +257,36 @@ final class SettingsController extends BaseController
                 'interval_hours' => $status['interval_hours'],
                 'preferred_hour' => $status['preferred_hour'],
             ]);
+            $status['ok'] = true;
+            $status['message'] = '✅ Cronjob opgeslagen in /etc/config/crontab en crond herstart.';
+            $jobName = $type === 'epg' ? 'EPG Gids' : 'M3U Kanalen';
+            $status['ok'] = true;
+            $status['action'] = 'deleted';
+            $status['message'] = "✅ {$jobName} cronjob verwijderd uit /etc/config/crontab en crond herstart.";
             $this->jsonSuccess($status);
         } catch (\Throwable $e) {
+            $elevation['ssh_password'] = '';
+            unset($elevation);
             \App\Services\AppLogger::log('CRON', 'ERROR', 'Opslaan van cronjob mislukt: ' . $e->getMessage(), [
                 'type' => $type,
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
             ]);
+            if ($e->getCode() === 403) {
+                header('Content-Type: application/json; charset=utf-8');
+                http_response_code($hadPassword ? 400 : 200);
+                echo json_encode([
+                    'success' => false,
+                    'ok' => false,
+                    'needs_elevation' => true,
+                    'methods' => ['sudo', 'ssh'],
+                    'message' => $hadPassword
+                        ? '❌ ' . $e->getMessage()
+                        : 'Geen directe schrijfrechten op /etc/config/crontab. Log hieronder eenmalig in met je QNAP admin-account.',
+                    'error' => $e->getMessage(),
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
             $this->jsonError($e->getMessage(), 400);
         }
     }
@@ -266,16 +298,47 @@ final class SettingsController extends BaseController
         $this->verifyCsrf($input);
 
         $type = trim((string) ($input['type'] ?? 'm3u'));
+        $elevation = [
+            'auth_mode' => trim((string) ($input['auth_mode'] ?? '')),
+            'ssh_user' => trim((string) ($input['ssh_user'] ?? 'admin')),
+            'ssh_password' => (string) ($input['ssh_password'] ?? ''),
+        ];
+        unset($input['ssh_password']);
 
         try {
-            $status = (new \App\Services\CrontabService())->deleteJob($type);
+            $status = (new \App\Services\CrontabService())->deleteJob($type, $elevation);
+            $elevation['ssh_password'] = '';
+            unset($elevation);
             \App\Services\AppLogger::log('CRON', 'INFO', 'Cronjob gewist.', ['type' => $type]);
+            $status['ok'] = true;
+            $status['message'] = '✅ Cronjob opgeslagen in /etc/config/crontab en crond herstart.';
+            $jobName = $type === 'epg' ? 'EPG Gids' : 'M3U Kanalen';
+            $status['ok'] = true;
+            $status['action'] = 'deleted';
+            $status['message'] = "✅ {$jobName} cronjob verwijderd uit /etc/config/crontab en crond herstart.";
             $this->jsonSuccess($status);
         } catch (\Throwable $e) {
+            $elevation['ssh_password'] = '';
+            unset($elevation);
             \App\Services\AppLogger::log('CRON', 'ERROR', 'Wissen van cronjob mislukt: ' . $e->getMessage(), [
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
             ]);
+            if ($e->getCode() === 403) {
+                header('Content-Type: application/json; charset=utf-8');
+                http_response_code($hadPassword ? 400 : 200);
+                echo json_encode([
+                    'success' => false,
+                    'ok' => false,
+                    'needs_elevation' => true,
+                    'methods' => ['sudo', 'ssh'],
+                    'message' => $hadPassword
+                        ? '❌ ' . $e->getMessage()
+                        : 'Geen directe schrijfrechten op /etc/config/crontab. Log hieronder eenmalig in met je QNAP admin-account.',
+                    'error' => $e->getMessage(),
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
             $this->jsonError($e->getMessage(), 400);
         }
     }

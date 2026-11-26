@@ -45,14 +45,7 @@ final class CrontabService
             }
         }
 
-        $permissionHint = $writable
-            ? ''
-            : sprintf(
-                'Geen schrijfrechten op %s. Voer eenmalig via SSH als admin/root uit: chmod 664 %s && chgrp httpdusr %s (of gebruik sudo crontab -e).',
-                $backend === 'qnap' ? self::QNAP_CRONTAB_PATH : 'crontab',
-                self::QNAP_CRONTAB_PATH,
-                self::QNAP_CRONTAB_PATH
-            );
+        $permissionHint = '';
 
         return [
             'supported' => $backend !== 'none',
@@ -68,7 +61,7 @@ final class CrontabService
         ];
     }
 
-    public function saveJob(string $schedule, string $phpPath, string $type = 'm3u'): array
+    public function saveJob(string $schedule, string $phpPath, string $type = 'm3u', array $elevation = []): array
     {
         if (!in_array($type, ['m3u', 'epg'], true)) {
             throw new \InvalidArgumentException('Ongeldig cronjob-type. Gebruik m3u of epg.');
@@ -85,63 +78,57 @@ final class CrontabService
         }
 
         $status = $this->getStatus();
-        if (!$status['writable']) {
-            throw new \RuntimeException($status['permission_hint'] ?: 'Geen schrijfrechten voor crontab.');
-        }
-
         $scriptPath = $status['script_path'];
         $typeFlag = '--' . $type;
         $newLine = sprintf('%s %s %s %s --force >/dev/null 2>&1', $schedule, $phpPath, $scriptPath, $typeFlag);
 
         $backend = $status['backend'];
         $lines = $this->readCrontabLines($backend);
-        $updated = [];
-        $replaced = false;
-
-        foreach ($lines as $line) {
+        $hadExisting = false;
+        $updated = array_values(array_filter($lines, static function (string $line) use ($typeFlag, &$hadExisting): bool {
             $trimmed = trim($line);
-            $isTarget = str_contains($line, self::SYNC_MARKER)
-                && str_contains($line, $typeFlag)
-                && !str_starts_with($trimmed, '#');
-
-            if ($isTarget) {
-                if (!$replaced) {
-                    $updated[] = $newLine;
-                    $replaced = true;
-                }
-                continue;
+            if ($trimmed === '' || str_starts_with($trimmed, '#')) {
+                return $trimmed !== '';
             }
-            $updated[] = $line;
-        }
+            if (str_contains($trimmed, self::SYNC_MARKER) && str_contains($trimmed, $typeFlag)) {
+                $hadExisting = true;
+                return false;
+            }
+            return true;
+        }));
+        $updated[] = $newLine;
 
-        if (!$replaced) {
-            $updated[] = $newLine;
-        }
-
-        $this->writeCrontabLines($backend, $updated);
-        return $this->getStatus();
+        $this->writeCrontabLines($backend, $updated, $elevation);
+        $result = $this->getStatus();
+        $result['action'] = $hadExisting ? 'updated' : 'created';
+        return $result;
     }
 
-    public function deleteJob(string $type = 'm3u'): array
+    public function deleteJob(string $type = 'm3u', array $elevation = []): array
     {
         if (!in_array($type, ['m3u', 'epg'], true)) {
             throw new \InvalidArgumentException('Ongeldig cronjob-type. Gebruik m3u of epg.');
         }
 
         $status = $this->getStatus();
-        if (!$status['writable']) {
-            throw new \RuntimeException($status['permission_hint'] ?: 'Geen schrijfrechten voor crontab.');
-        }
-
         $typeFlag = '--' . $type;
         $backend = $status['backend'];
         $lines = $this->readCrontabLines($backend);
         $filtered = array_values(array_filter($lines, static function (string $line) use ($typeFlag): bool {
-            return !(str_contains($line, self::SYNC_MARKER) && str_contains($line, $typeFlag) && !str_starts_with(trim($line), '#'));
+            $trimmed = trim($line);
+            if ($trimmed === '') {
+                return false;
+            }
+            if (str_starts_with($trimmed, '#')) {
+                return true;
+            }
+            return !(str_contains($trimmed, self::SYNC_MARKER) && str_contains($trimmed, $typeFlag));
         }));
 
-        $this->writeCrontabLines($backend, $filtered);
-        return $this->getStatus();
+        $this->writeCrontabLines($backend, $filtered, $elevation);
+        $result = $this->getStatus();
+        $result['action'] = 'deleted';
+        return $result;
     }
 
     private function detectPhpCli(): string
@@ -209,43 +196,337 @@ final class CrontabService
 
     /**
      * @param array<int, string> $lines
+     * @param array{auth_mode?: string, ssh_user?: string, ssh_password?: string} $elevation
      */
-    private function writeCrontabLines(string $backend, array $lines): void
+    private function writeCrontabLines(string $backend, array $lines, array $elevation = []): void
     {
         $payload = implode("\n", array_filter($lines, static fn(string $l): bool => $l !== '')) . "\n";
+        $authMode = trim((string) ($elevation['auth_mode'] ?? ''));
+        $sshUser = trim((string) ($elevation['ssh_user'] ?? 'admin'));
+        if ($sshUser === '') {
+            $sshUser = 'admin';
+        }
+        $sshPassword = (string) ($elevation['ssh_password'] ?? '');
+        $elevation['ssh_password'] = '';
 
-        if ($backend === 'qnap') {
-            if (@file_put_contents(self::QNAP_CRONTAB_PATH, $payload, LOCK_EX) === false) {
-                throw new \RuntimeException('Kon niet schrijven naar ' . self::QNAP_CRONTAB_PATH);
-            }
-            if (function_exists('exec')) {
-                @exec('crontab ' . escapeshellarg(self::QNAP_CRONTAB_PATH) . ' 2>&1');
-                if (@is_executable('/etc/init.d/crond.sh')) {
-                    @exec('/etc/init.d/crond.sh restart 2>&1');
+        try {
+            if ($backend === 'qnap') {
+                if (@is_writable(self::QNAP_CRONTAB_PATH) && $authMode === '') {
+                    if (@file_put_contents(self::QNAP_CRONTAB_PATH, $payload, LOCK_EX) === false) {
+                        throw new \RuntimeException('Kon niet schrijven naar ' . self::QNAP_CRONTAB_PATH);
+                    }
+                    $this->reloadQnapCrontab();
+                    return;
                 }
+
+                if ($authMode === '') {
+                    if ($this->trySudoNoPassQnap($payload)) {
+                        return;
+                    }
+                    throw new \RuntimeException(
+                        'Geen schrijfrechten op ' . self::QNAP_CRONTAB_PATH . '. Kies Sudo of QNAP SSH Login om op te slaan.',
+                        403
+                    );
+                }
+
+                if ($authMode === 'sudo') {
+                    if ($sshPassword === '') {
+                        if ($this->trySudoNoPassQnap($payload)) {
+                            return;
+                        }
+                        throw new \RuntimeException('Vul het sudo-wachtwoord in.', 403);
+                    }
+                    $this->writeQnapWithSudo($payload, $sshPassword);
+                    return;
+                }
+
+                if ($authMode === 'ssh') {
+                    if ($sshPassword === '') {
+                        throw new \RuntimeException('Vul het SSH-wachtwoord in.', 403);
+                    }
+                    if (!preg_match('/^[a-zA-Z0-9_.\-]+$/', $sshUser)) {
+                        throw new \InvalidArgumentException('Ongeldige SSH-gebruikersnaam.');
+                    }
+                    $this->writeQnapWithSsh($payload, $sshUser, $sshPassword);
+                    return;
+                }
+
+                throw new \InvalidArgumentException('Ongeldige auth_mode. Gebruik sudo of ssh.');
             }
+
+            if ($backend === 'cli' && function_exists('proc_open')) {
+                $proc = @proc_open('crontab -', [
+                    0 => ['pipe', 'r'],
+                    1 => ['pipe', 'w'],
+                    2 => ['pipe', 'w'],
+                ], $pipes);
+                if (!is_resource($proc)) {
+                    throw new \RuntimeException('Kon crontab proces niet starten.');
+                }
+                fwrite($pipes[0], $payload);
+                fclose($pipes[0]);
+                $err = stream_get_contents($pipes[2]);
+                fclose($pipes[1]);
+                fclose($pipes[2]);
+                $code = proc_close($proc);
+                if ($code !== 0) {
+                    throw new \RuntimeException('Crontab opslaan mislukt: ' . trim((string) $err));
+                }
+                return;
+            }
+
+            throw new \RuntimeException('Crontab wordt op deze server niet ondersteund.');
+        } finally {
+            $sshPassword = '';
+        }
+    }
+
+    private function reloadQnapCrontab(): void
+    {
+        if (!function_exists('exec')) {
             return;
         }
+        $cmd = 'crontab ' . escapeshellarg(self::QNAP_CRONTAB_PATH);
+        if (@is_executable('/etc/init.d/crond.sh')) {
+            $cmd .= ' && /etc/init.d/crond.sh restart';
+        }
+        @exec($cmd . ' 2>&1');
+    }
 
-        if ($backend === 'cli' && function_exists('proc_open')) {
-            $proc = @proc_open('crontab -', [
-                0 => ['pipe', 'r'],
-                1 => ['pipe', 'w'],
-                2 => ['pipe', 'w'],
-            ], $pipes);
-            if (!is_resource($proc)) {
-                throw new \RuntimeException('Kon crontab proces niet starten.');
+    private function trySudoNoPassQnap(string $payload): bool
+    {
+        $sudoBin = $this->findExecutable(['/usr/bin/sudo', '/opt/bin/sudo', 'sudo']);
+        if ($sudoBin === null || !function_exists('proc_open')) {
+            return false;
+        }
+        $tmpFile = @tempnam(sys_get_temp_dir(), 'iptv_cron_');
+        if ($tmpFile === false) {
+            return false;
+        }
+        try {
+            if (@file_put_contents($tmpFile, $payload) === false) {
+                return false;
             }
-            fwrite($pipes[0], $payload);
+            $cmd = sprintf(
+                '%s -n sh -c %s',
+                escapeshellarg($sudoBin),
+                escapeshellarg(
+                    'cp ' . escapeshellarg($tmpFile) . ' ' . self::QNAP_CRONTAB_PATH
+                    . ' && /usr/bin/crontab ' . self::QNAP_CRONTAB_PATH
+                    . ' && /etc/init.d/crond.sh restart'
+                )
+            );
+            $proc = @proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+            if (!is_resource($proc)) {
+                return false;
+            }
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            return proc_close($proc) === 0;
+        } finally {
+            @unlink($tmpFile);
+        }
+    }
+
+    private function writeQnapWithSudo(string $payload, string $password): void
+    {
+        $sudoBin = $this->findExecutable(['/usr/bin/sudo', '/opt/bin/sudo', 'sudo']);
+        if ($sudoBin === null || !function_exists('proc_open')) {
+            throw new \RuntimeException('sudo of proc_open is niet beschikbaar op deze server.', 403);
+        }
+        $tmpFile = @tempnam(sys_get_temp_dir(), 'iptv_cron_');
+        if ($tmpFile === false || @file_put_contents($tmpFile, $payload) === false) {
+            throw new \RuntimeException('Kon tijdelijk crontab-bestand niet aanmaken.');
+        }
+        try {
+            $shellCmd = 'cp ' . escapeshellarg($tmpFile) . ' ' . self::QNAP_CRONTAB_PATH
+                . ' && /usr/bin/crontab ' . self::QNAP_CRONTAB_PATH
+                . ' && /etc/init.d/crond.sh restart';
+            $proc = @proc_open(
+                escapeshellarg($sudoBin) . ' -S -p "" sh -c ' . escapeshellarg($shellCmd),
+                [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                $pipes
+            );
+            if (!is_resource($proc)) {
+                throw new \RuntimeException('Kon sudo-proces niet starten.');
+            }
+            fwrite($pipes[0], $password . "\n");
             fclose($pipes[0]);
+            $out = stream_get_contents($pipes[1]);
             $err = stream_get_contents($pipes[2]);
             fclose($pipes[1]);
             fclose($pipes[2]);
             $code = proc_close($proc);
             if ($code !== 0) {
-                throw new \RuntimeException('Crontab opslaan mislukt: ' . trim((string) $err));
+                throw new \RuntimeException('Sudo crontab-update mislukt: ' . trim((string) ($err ?: $out)));
+            }
+        } finally {
+            @unlink($tmpFile);
+        }
+    }
+
+    private function writeQnapWithSsh(string $payload, string $user, string $password): void
+    {
+        $hex = bin2hex($payload);
+        $phpCli = $this->detectPhpCli();
+        $tmpTarget = self::QNAP_CRONTAB_PATH . '.tmp';
+
+        // Pure POSIX printf '%b' octal fallback (0-byte safe for ASCII crontab)
+        $octal = '';
+        $len = strlen($payload);
+        for ($i = 0; $i < $len; $i++) {
+            $ord = ord($payload[$i]);
+            if ($ord < 32 || $ord > 126 || $payload[$i] === '\\' || $payload[$i] === '%') {
+                $octal .= '\\0' . str_pad(decoct($ord), 3, '0', STR_PAD_LEFT);
+            } else {
+                $octal .= $payload[$i];
             }
         }
+
+        $phpWrite = sprintf(
+            '%s -r %s %s %s',
+            escapeshellarg($phpCli),
+            escapeshellarg('if(file_put_contents($argv[1],hex2bin($argv[2]))===false)exit(1);'),
+            escapeshellarg($tmpTarget),
+            $hex
+        );
+        $posixWrite = sprintf('printf %s %s > %s', escapeshellarg('%b'), escapeshellarg($octal), $tmpTarget);
+
+        $remoteCmd = '( ' . $phpWrite . ' || ' . $posixWrite . ' )'
+            . ' && mv ' . $tmpTarget . ' ' . self::QNAP_CRONTAB_PATH
+            . ' && /usr/bin/crontab ' . self::QNAP_CRONTAB_PATH
+            . ' && /etc/init.d/crond.sh restart'
+            . ' && (grep -F ' . escapeshellarg(self::SYNC_MARKER) . ' ' . self::QNAP_CRONTAB_PATH . ' || true)';
+
+        $res = $this->executeAsAdminViaSsh($user, $password, $remoteCmd);
+        $password = '';
+        if (($res['exit_code'] ?? 1) !== 0) {
+            $detail = trim((string) ($res['output'] ?? 'Onbekende SSH-fout'));
+            throw new \RuntimeException('SSH-uitvoering mislukt: ' . $detail, 403);
+        }
+    }
+
+    /**
+     * @return array{exit_code: int, output: string, active_lines: array<int, string>}
+     */
+    public function executeAsAdminViaSsh(string $user, string $password, string $remoteCmd, int $port = 22): array
+    {
+        if (!function_exists('proc_open')) {
+            throw new \RuntimeException('proc_open is uitgeschakeld op deze server.', 403);
+        }
+
+        $sshBin = $this->findExecutable(['/usr/bin/ssh', '/opt/bin/ssh', 'ssh']);
+        if ($sshBin === null) {
+            throw new \RuntimeException('OpenSSH client (/usr/bin/ssh) niet gevonden op deze server.', 403);
+        }
+
+        $askpassFile = @tempnam(sys_get_temp_dir(), 'iptv_askpass_');
+        if ($askpassFile === false) {
+            throw new \RuntimeException('Kon tijdelijk SSH_ASKPASS-script niet aanmaken.', 403);
+        }
+
+        try {
+            $scriptContent = "#!/bin/sh\nprintf '%s\\n' " . escapeshellarg($password) . "\n";
+            if (@file_put_contents($askpassFile, $scriptContent) === false) {
+                throw new \RuntimeException('Kon tijdelijk SSH_ASKPASS-script niet schrijven.', 403);
+            }
+            @chmod($askpassFile, 0700);
+
+            $sshCmd = sprintf(
+                '%s -T -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive -o ConnectTimeout=8 -p %d %s@127.0.0.1 %s',
+                escapeshellarg($sshBin),
+                $port,
+                escapeshellarg($user),
+                escapeshellarg($remoteCmd)
+            );
+
+            $env = [
+                'SSH_ASKPASS' => $askpassFile,
+                'SSH_ASKPASS_REQUIRE' => 'force',
+                'DISPLAY' => ':0',
+                'PATH' => '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/bin',
+            ];
+
+            $runSsh = static function (string $cmd) use ($env): array {
+                $proc = @proc_open(
+                    $cmd,
+                    [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                    $pipes,
+                    null,
+                    $env
+                );
+                if (!is_resource($proc)) {
+                    return ['exit_code' => 1, 'combined' => 'Kon SSH-proces niet starten.'];
+                }
+                $out = (string) stream_get_contents($pipes[1]);
+                $err = (string) stream_get_contents($pipes[2]);
+                fclose($pipes[1]);
+                fclose($pipes[2]);
+                $code = proc_close($proc);
+                return ['exit_code' => $code, 'combined' => trim($out . "\n" . $err)];
+            };
+
+            $result = $runSsh($sshCmd);
+
+            // Secundaire fallback voor oudere OpenSSH (< 8.4) zonder SSH_ASKPASS_REQUIRE: gebruik setsid
+            if ($result['exit_code'] !== 0) {
+                $setsidBin = $this->findExecutable(['/usr/bin/setsid', '/opt/bin/setsid', 'setsid']);
+                if ($setsidBin !== null) {
+                    $result = $runSsh(escapeshellarg($setsidBin) . ' ' . $sshCmd);
+                }
+            }
+
+            return [
+                'exit_code' => $result['exit_code'],
+                'output' => $this->sanitizeSshOutput($result['combined'], $password),
+                'active_lines' => $this->extractSyncLines($result['combined']),
+            ];
+        } finally {
+            @unlink($askpassFile);
+        }
+    }
+
+    /**
+     * @param array<int, string> $candidates
+     */
+    private function findExecutable(array $candidates): ?string
+    {
+        foreach ($candidates as $bin) {
+            if (str_starts_with($bin, '/') && @is_executable($bin)) {
+                return $bin;
+            }
+            if (!str_starts_with($bin, '/') && function_exists('exec')) {
+                $out = [];
+                @exec('which ' . escapeshellarg($bin) . ' 2>/dev/null', $out, $code);
+                if ($code === 0 && !empty($out[0])) {
+                    return trim($out[0]);
+                }
+            }
+        }
+        return null;
+    }
+
+    private function sanitizeSshOutput(string $output, string $password): string
+    {
+        if ($password !== '') {
+            $output = str_replace($password, '***', $output);
+        }
+        return trim((string) preg_replace('/\r/', '', $output));
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function extractSyncLines(string $output): array
+    {
+        $lines = [];
+        foreach (preg_split('/\r\n|\r|\n/', $output) ?: [] as $line) {
+            $t = trim($line);
+            if ($t !== '' && str_contains($t, self::SYNC_MARKER) && !str_contains($t, 'echo ')) {
+                $lines[] = $t;
+            }
+        }
+        return array_values(array_unique($lines));
     }
 
     /**
