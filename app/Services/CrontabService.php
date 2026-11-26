@@ -358,10 +358,32 @@ final class CrontabService
 
     private function writeQnapWithSsh(string $payload, string $user, string $password): void
     {
-        $chunkedB64 = rtrim(chunk_split(base64_encode($payload), 76, "\n"));
+        $hex = bin2hex($payload);
+        $phpCli = $this->detectPhpCli();
         $tmpTarget = self::QNAP_CRONTAB_PATH . '.tmp';
-        $remoteCmd = 'printf ' . escapeshellarg("%s\n") . ' ' . escapeshellarg($chunkedB64)
-            . ' | base64 -d > ' . $tmpTarget
+
+        // Pure POSIX printf '%b' octal fallback (0-byte safe for ASCII crontab)
+        $octal = '';
+        $len = strlen($payload);
+        for ($i = 0; $i < $len; $i++) {
+            $ord = ord($payload[$i]);
+            if ($ord < 32 || $ord > 126 || $payload[$i] === '\\' || $payload[$i] === '%') {
+                $octal .= '\\0' . str_pad(decoct($ord), 3, '0', STR_PAD_LEFT);
+            } else {
+                $octal .= $payload[$i];
+            }
+        }
+
+        $phpWrite = sprintf(
+            '%s -r %s %s %s',
+            escapeshellarg($phpCli),
+            escapeshellarg('if(file_put_contents($argv[1],hex2bin($argv[2]))===false)exit(1);'),
+            escapeshellarg($tmpTarget),
+            $hex
+        );
+        $posixWrite = sprintf('printf %s %s > %s', escapeshellarg('%b'), escapeshellarg($octal), $tmpTarget);
+
+        $remoteCmd = '( ' . $phpWrite . ' || ' . $posixWrite . ' )'
             . ' && mv ' . $tmpTarget . ' ' . self::QNAP_CRONTAB_PATH
             . ' && /usr/bin/crontab ' . self::QNAP_CRONTAB_PATH
             . ' && /etc/init.d/crond.sh restart'
