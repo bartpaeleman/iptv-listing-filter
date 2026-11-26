@@ -259,8 +259,10 @@ final class SettingsController extends BaseController
             ]);
             $status['ok'] = true;
             $status['message'] = '✅ Cronjob opgeslagen in /etc/config/crontab en crond herstart.';
+            $jobName = $type === 'epg' ? 'EPG Gids' : 'M3U Kanalen';
             $status['ok'] = true;
-            $status['message'] = '✅ Cronjob verwijderd uit /etc/config/crontab en crond herstart.';
+            $status['action'] = 'deleted';
+            $status['message'] = "✅ {$jobName} cronjob verwijderd uit /etc/config/crontab en crond herstart.";
             $this->jsonSuccess($status);
         } catch (\Throwable $e) {
             $elevation['ssh_password'] = '';
@@ -310,8 +312,10 @@ final class SettingsController extends BaseController
             \App\Services\AppLogger::log('CRON', 'INFO', 'Cronjob gewist.', ['type' => $type]);
             $status['ok'] = true;
             $status['message'] = '✅ Cronjob opgeslagen in /etc/config/crontab en crond herstart.';
+            $jobName = $type === 'epg' ? 'EPG Gids' : 'M3U Kanalen';
             $status['ok'] = true;
-            $status['message'] = '✅ Cronjob verwijderd uit /etc/config/crontab en crond herstart.';
+            $status['action'] = 'deleted';
+            $status['message'] = "✅ {$jobName} cronjob verwijderd uit /etc/config/crontab en crond herstart.";
             $this->jsonSuccess($status);
         } catch (\Throwable $e) {
             $elevation['ssh_password'] = '';

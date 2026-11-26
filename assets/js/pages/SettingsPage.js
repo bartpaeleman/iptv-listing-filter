@@ -395,15 +395,6 @@ export class SettingsPage extends BaseComponent {
                     </div>
                 </div>
                 ${job.raw_line ? `<div class="muted" style="font-size:0.85rem;">Huidige regel: <code>${this.escapeHtml(job.raw_line)}</code></div>` : ''}
-                ${!st.writable ? `
-                    <div class="alert alert-warning" style="padding:0.75rem;border-radius:6px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);">
-                        <p style="margin:0 0 0.5rem 0;font-size:0.88rem;">${this.escapeHtml(st.permission_hint)}</p>
-                        <div class="copy-group">
-                            <input type="text" id="cronPermCmdInput" value="${this.escapeHtml(cronStatus.fix_command || 'chmod 664 /etc/config/crontab && chgrp httpdusr /etc/config/crontab')}" readonly style="font-size:16px;">
-                            <button type="button" class="btn btn-sm" id="copyCronPermBtn" style="min-height:44px;">Kopieer SSH-commando</button>
-                        </div>
-                    </div>
-                ` : ''}
                 <div class="grid-2">
                     <label>Schema Preset
                         <select id="cronPresetSelect" style="font-size:16px;">
@@ -417,27 +408,20 @@ export class SettingsPage extends BaseComponent {
                 <label>PHP-CLI Pad
                     <input type="text" id="cronPhpPathInput" value="${this.escapeHtml(st.default_php_path || '/usr/bin/php')}" style="font-size:16px;">
                 </label>
-                <details id="cronElevationDetails" ${!st.writable ? 'open' : ''} style="border:1px solid var(--border-color, #2a2f3a);border-radius:6px;padding:0.65rem 0.85rem;background:rgba(0,0,0,0.12);">
-                    <summary style="cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center;">🔐 Toegang voor /etc/config/crontab (QNAP)</summary>
-                    <div id="cronElevationNotice" class="muted" style="font-size:0.85rem;margin:0.35rem 0 0.65rem 0;">
-                        Alleen nodig als de webserver geen directe schrijfrechten heeft. Wachtwoorden worden nooit opgeslagen.
+                <div id="cronElevationDetails" style="border:1px solid var(--border-color, #2a2f3a);border-radius:6px;padding:0.75rem 0.85rem;background:rgba(0,0,0,0.12);">
+                    <div style="font-weight:600;margin-bottom:0.25rem;">🔐 Toegang voor /etc/config/crontab (QNAP SSH)</div>
+                    <div id="cronElevationNotice" class="muted" style="font-size:0.85rem;margin-bottom:0.65rem;">
+                        Eenmalige QNAP SSH-login (admin / root). Wachtwoorden worden nooit opgeslagen.
                     </div>
                     <div class="grid-2" style="gap:0.65rem;">
-                        <label>Authenticatiemethode
-                            <select id="cronAuthModeSelect" style="font-size:16px;">
-                                <option value="">Automatisch / Direct</option>
-                                <option value="sudo">Automatisch / Sudo</option>
-                                <option value="ssh">QNAP SSH Login (admin / root)</option>
-                            </select>
-                        </label>
-                        <label id="cronSshUserWrap" class="hidden">SSH Gebruikersnaam
+                        <label id="cronSshUserWrap">SSH Gebruikersnaam
                             <input type="text" id="cronSshUserInput" value="admin" autocomplete="off" style="font-size:16px;">
                         </label>
+                        <label id="cronSshPassWrap">Wachtwoord (eenmalig, niet opgeslagen)
+                            <input type="password" id="cronSshPassInput" value="" autocomplete="off" placeholder="QNAP admin wachtwoord" style="font-size:16px;">
+                        </label>
                     </div>
-                    <label id="cronSshPassWrap" class="hidden" style="margin-top:0.5rem;">Wachtwoord (eenmalig, niet opgeslagen)
-                        <input type="password" id="cronSshPassInput" value="" autocomplete="off" placeholder="Sudo of SSH wachtwoord" style="font-size:16px;">
-                    </label>
-                </details>
+                </div>
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
                     <button type="button" class="btn btn-primary" id="saveCrontabBtn" style="min-height:44px;font-size:16px;">
                         💾 Opslaan in ${crontabTargetLabel}
@@ -548,24 +532,16 @@ export class SettingsPage extends BaseComponent {
             syncFromCronExpression(currentExpr);
 
             const getElevationPayload = () => {
-                const authMode = document.getElementById('cronAuthModeSelect')?.value || '';
                 const sshUser = document.getElementById('cronSshUserInput')?.value?.trim() || 'admin';
                 const sshPassword = document.getElementById('cronSshPassInput')?.value || '';
-                return authMode ? { auth_mode: authMode, ssh_user: sshUser, ssh_password: sshPassword } : {};
+                return { auth_mode: 'ssh', ssh_user: sshUser, ssh_password: sshPassword };
             };
 
             const handleElevationNeeded = (err) => {
-                const details = document.getElementById('cronElevationDetails');
                 const notice = document.getElementById('cronElevationNotice');
-                if (details) details.open = true;
                 if (notice) {
-                    notice.textContent = err?.message || 'Geen directe schrijfrechten. Kies Sudo of QNAP SSH Login en probeer opnieuw.';
+                    notice.textContent = err?.message || 'Vul het QNAP SSH-wachtwoord in en probeer opnieuw.';
                     notice.style.color = '#f59e0b';
-                }
-                const modeSelect = document.getElementById('cronAuthModeSelect');
-                if (modeSelect && !modeSelect.value) {
-                    modeSelect.value = 'ssh';
-                    modeSelect.dispatchEvent(new Event('change'));
                 }
             };
 

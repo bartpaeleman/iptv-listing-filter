@@ -84,17 +84,24 @@ final class CrontabService
 
         $backend = $status['backend'];
         $lines = $this->readCrontabLines($backend);
-        $updated = array_values(array_filter($lines, static function (string $line) use ($typeFlag): bool {
+        $hadExisting = false;
+        $updated = array_values(array_filter($lines, static function (string $line) use ($typeFlag, &$hadExisting): bool {
             $trimmed = trim($line);
             if ($trimmed === '' || str_starts_with($trimmed, '#')) {
                 return $trimmed !== '';
             }
-            return !(str_contains($trimmed, self::SYNC_MARKER) && str_contains($trimmed, $typeFlag));
+            if (str_contains($trimmed, self::SYNC_MARKER) && str_contains($trimmed, $typeFlag)) {
+                $hadExisting = true;
+                return false;
+            }
+            return true;
         }));
         $updated[] = $newLine;
 
         $this->writeCrontabLines($backend, $updated, $elevation);
-        return $this->getStatus();
+        $result = $this->getStatus();
+        $result['action'] = $hadExisting ? 'updated' : 'created';
+        return $result;
     }
 
     public function deleteJob(string $type = 'm3u', array $elevation = []): array
@@ -119,7 +126,9 @@ final class CrontabService
         }));
 
         $this->writeCrontabLines($backend, $filtered, $elevation);
-        return $this->getStatus();
+        $result = $this->getStatus();
+        $result['action'] = 'deleted';
+        return $result;
     }
 
     private function detectPhpCli(): string
