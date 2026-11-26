@@ -203,13 +203,17 @@ final class GroupRepository extends BaseRepository
         ]);
     }
 
-    public function setShowInEpg(int $groupId, int $showInEpg): void
+    public function setShowInEpg(int $groupId, int $showInEpg): int
     {
         $stmt = $this->pdo->prepare('UPDATE m3u_groups SET show_in_epg = :show WHERE id = :id');
         $stmt->execute([
             ':show' => $showInEpg ? 1 : 0,
             ':id' => $groupId,
         ]);
+
+        $check = $this->pdo->prepare('SELECT show_in_epg FROM m3u_groups WHERE id = :id LIMIT 1');
+        $check->execute([':id' => $groupId]);
+        return (int) $check->fetchColumn();
     }
 
     public function updateGroup(int $id, ?int $isEnabled, ?string $customName, ?int $sortOrder): void

@@ -203,10 +203,15 @@ final class ChannelController extends BaseController
         }
 
         $showInEpg = !empty($input['show_in_epg']) ? 1 : 0;
-        (new GroupRepository())->setShowInEpg($id, $showInEpg);
+        $newStatus = (new GroupRepository())->setShowInEpg($id, $showInEpg);
         (new ViewCacheService())->invalidateGroupsCache();
 
-        $this->jsonSuccess(['ok' => true, 'group_id' => $id, 'show_in_epg' => $showInEpg]);
+        $this->jsonSuccess([
+            'ok' => true,
+            'group_id' => $id,
+            'show_in_epg' => $newStatus,
+            'message' => $newStatus === 1 ? 'EPG ingeschakeld voor groep' : 'EPG uitgeschakeld voor groep',
+        ]);
     }
 
     public function bulkGroups(): void

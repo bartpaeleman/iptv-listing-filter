@@ -1089,9 +1089,10 @@ export class ChannelsPage extends BaseComponent {
             await this.load();
         });
 
-        document.getElementById('toggleEpgLinksBtn')?.addEventListener('click', async ev => {
+        this.container.addEventListener('click', async ev => {
+            const btn = ev.target.closest('#toggleEpgLinksBtn');
+            if (!btn) return;
             ev.stopPropagation();
-            const btn = ev.currentTarget;
             const group = (this.state.groups || []).find(g => Number(g.id) === Number(this.state.selectedGroupId));
             if (!group || btn.disabled) return;
 
@@ -1101,17 +1102,22 @@ export class ChannelsPage extends BaseComponent {
                 group.show_in_epg = val;
                 btn.classList.toggle('btn-epg-active', val === 1);
                 btn.classList.toggle('btn-epg-inactive', val === 0);
+                btn.setAttribute('aria-pressed', val === 1 ? 'true' : 'false');
                 btn.title = val === 1 ? 'EPG zichtbaar — klik om uit te schakelen' : 'EPG inactief — klik om in te schakelen';
             };
 
             btn.disabled = true;
             applyState(nextVal);
             try {
-                const res = await this.props.api.post('toggle_group_epg_links', { group_id: group.id, show_in_epg: nextVal });
+                const res = await this.props.api.post('toggle_group_epg_links', {
+                    group_id: group.id,
+                    id: group.id,
+                    show_in_epg: nextVal,
+                });
                 const rawVal = res?.show_in_epg ?? res?.data?.show_in_epg ?? nextVal;
                 const finalVal = Number(rawVal) === 1 ? 1 : 0;
                 applyState(finalVal);
-                this.props.toast.show(finalVal === 1 ? 'EPG zichtbaarheid ingeschakeld' : 'EPG zichtbaarheid uitgeschakeld');
+                this.props.toast.show(res?.message || (finalVal === 1 ? 'EPG ingeschakeld voor groep' : 'EPG uitgeschakeld voor groep'));
             } catch (err) {
                 applyState(prevVal);
                 this.props.toast.show(err?.message || 'Kon EPG zichtbaarheid niet bijwerken.', 'error');
@@ -1211,6 +1217,7 @@ export class ChannelsPage extends BaseComponent {
             const isEpgOn = selected ? Number(selected.show_in_epg ?? 1) === 1 : false;
             epgBtn.classList.toggle('btn-epg-active', isEpgOn);
             epgBtn.classList.toggle('btn-epg-inactive', !isEpgOn);
+            epgBtn.setAttribute('aria-pressed', isEpgOn ? 'true' : 'false');
             epgBtn.title = isEpgOn ? 'EPG zichtbaar — klik om uit te schakelen' : 'EPG inactief — klik om in te schakelen';
         }
         document.getElementById('convertToCustomBtn')?.classList.toggle('hidden', !selected || isCustom);
