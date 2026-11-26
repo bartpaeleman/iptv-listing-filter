@@ -358,9 +358,12 @@ final class CrontabService
 
     private function writeQnapWithSsh(string $payload, string $user, string $password): void
     {
-        $b64 = base64_encode($payload);
-        $remoteCmd = 'echo ' . escapeshellarg($b64) . ' | base64 -d > ' . self::QNAP_CRONTAB_PATH
-            . ' && crontab ' . self::QNAP_CRONTAB_PATH
+        $chunkedB64 = rtrim(chunk_split(base64_encode($payload), 76, "\n"));
+        $tmpTarget = self::QNAP_CRONTAB_PATH . '.tmp';
+        $remoteCmd = 'printf ' . escapeshellarg("%s\n") . ' ' . escapeshellarg($chunkedB64)
+            . ' | base64 -d > ' . $tmpTarget
+            . ' && mv ' . $tmpTarget . ' ' . self::QNAP_CRONTAB_PATH
+            . ' && /usr/bin/crontab ' . self::QNAP_CRONTAB_PATH
             . ' && /etc/init.d/crond.sh restart'
             . ' && (grep -F ' . escapeshellarg(self::SYNC_MARKER) . ' ' . self::QNAP_CRONTAB_PATH . ' || true)';
 
@@ -399,7 +402,7 @@ final class CrontabService
             @chmod($askpassFile, 0700);
 
             $sshCmd = sprintf(
-                '%s -T -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive -o ConnectTimeout=8 -p %d %s@127.0.0.1 %s',
+                '%s -T -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive -o ConnectTimeout=8 -p %d %s@127.0.0.1 %s',
                 escapeshellarg($sshBin),
                 $port,
                 escapeshellarg($user),
