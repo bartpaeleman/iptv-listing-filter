@@ -1,5 +1,12 @@
 # Detailed Changes
 
+## Relatieve Cache-Tijd & Auto-Retentie (`Sync-updates`)
+- **`assets/js/pages/DashboardPage.js` & `assets/css/components.css`:**
+  - `DashboardPage::formatRelativeDuration()` zet `age_minutes` om naar een natuurlijke Nederlandse weergave met de 2 meest significante eenheden (maanden, weken, dagen, uren, minuten).
+  - De cache-leeftijd onder **Synchronisatie & Lokale Cache** wordt uitgelicht met `<strong class="cache-age-highlight">` (`font-weight: 700; color: var(--accent-info, #38bdf8)`).
+- **`app/Services/FeedCacheService.php`:**
+  - `pruneOldFiles(string $type, int $keepCount = 2): int` toegevoegd en aangeroepen aan het einde van `storeFromTempFile()`, zodat na elke geslaagde opslag automatisch maximaal 2 `.m3u` en maximaal 2 `.xml` bestanden (inclusief `.meta.json`) behouden blijven.
+
 ## EPG-LINKS Toggle, Compacte Groepsheader, Close-Match & QNAP SSH Crontab
 - **`database/schema.sql`, `database/update.sql` & `app/Core/SchemaMigrator.php`:**
   - Kolom `show_in_epg TINYINT(1) NOT NULL DEFAULT 1` toegevoegd aan `m3u_groups` (`schema_integrity_v10`), automatisch geïnitialiseerd op `0` voor `Film` en `TV Series`.

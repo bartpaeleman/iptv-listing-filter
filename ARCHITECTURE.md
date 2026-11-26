@@ -116,6 +116,7 @@ Vóór elke download/sync controleert `SchedulerService`:
   - `force_download`: downloadt altijd opnieuw naar een `.tmp` bestand en slaat atomisch op via `storeFromTempFile()` (`rename()` met `copy()+unlink()` fallback en `clearstatcache()` + 0-byte validatie).
   - `auto`: gebruikt het nieuwste cachebestand als `age_minutes < cache_ttl_minutes` (default `360` min), anders nieuwe download.
   - `cache_only`: leest uitsluitend van schijf (`$cacheFilename` of nieuwste bestand uit `getCacheInfo()`), zonder provider-contact.
+- **Auto-retentie (`pruneOldFiles`):** `FeedCacheService` behoudt na elke geslaagde opslag via `storeFromTempFile()` automatisch maximaal 2 cachebestanden per type (`m3u` en `epg`) en verwijdert oudere bestanden inclusief bijbehorende `.meta.json`.
 
 ### 6.3 View-Cache (`ViewCacheService`)
 - Slaat voorbewerkte JSON-responses op in `storage/cache/view/` (`dashboard_stats.json`, `active_groups_*.json`, `group_channels_{id}.json`) om `COUNT(*)`- en `JOIN`-queries te vermijden bij het openen van de UI.
