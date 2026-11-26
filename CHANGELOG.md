@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased] - feature/cronjob-split
+### Toegevoegd
+- **Gesplitste M3U & EPG Cronjobs (`CrontabService.php`, `SettingsController.php`, `SettingsPage.js`):** Onder **⏱️ Automatisering & Crontab** kunnen nu twee afzonderlijke cronjobs worden beheerd (`📺 M3U Kanalen Cronjob` met `--m3u` en `📅 EPG Gids Cronjob` met `--epg`), elk met een eigen Sync Interval, Voorkeursuur, crontab-regel en dynamische opslaan/bijwerken/wissen-knoppen.
+- **Directe Download-knoppen (`DashboardPage.js`, `components.css`, `PlaylistExporterService.php`, `EpgExporterService.php`):** Contrasterende `⬇️ Download`-knoppen (`.btn-download`) naast de M3U en EPG `Kopieer`-knoppen; `&download=1` stuurt `Content-Disposition: attachment` (`playlist.m3u` resp. `epg.xml` / `epg.xml.gz`).
+- **M3U Group-Title Prefix (`PlaylistExporterService.php`):** `Film`-groepen krijgen automatisch de prefix `VOD - ` en `TV Series`-groepen `Series - ` in `#EXTINF` `group-title` (tenzij al aanwezig).
+- **Bitwarden & Cross-Browser Autofill (`views/login.php`):** Semantische `<form action="index.php?route=login" autocomplete="on">` en standaard `id`/`name`/`autocomplete`/`autocorrect`-attributen op het loginformulier.
+
 ## [Unreleased] - feature/xtream-vod-series
 ### Toegevoegd
 - **Xtream VOD & Series Routing (`XtreamServerService.php`, `XtreamServerController.php`, `index.php`, `.htaccess`):** Groepen met categorie `Film` worden gerouteerd naar Xtream VOD (`get_vod_categories`, `get_vod_streams`, `get_vod_info`, `/movie/...`) en groepen met categorie `TV Series` naar Xtream Series (`get_series_categories`, `get_series`, `get_series_info`, `/series/...`) met automatische seizoen/aflevering-groepering, en uitgesloten van `Live TV`.

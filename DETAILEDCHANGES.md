@@ -1,5 +1,20 @@
 # Detailed Changes
 
+## Gesplitste Cronjobs, Download-knoppen, M3U Prefix & Login Autofill (`feature/cronjob-split`)
+- **`app/Services/CrontabService.php` & `app/Controllers/SettingsController.php`:**
+  - `CrontabService::getStatus()` rapporteert beide jobs afzonderlijk onder `jobs.m3u` (`--m3u`) en `jobs.epg` (`--epg`).
+  - `CrontabService::saveJob($schedule, $phpPath, $type)` en `deleteJob($type)` beheren uitsluitend de bijbehorende `--m3u` of `--epg` regel in de systeem-crontab.
+  - `SettingsController::get()` en `save()` ondersteunen aparte instellingen (`sync_m3u_interval_hours`, `sync_m3u_preferred_hour`, `sync_epg_interval_hours`, `sync_epg_preferred_hour`); `crontabSave()` en `crontabDelete()` geven `type` door aan `CrontabService`.
+- **`assets/js/pages/SettingsPage.js`:**
+  - Selector (`📺 M3U Kanalen Cronjob` | `📅 EPG Gids Cronjob`) toegevoegd die interval/voorkeursuur, crontab-commando en interactief crontab-beheer (inclusief dynamische knoppen `toevoegen` / `bijwerken` / `wissen`) omschakelt per job.
+- **`app/Services/PlaylistExporterService.php` & `app/Services/EpgExporterService.php`:**
+  - `PlaylistExporterService::streamPlaylist()` selecteert `g.category` en past `formatGroupTitle()` toe (`VOD - ` voor `Film`, `Series - ` voor `TV Series`).
+  - Beide exporters sturen `Content-Disposition: attachment` (`playlist.m3u` resp. `epg.xml`/`epg.xml.gz`) wanneer `$_GET['download'] === '1'`.
+- **`assets/js/pages/DashboardPage.js` & `assets/css/components.css`:**
+  - `⬇️ Download`-knoppen (`.btn-download`, `min-height: 44px`, teal `#0d9488`) toegevoegd naast de M3U en EPG `Kopieer`-knoppen, gekoppeld aan de actuele input-URL + `&download=1`.
+- **`views/login.php`:**
+  - `action="index.php?route=login"`, `id="username"` / `id="password"`, `autocomplete="username"` / `autocomplete="current-password"`, `autocorrect="off"` en bijpassende `<label for="...">` voor Bitwarden en browser-autofill.
+
 ## Automatische Groepscategorieën & Beheer (`feature/groep-tags`)
 - **`database/schema.sql`, `database/update.sql` & `app/Core/SchemaMigrator.php`:**
   - Kolommen `category` (`VARCHAR(32)`) en `category_locked` (`TINYINT(1)`) toegevoegd aan `m3u_groups`, plus tabel `group_category_rules` (`schema_integrity_v7`).
