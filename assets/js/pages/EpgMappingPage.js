@@ -26,6 +26,18 @@ export class EpgMappingPage extends BaseComponent {
         const group_id = document.getElementById('epgGroupFilter')?.value || '';
         const offset = (this.currentPage - 1) * this.pageSize;
 
+        if (!group_id) {
+            this.totalItems = 0;
+            this.mapper.setState({ channels: [] });
+            const tbody = document.getElementById('epgMapperRoot');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;padding:1.5rem;">Kies hierboven een groep om kanalen te laden.</td></tr>';
+            }
+            this.updateSortHeaders();
+            this.renderPagination();
+            return;
+        }
+
         const params = {
             active_only: 1,
             live_only: 1,
@@ -34,17 +46,52 @@ export class EpgMappingPage extends BaseComponent {
             sort_by: this.sortBy,
             limit: this.pageSize,
             offset,
+            group_id,
         };
-        if (group_id) params.group_id = group_id;
 
         const data = await this.props.api.get('channels', params);
         this.totalItems = Number(data.total || 0);
         const safeItems = (data.items || []).filter(
-            ch => Number(ch.is_enabled ?? 1) === 1 && ch.group_category !== 'Film' && ch.group_category !== 'TV Series'
+            ch => Number(ch.is_enabled ?? 1) === 1 && (!ch.group_category || ch.group_category === 'Live TV')
         );
         this.mapper.setState({ channels: safeItems });
+        this.enhanceCloseMatchRows(safeItems);
         this.updateSortHeaders();
         this.renderPagination();
+    }
+
+    enhanceCloseMatchRows(items) {
+        const tbody = document.getElementById('epgMapperRoot');
+        if (!tbody) return;
+        const rows = tbody.querySelectorAll('tr');
+        items.forEach((ch, idx) => {
+            if (ch.epg_match_type !== 'close_match' || !ch.epg_channel_id) return;
+            const tr = rows[idx];
+            if (!tr) return;
+            tr.classList.add('row-epg-close-match');
+            const statusTd = tr.children[1];
+            if (statusTd) {
+                statusTd.innerHTML = '<span class="badge badge-warning">⚠️ Close match — controleer</span>';
+            }
+            const actionTd = tr.children[3];
+            if (actionTd) {
+                const confirmBtn = document.createElement('button');
+                confirmBtn.type = 'button';
+                confirmBtn.className = 'btn btn-sm btn-primary btn-confirm-epg';
+                confirmBtn.textContent = '✓ Bevestig';
+                confirmBtn.style.marginLeft = '0.35rem';
+                confirmBtn.addEventListener('click', async () => {
+                    await this.props.api.post('map_epg', {
+                        channel_id: ch.id,
+                        epg_channel_id: ch.epg_channel_id,
+                        match_type: 'manual',
+                    });
+                    this.props.toast.show('Close match bevestigd!');
+                    this.load();
+                });
+                actionTd.appendChild(confirmBtn);
+            }
+        });
     }
 
     async loadActiveGroups() {
@@ -53,10 +100,10 @@ export class EpgMappingPage extends BaseComponent {
         const groups = await this.props.api.get('groups', { scope: 'active', live_only: 1 });
         const rawList = Array.isArray(groups) ? groups : (groups?.items || []);
         const list = rawList.filter(
-            g => Number(g.is_enabled ?? 1) === 1 && g.category !== 'Film' && g.category !== 'TV Series'
+            g => Number(g.is_enabled ?? 1) === 1 && Number(g.show_in_epg ?? 1) === 1 && g.category !== 'Film' && g.category !== 'TV Series'
         );
         const cur = sel.value;
-        sel.innerHTML = `<option value="">Alle actieve groepen</option>` + list.map(g => {
+        sel.innerHTML = `<option value="">-- Kies een groep om kanalen te laden --</option>` + list.map(g => {
             const label = this.escapeHtml(g.display_name || g.custom_name || g.original_name || '');
             return `<option value="${g.id}">${label}</option>`;
         }).join('');
@@ -131,8 +178,8 @@ export class EpgMappingPage extends BaseComponent {
                 </div>
                 <div class="toolbar" style="display:flex;gap:0.5rem;flex-wrap:nowrap;align-items:center;overflow-x:auto;">
                     <input type="search" id="epgChannelSearch" placeholder="Zoek actief kanaal..." style="font-size:16px;min-height:44px;flex:1;min-width:140px;">
-                    <select id="epgGroupFilter" style="font-size:16px;min-height:44px;width:auto;max-width:220px;flex-shrink:0;">
-                        <option value="">Alle actieve groepen</option>
+                    <select id="epgGroupFilter" style="font-size:16px;min-height:44px;width:auto;max-width:260px;flex-shrink:0;">
+                        <option value="">-- Kies een groep om kanalen te laden --</option>
                     </select>
                     <select id="epgStatusFilter" style="font-size:16px;min-height:44px;width:auto;flex-shrink:0;">
                         <option value="">Alle statussen</option>

@@ -520,36 +520,37 @@ export class ChannelsPage extends BaseComponent {
                 </aside>
                 <div class="card channels-pane">
                     <div id="channelsViewContainer">
-                    <div class="card-header">
+                    <div class="card-header channels-group-header-row1">
                         <div id="groupHeaderTitleWrap" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
                             <h2 id="selectedGroupTitle">Alle Kanalen</h2>
                             <div id="inlineGroupEditWrap" class="hidden" style="display:inline-flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
-                                <input type="text" id="inlineGroupNameInput" placeholder="Custom groepsnaam (leeg = origineel)" style="font-size:16px;min-height:44px;min-width:180px;">
-                                <button type="button" class="btn btn-sm btn-primary" id="inlineGroupSaveBtn" title="Opslaan (Enter)" style="min-height:44px;min-width:44px;">✔️</button>
-                                <button type="button" class="btn btn-sm" id="inlineGroupCancelBtn" title="Annuleren (Escape)" style="min-height:44px;min-width:44px;">✖️</button>
+                                <input type="text" id="inlineGroupNameInput" placeholder="Custom groepsnaam (leeg = origineel)" style="font-size:16px;min-height:38px;min-width:180px;">
+                                <button type="button" class="btn btn-sm btn-primary" id="inlineGroupSaveBtn" title="Opslaan (Enter)">✔️</button>
+                                <button type="button" class="btn btn-sm" id="inlineGroupCancelBtn" title="Annuleren (Escape)">✖️</button>
                             </div>
                         </div>
                         <div class="btn-group">
                             <button type="button" class="btn btn-sm hidden" id="adoptGroupNameBtn" title="Huidige weergavenaam (incl. vlag/emoji) opslaan als custom naam">❐</button>
                             <button type="button" class="btn btn-sm hidden" id="editGroupNameBtn" title="Groepsnaam aanpassen">✏️</button>
+                            <button type="button" class="btn btn-sm hidden" id="toggleEpgLinksBtn" title="Toon/verberg deze groep in EPG Zender Koppeling">EPG-LINKS</button>
                             <button type="button" class="btn btn-sm hidden" id="convertToCustomBtn" title="Zet deze provider-groep om naar een bewerkbare custom groep">🛠️ Omzetten naar custom groep</button>
-                            <button type="button" class="btn btn-sm btn-primary hidden" id="openCustomChannelPickerBtn" style="min-height:44px;">➕ Kanalen toevoegen uit database</button>
+                            <button type="button" class="btn btn-sm btn-primary hidden" id="openCustomChannelPickerBtn">➕ Kanalen toevoegen uit database</button>
                             <button type="button" class="btn btn-sm btn-danger hidden" id="deleteCustomGroupBtn" title="Verwijder custom groep">🗑️ Verwijder custom groep</button>
                             <button type="button" class="btn btn-sm btn-danger hidden" id="removeFromCustomGroupBtn" title="Verwijder geselecteerde kanalen uit deze custom groep">🗑️ Verwijder uit groep</button>
                             <button class="btn btn-sm" id="manageCountryTagsBtn">🏷️ Landen & Tags Beheren</button>
-                            <button class="btn btn-sm" id="bulkEnableChannelsBtn">Selectie Aan</button>
-                            <button class="btn btn-sm" id="bulkDisableChannelsBtn">Selectie Uit</button>
                         </div>
                     </div>
-                    <div class="toolbar" id="channelsFilterToolbar" style="flex-wrap:wrap;">
-                        <input type="search" id="channelSearchInput" placeholder="Zoek kanaalnaam..." style="flex:2;min-width:180px;">
-                        <select id="channelCountryFilter" style="flex:1;min-width:140px;"><option value="">Alle landen/tags</option></select>
-                        <select id="channelStatusFilter" style="flex:1;min-width:120px;">
+                    <div class="toolbar channels-group-header-row2" id="channelsFilterToolbar">
+                        <button class="btn btn-sm" id="bulkEnableChannelsBtn">Selectie Aan</button>
+                        <button class="btn btn-sm" id="bulkDisableChannelsBtn">Selectie Uit</button>
+                        <input type="search" id="channelSearchInput" placeholder="Zoek kanaalnaam..." style="flex:1 1 160px;min-width:140px;">
+                        <select id="channelCountryFilter"><option value="">Alle landen/tags</option></select>
+                        <select id="channelStatusFilter">
                             <option value="all">Alle statussen</option>
                             <option value="enabled">Actief</option>
                             <option value="disabled">Uitgeschakeld</option>
                         </select>
-                        <select id="channelEpgFilter" style="flex:1;min-width:120px;">
+                        <select id="channelEpgFilter">
                             <option value="all">Alle EPG</option>
                             <option value="yes">Met EPG</option>
                             <option value="no">Zonder EPG</option>
@@ -1088,6 +1089,20 @@ export class ChannelsPage extends BaseComponent {
             await this.load();
         });
 
+        document.getElementById('toggleEpgLinksBtn')?.addEventListener('click', async () => {
+            const group = (this.state.groups || []).find(g => Number(g.id) === Number(this.state.selectedGroupId));
+            if (!group) return;
+            const nextVal = Number(group.show_in_epg ?? 1) === 1 ? 0 : 1;
+            await this.props.api.post('toggle_group_epg_links', { group_id: group.id, show_in_epg: nextVal });
+            group.show_in_epg = nextVal;
+            const btn = document.getElementById('toggleEpgLinksBtn');
+            if (btn) {
+                btn.classList.toggle('btn-epg-active', nextVal === 1);
+                btn.classList.toggle('btn-epg-inactive', nextVal === 0);
+            }
+            this.props.toast.show(nextVal === 1 ? 'Groep zichtbaar in EPG Zender Koppeling.' : 'Groep verborgen in EPG Zender Koppeling.');
+        });
+
         document.getElementById('convertToCustomBtn')?.addEventListener('click', async () => {
             if (!this.selectedGroupId) return;
             if (!confirm('Weet je zeker dat je deze provider-groep wilt omzetten naar een custom groep?')) return;
@@ -1173,6 +1188,13 @@ export class ChannelsPage extends BaseComponent {
         const isCustom = Boolean(selected && Number(selected.is_custom || 0) === 1);
         this.channelTable?.setState({ isCustomGroup: isCustom });
 
+        const epgBtn = document.getElementById('toggleEpgLinksBtn');
+        if (epgBtn) {
+            epgBtn.classList.toggle('hidden', !selected);
+            const isEpgOn = selected ? Number(selected.show_in_epg ?? 1) === 1 : false;
+            epgBtn.classList.toggle('btn-epg-active', isEpgOn);
+            epgBtn.classList.toggle('btn-epg-inactive', !isEpgOn);
+        }
         document.getElementById('convertToCustomBtn')?.classList.toggle('hidden', !selected || isCustom);
         document.getElementById('openCustomChannelPickerBtn')?.classList.toggle('hidden', !isCustom);
         document.getElementById('deleteCustomGroupBtn')?.classList.toggle('hidden', !isCustom);

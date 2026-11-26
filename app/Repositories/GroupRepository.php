@@ -25,7 +25,7 @@ final class GroupRepository extends BaseRepository
         if ($contentTypes !== []) {
             $placeholders = implode(', ', array_fill(0, count($contentTypes), '?'));
             $stmt = $this->pdo->prepare(
-                "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type,
+                "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.show_in_epg, g.sort_order, g.import_order, g.content_type,
                         COUNT(c.id) AS channel_count,
                         SUM(CASE WHEN c.is_enabled = 1 THEN 1 ELSE 0 END) AS active_channel_count
                  FROM m3u_groups g
@@ -38,7 +38,7 @@ final class GroupRepository extends BaseRepository
         }
 
         return $this->pdo->query(
-            "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type,
+            "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.show_in_epg, g.sort_order, g.import_order, g.content_type,
                     COUNT(c.id) AS channel_count,
                     SUM(CASE WHEN c.is_enabled = 1 THEN 1 ELSE 0 END) AS active_channel_count
              FROM m3u_groups g
@@ -59,7 +59,7 @@ final class GroupRepository extends BaseRepository
         if ($contentTypes !== []) {
             $placeholders = implode(', ', array_fill(0, count($contentTypes), '?'));
             $stmt = $this->pdo->prepare(
-                "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type,
+                "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.show_in_epg, g.sort_order, g.import_order, g.content_type,
                         g.category, g.category_locked, g.is_custom, g.source_group_id, g.sync_diff_json,
                         CASE WHEN g.is_custom = 1 THEN
                             (SELECT COUNT(*) FROM custom_group_channels cgc WHERE cgc.custom_group_id = g.id AND cgc.is_ignored = 0)
@@ -82,7 +82,7 @@ final class GroupRepository extends BaseRepository
         }
 
         return $this->pdo->query(
-            "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type,
+            "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.show_in_epg, g.sort_order, g.import_order, g.content_type,
                     g.category, g.category_locked, g.is_custom, g.source_group_id, g.sync_diff_json,
                     CASE WHEN g.is_custom = 1 THEN
                         (SELECT COUNT(*) FROM custom_group_channels cgc WHERE cgc.custom_group_id = g.id AND cgc.is_ignored = 0)
@@ -166,7 +166,7 @@ final class GroupRepository extends BaseRepository
         $limitPlusOne = $safeLimit + 1;
         $whereSql = implode(' AND ', $where);
         $stmt = $this->pdo->prepare(
-            "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.sort_order, g.import_order, g.content_type,
+            "SELECT g.id, g.original_name, g.custom_name, g.is_enabled, g.show_in_epg, g.sort_order, g.import_order, g.content_type,
                     g.category, g.category_locked
              FROM m3u_groups g
              WHERE {$whereSql}
@@ -199,6 +199,15 @@ final class GroupRepository extends BaseRepository
         $stmt->execute([
             ':cat' => $category,
             ':locked' => $lock ? 1 : 0,
+            ':id' => $groupId,
+        ]);
+    }
+
+    public function setShowInEpg(int $groupId, int $showInEpg): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE m3u_groups SET show_in_epg = :show WHERE id = :id');
+        $stmt->execute([
+            ':show' => $showInEpg ? 1 : 0,
             ':id' => $groupId,
         ]);
     }

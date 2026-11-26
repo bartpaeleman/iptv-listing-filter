@@ -111,6 +111,7 @@ switch ($route) {
         $router->addApiRoute('groups_search', ChannelController::class, 'searchGroups');
         $router->addApiRoute('set_group_sort', ChannelController::class, 'setGroupSort');
         $router->addApiRoute('update_group', ChannelController::class, 'updateGroup');
+        $router->addApiRoute('toggle_group_epg_links', ChannelController::class, 'toggleGroupEpgLinks');
         $router->addApiRoute('update_group_category', ChannelController::class, 'updateGroupCategory');
         $router->addApiRoute('group_category_rules', ChannelController::class, 'groupCategoryRules');
         $router->addApiRoute('save_group_category_rule', ChannelController::class, 'saveGroupCategoryRule');

@@ -34,3 +34,8 @@ Voeg een uurlijkse cronjob toe in `/etc/config/crontab` (en herlaad met `crontab
 - Zie [`AGENTS.md`](AGENTS.md) voor de architectuurcontracten, security-standaarden en code-richtlijnen.
 - **Database-updates:** Nieuwe installaties gebruiken `database/schema.sql`. Bestaande QNAP-installaties gebruiken `database/update.sql` (Latest-Only Delta beleid) en eventuele instructies in `MANUALUPDATES.md`.
 
+
+## Recente Functies
+- **EPG-LINKS Toggle & Compacte Groepsheader:** Per groep instelbaar via de groene/neutrale `EPG-LINKS` knop in Groepen & Kanalen.
+- **EPG Zender Koppeling:** Start met een lege groepsselectie, filtert strikt op `Live TV` en `show_in_epg = 1`, en markeert `close_match`-suggesties met een directe `✓ Bevestig`-knop.
+- **QNAP Crontab via SSH:** Schrijft duplicaatvrij naar `/etc/config/crontab` via OpenSSH `SSH_ASKPASS` + PHP `hex2bin` met directe statusfeedback.

@@ -1,5 +1,22 @@
 # Detailed Changes
 
+## EPG-LINKS Toggle, Compacte Groepsheader, Close-Match & QNAP SSH Crontab
+- **`database/schema.sql`, `database/update.sql` & `app/Core/SchemaMigrator.php`:**
+  - Kolom `show_in_epg TINYINT(1) NOT NULL DEFAULT 1` toegevoegd aan `m3u_groups` (`schema_integrity_v10`), automatisch geïnitialiseerd op `0` voor `Film` en `TV Series`.
+  - `channels.epg_match_type` uitgebreid met `'close_match'` (`ENUM('none', 'auto', 'close_match', 'manual')`).
+- **`app/Repositories/GroupRepository.php`, `app/Controllers/ChannelController.php` & `index.php`:**
+  - Nieuw endpoint `toggle_group_epg_links` (`POST`, auth + CSRF) dat `m3u_groups.show_in_epg` bijwerkt en de groepscache invalideert.
+  - `allWithCounts()` en `activeWithCounts()` geven `show_in_epg` mee.
+- **`assets/js/pages/ChannelsPage.js` & `assets/css/components.css`:**
+  - Toggle-knop `EPG-LINKS` (`.btn-epg-active` groen / `.btn-epg-inactive` neutraal) toegevoegd aan de groepsheader.
+  - Groepsheader herordend in 3 compacte rijen (`channels-group-header-row1`, `channels-group-header-row2` met `Selectie Aan`/`Uit` + filters zonder afgekapte tekst, en de Zoek & Vervang-balk).
+- **`app/Services/EpgMatcherService.php` & `assets/js/pages/EpgMappingPage.js`:**
+  - Groepsdropdown op EPG Zender Koppeling start leeg (`-- Kies een groep om kanalen te laden --`) en toont alleen actieve groepen met `show_in_epg = 1`.
+  - Strikt `Live TV`-filter op auto-match en kanaalweergave; `findMatchWithQuality()` detecteert `close_match` (amber markering + `⚠️ Close match — controleer` + `✓ Bevestig`-knop).
+- **`app/Services/CrontabService.php`, `app/Controllers/SettingsController.php`, `assets/js/pages/SettingsPage.js` & `assets/js/core/ClipboardHelper.js`:**
+  - `ClipboardHelper` geïmporteerd in `SettingsPage.js` en beschikbaar gemaakt op `window.ClipboardHelper`.
+  - QNAP `/etc/config/crontab` schrijver gebruikt OpenSSH `SSH_ASKPASS` + PHP `hex2bin` (met POSIX `printf '%b'` fallback) zonder `sudoers`-melding, en geeft exacte `created`/`updated`/`deleted` statusmeldingen terug in `#crontabResultBanner`.
+
 ## Gesplitste Cronjobs, Download-knoppen, M3U Prefix & Login Autofill (`feature/cronjob-split`)
 - **`app/Services/CrontabService.php` & `app/Controllers/SettingsController.php`:**
   - `CrontabService::getStatus()` rapporteert beide jobs afzonderlijk onder `jobs.m3u` (`--m3u`) en `jobs.epg` (`--epg`).
