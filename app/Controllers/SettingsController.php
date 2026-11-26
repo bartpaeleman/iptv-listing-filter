@@ -58,6 +58,9 @@ final class SettingsController extends BaseController
             'output_token' => $settings->get('output_token', ''),
             'app_root' => dirname(__DIR__, 2),
             'epg_sources' => $maskedSources,
+            'cron_exec_mode' => $settings->get('cron_exec_mode', 'direct'),
+            'has_cron_sudo_password' => ((string) $settings->get('cron_sudo_password', '')) !== '',
+            'cron_status' => (new \App\Services\CrontabManagerService($settings))->getStatus(),
         ]);
     }
 
@@ -163,6 +166,17 @@ final class SettingsController extends BaseController
         }
         if (!empty($input['xtream_out_password'])) {
             $settings->set('xtream_out_password', (string) $input['xtream_out_password'], true);
+        }
+        if (isset($input['cron_exec_mode']) && in_array($input['cron_exec_mode'], ['direct', 'sudo_nopasswd', 'sudo_password'], true)) {
+            $settings->set('cron_exec_mode', (string) $input['cron_exec_mode'], false);
+            \App\Services\AppLogger::log('CRON', 'INFO', 'Cron executiemodus bijgewerkt.', ['cron_exec_mode' => $input['cron_exec_mode']]);
+        }
+        if (!empty($input['clear_cron_sudo_password'])) {
+            $settings->set('cron_sudo_password', '', true);
+            \App\Services\AppLogger::log('CRON', 'INFO', 'Opgeslagen cron sudo-wachtwoord gewist.');
+        } elseif (isset($input['cron_sudo_password']) && (string) $input['cron_sudo_password'] !== '') {
+            $settings->set('cron_sudo_password', (string) $input['cron_sudo_password'], true);
+            \App\Services\AppLogger::log('CRON', 'INFO', 'Cron sudo-wachtwoord bijgewerkt (versleuteld opgeslagen).');
         }
 
         $this->jsonSuccess();
@@ -283,6 +297,22 @@ final class SettingsController extends BaseController
         } catch (\Throwable $e) {
             \App\Services\AppLogger::log('CRON', 'ERROR', sprintf('Handmatige cronjob-test mislukt: %s in %s:%d', $e->getMessage(), $e->getFile(), $e->getLine()));
             $this->jsonError('Cronjob-test mislukt: ' . $e->getMessage(), 500);
+        }
+    }
+
+    public function restartCron(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        try {
+            $output = (new \App\Services\CrontabManagerService())->restartCron();
+            $this->jsonSuccess([
+                'message' => $output,
+            ]);
+        } catch (\Throwable $e) {
+            $this->jsonError($e->getMessage(), 500);
         }
     }
 

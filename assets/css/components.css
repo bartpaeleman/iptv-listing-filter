@@ -1059,3 +1059,28 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; }
     word-break: break-word;
     white-space: pre-wrap;
 }
+
+/* Crontab execution mode & actions */
+.cron-exec-box {
+    padding: 0.75rem;
+    border-radius: 6px;
+    background: var(--bg-secondary, rgba(0, 0, 0, 0.12));
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+}
+
+.cron-status-banner {
+    padding: 0.75rem;
+    border-radius: 6px;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.cron-actions-bar {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.cron-actions-bar .btn {
+    min-height: 44px;
+}
