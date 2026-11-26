@@ -589,6 +589,12 @@ export class SettingsPage extends BaseComponent {
                         ...getElevationPayload(),
                     });
 
+                    if (res?.needs_elevation || res?.ok === false) {
+                        handleElevationNeeded(res);
+                        this.props.toast.show(res?.message || 'Geen directe schrijfrechten. Vul QNAP SSH/Sudo in.', 'error');
+                        return;
+                    }
+
                     if (this.cronState?.[activeType]) {
                         this.cronState[activeType].interval_hours = res?.interval_hours ?? intervalHours;
                         this.cronState[activeType].preferred_hour = res?.preferred_hour ?? preferredHour;
@@ -649,7 +655,12 @@ export class SettingsPage extends BaseComponent {
 
             document.getElementById('deleteCrontabBtn')?.addEventListener('click', async () => {
                 try {
-                    await this.props.api.post('crontab_delete', { type: activeType, ...getElevationPayload() });
+                    const res = await this.props.api.post('crontab_delete', { type: activeType, ...getElevationPayload() });
+                    if (res?.needs_elevation || res?.ok === false) {
+                        handleElevationNeeded(res);
+                        this.props.toast.show(res?.message || 'Geen directe schrijfrechten. Vul QNAP SSH/Sudo in.', 'error');
+                        return;
+                    }
                     const passInput = document.getElementById('cronSshPassInput');
                     if (passInput) passInput.value = '';
                     this.props.toast.show(`${typeLabel} cronjob gewist!`);

@@ -223,6 +223,7 @@ final class SettingsController extends BaseController
         ];
         unset($input['ssh_password']);
 
+        $hadPassword = ($elevation['ssh_password'] ?? '') !== '';
         try {
             $status = (new \App\Services\CrontabService())->saveJob($schedule, $phpPath, $type, $elevation);
             $elevation['ssh_password'] = '';
@@ -267,12 +268,16 @@ final class SettingsController extends BaseController
             ]);
             if ($e->getCode() === 403) {
                 header('Content-Type: application/json; charset=utf-8');
-                http_response_code(403);
+                http_response_code($hadPassword ? 400 : 200);
                 echo json_encode([
                     'success' => false,
-                    'error' => $e->getMessage(),
+                    'ok' => false,
                     'needs_elevation' => true,
                     'methods' => ['sudo', 'ssh'],
+                    'message' => $hadPassword
+                        ? '❌ ' . $e->getMessage()
+                        : 'Geen directe schrijfrechten op /etc/config/crontab. Log hieronder eenmalig in met je QNAP admin-account.',
+                    'error' => $e->getMessage(),
                 ], JSON_UNESCAPED_UNICODE);
                 exit;
             }
@@ -309,12 +314,16 @@ final class SettingsController extends BaseController
             ]);
             if ($e->getCode() === 403) {
                 header('Content-Type: application/json; charset=utf-8');
-                http_response_code(403);
+                http_response_code($hadPassword ? 400 : 200);
                 echo json_encode([
                     'success' => false,
-                    'error' => $e->getMessage(),
+                    'ok' => false,
                     'needs_elevation' => true,
                     'methods' => ['sudo', 'ssh'],
+                    'message' => $hadPassword
+                        ? '❌ ' . $e->getMessage()
+                        : 'Geen directe schrijfrechten op /etc/config/crontab. Log hieronder eenmalig in met je QNAP admin-account.',
+                    'error' => $e->getMessage(),
                 ], JSON_UNESCAPED_UNICODE);
                 exit;
             }
