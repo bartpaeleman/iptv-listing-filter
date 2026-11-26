@@ -1134,15 +1134,16 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 22px; }
     }
 }
 
-.btn-epg-active {
-    background-color: #16a34a !important;
-    border-color: #16a34a !important;
-    color: #ffffff !important;
+.btn.btn-epg-active {
+    background: #16a34a;
+    border-color: #15803d;
+    color: #ffffff;
 }
 
-.btn-epg-inactive {
-    background-color: transparent !important;
-    color: inherit;
+.btn.btn-epg-inactive {
+    background: transparent;
+    border: 1px solid var(--border-color, #334155);
+    color: var(--text-muted, #94a3b8);
 }
 
 /* EPG Close-match row highlight */

@@ -8,7 +8,7 @@
   - Nieuw endpoint `toggle_group_epg_links` (`POST`, auth + CSRF) dat `m3u_groups.show_in_epg` bijwerkt en de groepscache invalideert.
   - `allWithCounts()` en `activeWithCounts()` geven `show_in_epg` mee.
 - **`assets/js/pages/ChannelsPage.js` & `assets/css/components.css`:**
-  - Toggle-knop `EPG-LINKS` (`.btn-epg-active` groen / `.btn-epg-inactive` neutraal) toegevoegd aan de groepsheader.
+  - Toggle-knop `EPG` (`.btn.btn-epg-active` groen / `.btn.btn-epg-inactive` neutraal) toegevoegd aan de groepsheader.
   - Groepsheader herordend in 3 compacte rijen (`channels-group-header-row1`, `channels-group-header-row2` met `Selectie Aan`/`Uit` + filters zonder afgekapte tekst, en de Zoek & Vervang-balk).
 - **`app/Services/EpgMatcherService.php` & `assets/js/pages/EpgMappingPage.js`:**
   - Groepsdropdown op EPG Zender Koppeling start leeg (`-- Kies een groep om kanalen te laden --`) en toont alleen actieve groepen met `show_in_epg = 1`.
