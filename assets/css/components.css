@@ -76,6 +76,7 @@
     white-space: nowrap;
 }
 .btn-download:hover { background: #0f766e; border-color: #0f766e; color: #fff; }
+.cache-age-highlight { font-weight: 700; color: var(--accent-info, #38bdf8); }
 .btn-ghost { background: transparent; border-color: transparent; }
 .btn-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 

@@ -55,9 +55,9 @@ export class DashboardPage extends BaseComponent {
                     </div>
                 </div>
                 <p class="muted" style="font-size:0.85rem;margin:0 0 0.5rem 0;">
-                    Lokale M3U cache: ${d.cache_status?.m3u?.exists ? `${this.escapeHtml(d.cache_status.m3u.size_formatted)} — ${d.cache_status.m3u.age_minutes} min geleden` : 'Geen'}
+                    Lokale M3U cache: ${d.cache_status?.m3u?.exists ? `${this.escapeHtml(d.cache_status.m3u.size_formatted)} — <strong class="cache-age-highlight">${this.escapeHtml(this.formatRelativeDuration(d.cache_status.m3u.age_minutes))}</strong>` : 'Geen'}
                     &nbsp;|&nbsp;
-                    Lokale EPG cache: ${d.cache_status?.epg?.exists ? `${this.escapeHtml(d.cache_status.epg.size_formatted)} — ${d.cache_status.epg.age_minutes} min geleden` : 'Geen'}
+                    Lokale EPG cache: ${d.cache_status?.epg?.exists ? `${this.escapeHtml(d.cache_status.epg.size_formatted)} — <strong class="cache-age-highlight">${this.escapeHtml(this.formatRelativeDuration(d.cache_status.epg.age_minutes))}</strong>` : 'Geen'}
                 </p>
                 <div id="dashboardProgressMount"></div>
                 <div id="syncStatusBanner" class="sync-banner hidden"></div>
@@ -325,5 +325,31 @@ export class DashboardPage extends BaseComponent {
 
     renderSyncLogs() {
         this.loadSyncLogViewer();
+    }
+
+    formatRelativeDuration(totalMinutes) {
+        const mins = Math.max(0, Math.floor(Number(totalMinutes) || 0));
+        if (mins === 0) return 'zojuist';
+
+        const units = [
+            { size: 43200, singular: 'maand', plural: 'maanden' },
+            { size: 10080, singular: 'week', plural: 'weken' },
+            { size: 1440, singular: 'dag', plural: 'dagen' },
+            { size: 60, singular: 'uur', plural: 'uren' },
+            { size: 1, singular: 'min', plural: 'min' },
+        ];
+
+        let rem = mins;
+        const parts = [];
+        for (const u of units) {
+            const val = Math.floor(rem / u.size);
+            if (val > 0) {
+                parts.push(`${val} ${val === 1 ? u.singular : u.plural}`);
+                rem %= u.size;
+                if (parts.length === 2) break;
+            }
+        }
+
+        return `${parts.join(', ')} geleden`;
     }
 }

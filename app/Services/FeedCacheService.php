@@ -216,6 +216,21 @@ final class FeedCacheService
         return $deleted;
     }
 
+    public function pruneOldFiles(string $type, int $keepCount = 2): int
+    {
+        $files = $this->listCacheFiles($type);
+        usort($files, static fn(array $a, array $b): int => ($b['timestamp'] ?? 0) <=> ($a['timestamp'] ?? 0));
+
+        $toDelete = [];
+        foreach (array_slice($files, max(0, $keepCount)) as $file) {
+            if (!empty($file['filename'])) {
+                $toDelete[] = (string) $file['filename'];
+            }
+        }
+
+        return $toDelete === [] ? 0 : $this->deleteBulk($toDelete);
+    }
+
     public function clearCache(?string $type = null): void
     {
         foreach ($this->listCacheFiles($type) as $file) {
