@@ -206,7 +206,7 @@ final class ChannelController extends BaseController
         (new GroupRepository())->setShowInEpg($id, $showInEpg);
         (new ViewCacheService())->invalidateGroupsCache();
 
-        $this->jsonSuccess(['group_id' => $id, 'show_in_epg' => $showInEpg]);
+        $this->jsonSuccess(['ok' => true, 'group_id' => $id, 'show_in_epg' => $showInEpg]);
     }
 
     public function bulkGroups(): void

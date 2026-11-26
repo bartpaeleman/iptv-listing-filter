@@ -1101,13 +1101,15 @@ export class ChannelsPage extends BaseComponent {
                 group.show_in_epg = val;
                 btn.classList.toggle('btn-epg-active', val === 1);
                 btn.classList.toggle('btn-epg-inactive', val === 0);
+                btn.title = val === 1 ? 'EPG zichtbaar — klik om uit te schakelen' : 'EPG inactief — klik om in te schakelen';
             };
 
             btn.disabled = true;
             applyState(nextVal);
             try {
                 const res = await this.props.api.post('toggle_group_epg_links', { group_id: group.id, show_in_epg: nextVal });
-                const finalVal = Number(res?.show_in_epg ?? nextVal) === 1 ? 1 : 0;
+                const rawVal = res?.show_in_epg ?? res?.data?.show_in_epg ?? nextVal;
+                const finalVal = Number(rawVal) === 1 ? 1 : 0;
                 applyState(finalVal);
                 this.props.toast.show(finalVal === 1 ? 'EPG zichtbaarheid ingeschakeld' : 'EPG zichtbaarheid uitgeschakeld');
             } catch (err) {
@@ -1209,6 +1211,7 @@ export class ChannelsPage extends BaseComponent {
             const isEpgOn = selected ? Number(selected.show_in_epg ?? 1) === 1 : false;
             epgBtn.classList.toggle('btn-epg-active', isEpgOn);
             epgBtn.classList.toggle('btn-epg-inactive', !isEpgOn);
+            epgBtn.title = isEpgOn ? 'EPG zichtbaar — klik om uit te schakelen' : 'EPG inactief — klik om in te schakelen';
         }
         document.getElementById('convertToCustomBtn')?.classList.toggle('hidden', !selected || isCustom);
         document.getElementById('openCustomChannelPickerBtn')?.classList.toggle('hidden', !isCustom);

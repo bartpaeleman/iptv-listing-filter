@@ -18,9 +18,7 @@ export class EpgMappingPage extends BaseComponent {
             this.renderShell();
             this.container.dataset.mounted = '1';
         }
-        if (!this.groupsLoaded) {
-            await this.loadActiveGroups();
-        }
+        await this.loadActiveGroups();
         const search = document.getElementById('epgChannelSearch')?.value || '';
         const epg_status = document.getElementById('epgStatusFilter')?.value || '';
         const group_id = document.getElementById('epgGroupFilter')?.value || '';
@@ -97,10 +95,10 @@ export class EpgMappingPage extends BaseComponent {
     async loadActiveGroups() {
         const sel = document.getElementById('epgGroupFilter');
         if (!sel) return;
-        const groups = await this.props.api.get('groups', { scope: 'active', live_only: 1 });
+        const groups = await this.props.api.get('groups', { scope: 'active', live_only: 1, refresh: 1 });
         const rawList = Array.isArray(groups) ? groups : (groups?.items || []);
         const list = rawList.filter(
-            g => Number(g.is_enabled ?? 1) === 1 && Number(g.show_in_epg ?? 1) === 1 && g.category !== 'Film' && g.category !== 'TV Series'
+            g => Number(g.is_enabled ?? 1) === 1 && Number(g.show_in_epg ?? 1) === 1 && (!g.category || g.category === 'Live TV')
         );
         const cur = sel.value;
         sel.innerHTML = `<option value="">-- Kies een groep om kanalen te laden --</option>` + list.map(g => {
