@@ -13,13 +13,35 @@ export class SettingsPage extends BaseComponent {
             return;
         }
         this._appRoot = s.app_root || '';
+        this.activeCronType = this.activeCronType || 'm3u';
+        const m3uInt = Number(s.sync_m3u_interval_hours ?? s.sync_interval_hours ?? 72);
+        const m3uHr = Number(s.sync_m3u_preferred_hour ?? s.sync_preferred_hour ?? 3);
+        const epgInt = Number(s.sync_epg_interval_hours ?? 12);
+        const epgHr = Number(s.sync_epg_preferred_hour ?? 4);
+        this.cronState = {
+            m3u: {
+                interval_hours: m3uInt,
+                preferred_hour: m3uHr,
+                cron_expression: this.buildCronSchedule(m3uInt, m3uHr).expr,
+                php_cli_path: '/mnt/ext/opt/apache/bin/php',
+                active_rule: '',
+            },
+            epg: {
+                interval_hours: epgInt,
+                preferred_hour: epgHr,
+                cron_expression: this.buildCronSchedule(epgInt, epgHr).expr,
+                php_cli_path: '/mnt/ext/opt/apache/bin/php',
+                active_rule: '',
+            },
+        };
 
         const base = window.location.origin + window.location.pathname.replace(/\/index\.php$/, '');
         const tok = s.output_token ? `&token=${encodeURIComponent(s.output_token)}` : '';
         const playlistUrl = `${base}/index.php?route=playlist${tok}`;
         const epgUrl = `${base}/index.php?route=epg${tok}`;
-        const initCron = this.buildCronSchedule(Number(s.sync_interval_hours || 72), Number(s.sync_preferred_hour || 3));
-        const cronCmd = `${initCron.expr} /mnt/ext/opt/apache/bin/php ${s.app_root}/bin/sync.php --force >/dev/null 2>&1`;
+        const activeState = this.cronState[this.activeCronType];
+        const initCron = this.buildCronSchedule(activeState.interval_hours, activeState.preferred_hour);
+        const cronCmd = `${initCron.expr} /mnt/ext/opt/apache/bin/php ${s.app_root}/bin/sync.php --${this.activeCronType} --force >/dev/null 2>&1`;
 
         const sourceMode = s.source_mode === 'separate_urls' ? 'separate_urls' : 'xtream';
 
@@ -181,10 +203,60 @@ export class SettingsPage extends BaseComponent {
             this.load();
         });
 
+        const syncFromInputs = (type) => {
+            const intEl = document.getElementById(type === 'epg' ? 'settingEpgIntervalHours' : 'settingM3uIntervalHours');
+            const hrEl = document.getElementById(type === 'epg' ? 'settingEpgPreferredHour' : 'settingM3uPreferredHour');
+            const interval = Math.max(1, parseInt(intEl?.value || (type === 'epg' ? '12' : '72'), 10) || 1);
+            const hour = Math.max(0, Math.min(23, parseInt(hrEl?.value || (type === 'epg' ? '4' : '3'), 10) || 0));
+            const cron = this.buildCronSchedule(interval, hour);
+
+            if (this.cronState?.[type]) {
+                this.cronState[type].interval_hours = interval;
+                this.cronState[type].preferred_hour = hour;
+                this.cronState[type].cron_expression = cron.expr;
+            }
+
+            if (this.activeCronType === type) {
+                const labelEl = document.getElementById('qnapCronLabel');
+                const inputEl = document.getElementById('qnapCronInput');
+                const exprEl = document.getElementById('cronExprInput');
+                const presetEl = document.getElementById('cronPresetSelect');
+                if (labelEl) labelEl.textContent = cron.label;
+                if (inputEl && this._cronCmdBase) {
+                    const baseWithFlag = this._cronCmdBase.replace(/\s+--force/, ` --${type} --force`);
+                    inputEl.value = `${cron.expr} ${baseWithFlag}`;
+                }
+                if (exprEl) exprEl.value = cron.expr;
+                if (presetEl) {
+                    const hasPreset = [...presetEl.options].some(o => o.value === cron.expr);
+                    presetEl.value = hasPreset ? cron.expr : 'custom';
+                }
+            }
+        };
+
+        ['settingM3uIntervalHours', 'settingM3uPreferredHour'].forEach(id => {
+            document.getElementById(id)?.addEventListener('input', () => syncFromInputs('m3u'));
+            document.getElementById(id)?.addEventListener('change', () => syncFromInputs('m3u'));
+        });
+        ['settingEpgIntervalHours', 'settingEpgPreferredHour'].forEach(id => {
+            document.getElementById(id)?.addEventListener('input', () => syncFromInputs('epg'));
+            document.getElementById(id)?.addEventListener('change', () => syncFromInputs('epg'));
+        });
+
         this.container.querySelectorAll('[data-cron-type]').forEach(btn => {
             btn.addEventListener('click', () => {
                 const nextType = btn.dataset.cronType === 'epg' ? 'epg' : 'm3u';
                 if (this.activeCronType === nextType) return;
+
+                // Save current tab state before switching
+                const prevType = this.activeCronType;
+                const prevExpr = document.getElementById('cronExprInput')?.value?.trim();
+                const prevPhp = document.getElementById('cronPhpPathInput')?.value?.trim();
+                if (this.cronState?.[prevType]) {
+                    if (prevExpr) this.cronState[prevType].cron_expression = prevExpr;
+                    if (prevPhp) this.cronState[prevType].php_cli_path = prevPhp;
+                }
+
                 this.activeCronType = nextType;
                 this.container.querySelectorAll('[data-cron-type]').forEach(b => {
                     b.classList.toggle('btn-primary', b.dataset.cronType === nextType);
@@ -303,6 +375,12 @@ export class SettingsPage extends BaseComponent {
             const isPreset = presets.some(p => p.value === currentExpr);
             const selectedPreset = isPreset ? currentExpr : 'custom';
 
+            const settings = this.state.settings || {};
+            const execMode = settings.cron_exec_mode || 'direct';
+            const hasSudoPass = Boolean(settings.has_cron_sudo_password);
+            const cronStatus = settings.cron_status || { can_write: Boolean(st.writable), mode: execMode, message: st.permission_hint || '', fix_command: 'chmod 664 /etc/config/crontab && chgrp httpdusr /etc/config/crontab' };
+            const canWrite = Boolean(cronStatus.can_write);
+
             box.innerHTML = `
                 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
                     <strong>Interactief Crontab-beheer (${typeLabel})</strong>
@@ -315,32 +393,62 @@ export class SettingsPage extends BaseComponent {
                     <div class="alert alert-warning" style="padding:0.75rem;border-radius:6px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);">
                         <p style="margin:0 0 0.5rem 0;font-size:0.88rem;">${this.escapeHtml(st.permission_hint)}</p>
                         <div class="copy-group">
-                            <input type="text" id="cronPermCmdInput" value="chmod 664 /etc/config/crontab && chgrp httpdusr /etc/config/crontab" readonly>
-                            <button type="button" class="btn btn-sm" id="copyCronPermBtn">Kopieer SSH-commando</button>
+                            <input type="text" id="cronPermCmdInput" value="${this.escapeHtml(cronStatus.fix_command || 'chmod 664 /etc/config/crontab && chgrp httpdusr /etc/config/crontab')}" readonly>
+                            <button type="button" class="btn btn-sm" id="copyCronPermBtn" style="min-height:44px;">Kopieer SSH-commando</button>
                         </div>
                     </div>
                 ` : ''}
                 <div class="grid-2">
                     <label>Schema Preset
-                        <select id="cronPresetSelect" ${!st.writable ? 'disabled' : ''}>
+                        <select id="cronPresetSelect" ${!canWrite ? 'disabled' : ''}>
                             ${presets.map(p => `<option value="${this.escapeHtml(p.value)}" ${p.value === selectedPreset ? 'selected' : ''}>${this.escapeHtml(p.label)}</option>`).join('')}
                         </select>
                     </label>
                     <label>Cron Expressie (5 velden)
-                        <input type="text" id="cronExprInput" value="${this.escapeHtml(currentExpr)}" ${!st.writable ? 'disabled' : ''}>
+                        <input type="text" id="cronExprInput" value="${this.escapeHtml(currentExpr)}" ${!canWrite ? 'disabled' : ''}>
                     </label>
                 </div>
                 <label>PHP-CLI Pad
-                    <input type="text" id="cronPhpPathInput" value="${this.escapeHtml(st.default_php_path || '/usr/bin/php')}" ${!st.writable ? 'disabled' : ''}>
+                    <input type="text" id="cronPhpPathInput" value="${this.escapeHtml(st.default_php_path || '/usr/bin/php')}" ${!canWrite ? 'disabled' : ''}>
                 </label>
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
                     <button type="button" class="btn btn-primary" id="saveCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>
                         ${job.raw_line ? `💾 ${typeLabel} Cronjob bijwerken` : `➕ ${typeLabel} toevoegen aan crontab`}
                     </button>
                     <button type="button" class="btn" id="testCrontabBtn" style="min-height:44px;">▶️ ${typeLabel} nu testen</button>
+                    <button type="button" class="btn" id="viewCrontabBtn" style="min-height:44px;">📋 Bekijk Crontab</button>
                     ${job.raw_line ? `<button type="button" class="btn btn-danger" id="deleteCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>🗑️ ${typeLabel} wissen uit crontab</button>` : ''}
                 </div>
+                <div id="crontabViewerBox" class="hidden" style="margin-top:0.5rem;"></div>
             `;
+
+            document.getElementById('cronExecModeSelect')?.addEventListener('change', ev => {
+                const passGroup = document.getElementById('cronSudoPassGroup');
+                if (passGroup) passGroup.style.display = ev.target.value === 'sudo_password' ? 'flex' : 'none';
+            });
+
+            document.getElementById('saveCronExecModeBtn')?.addEventListener('click', async ev => {
+                const btn = ev.currentTarget;
+                const mode = document.getElementById('cronExecModeSelect')?.value || 'direct';
+                const pass = document.getElementById('cronSudoPassInput')?.value || '';
+                const clearPass = Boolean(document.getElementById('clearCronSudoPassChk')?.checked);
+                btn.disabled = true;
+                try {
+                    await this.props.api.post('save_settings', {
+                        cron_exec_mode: mode,
+                        cron_sudo_password: pass,
+                        clear_cron_sudo_password: clearPass,
+                    });
+                    const updated = await this.props.api.get('get_settings');
+                    this.state.settings = updated;
+                    this.props.toast.show('Cron executiemodus opgeslagen!');
+                    await this.loadCrontabStatus();
+                } catch (err) {
+                    this.props.toast.show(err?.message || 'Opslaan mislukt.', 'error');
+                } finally {
+                    btn.disabled = false;
+                }
+            });
 
             document.getElementById('copyCronPermBtn')?.addEventListener('click', ev => {
                 const input = document.getElementById('cronPermCmdInput');
@@ -408,15 +516,92 @@ export class SettingsPage extends BaseComponent {
             document.getElementById('saveCrontabBtn')?.addEventListener('click', async () => {
                 const schedule = document.getElementById('cronExprInput')?.value?.trim() || '';
                 const phpPath = document.getElementById('cronPhpPathInput')?.value?.trim() || '';
-                await this.props.api.post('crontab_save', { schedule, php_path: phpPath, type: activeType });
+                const intEl = document.getElementById(intervalElId);
+                const hrEl = document.getElementById(hourElId);
+                const intervalHours = Math.max(1, parseInt(intEl?.value || (activeType === 'epg' ? '12' : '72'), 10) || 1);
+                const preferredHour = Math.max(0, Math.min(23, parseInt(hrEl?.value || (activeType === 'epg' ? '4' : '3'), 10) || 0));
+
+                const res = await this.props.api.post('crontab_save', {
+                    job_type: activeType,
+                    type: activeType,
+                    interval_hours: intervalHours,
+                    preferred_hour: preferredHour,
+                    cron_expression: schedule,
+                    schedule,
+                    php_cli_path: phpPath,
+                    php_path: phpPath,
+                });
+
+                if (this.cronState?.[activeType]) {
+                    this.cronState[activeType].interval_hours = res?.interval_hours ?? intervalHours;
+                    this.cronState[activeType].preferred_hour = res?.preferred_hour ?? preferredHour;
+                    this.cronState[activeType].cron_expression = res?.cron_expression ?? schedule;
+                    this.cronState[activeType].php_cli_path = phpPath;
+                    this.cronState[activeType].active_rule = res?.active_rule ?? '';
+                }
+
                 this.props.toast.show(`${typeLabel} cronjob opgeslagen!`);
                 this.loadCrontabStatus();
             });
+
+            const renderCrontabViewer = async () => {
+                const viewer = document.getElementById('crontabViewerBox');
+                if (!viewer) return;
+                viewer.classList.remove('hidden');
+                viewer.innerHTML = '<p class="muted" style="margin:0;">Crontab ophalen...</p>';
+                try {
+                    const data = await this.props.api.get('get_crontab');
+                    const lines = String(data.content || '').split(/\r\n|\r|\n/).map(line => {
+                        const escaped = this.escapeHtml(line);
+                        if (line.includes('sync.php')) {
+                            return `<span style="display:block;background:rgba(13,148,136,0.18);color:#5eead4;padding:0 0.25rem;border-radius:3px;">${escaped}</span>`;
+                        }
+                        return escaped;
+                    }).join('\n');
+
+                    viewer.innerHTML = `
+                        <div style="border:1px solid var(--border-color, #2a2f3a);border-radius:6px;padding:0.75rem;background:rgba(0,0,0,0.2);">
+                            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;">
+                                <span class="muted" style="font-size:0.85rem;">Bron: <code>${this.escapeHtml(data.source || 'crontab -l')}</code></span>
+                                <div style="display:flex;gap:0.5rem;">
+                                    <button type="button" class="btn btn-sm" id="refreshCrontabViewerBtn">🔄 Vernieuwen</button>
+                                    <button type="button" class="btn btn-sm" id="closeCrontabViewerBtn">✖️ Sluiten</button>
+                                </div>
+                            </div>
+                            <pre style="margin:0;max-height:260px;overflow:auto;font-size:0.82rem;line-height:1.45;white-space:pre-wrap;word-break:break-word;">${lines || '(leeg)'}</pre>
+                        </div>
+                    `;
+                    document.getElementById('refreshCrontabViewerBtn')?.addEventListener('click', renderCrontabViewer);
+                    document.getElementById('closeCrontabViewerBtn')?.addEventListener('click', () => {
+                        viewer.classList.add('hidden');
+                    });
+                } catch (err) {
+                    viewer.innerHTML = `<p class="muted" style="margin:0;">Kon crontab niet ophalen: ${this.escapeHtml(err.message)}</p>`;
+                }
+            };
+
+            document.getElementById('viewCrontabBtn')?.addEventListener('click', renderCrontabViewer);
 
             document.getElementById('deleteCrontabBtn')?.addEventListener('click', async () => {
                 await this.props.api.post('crontab_delete', { type: activeType });
                 this.props.toast.show(`${typeLabel} cronjob gewist!`);
                 this.loadCrontabStatus();
+            });
+
+            document.getElementById('restartCrontabBtn')?.addEventListener('click', async ev => {
+                const btn = ev.currentTarget;
+                const origText = btn.textContent;
+                btn.disabled = true;
+                btn.textContent = 'Bezig met herstarten...';
+                try {
+                    const res = await this.props.api.post('restart_cron', {});
+                    this.props.toast.show(res?.message || 'Crontab succesvol herstart!');
+                } catch (err) {
+                    this.props.toast.show(err?.message || 'Crontab herstarten mislukt.', 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = origText;
+                }
             });
 
             document.getElementById('testCrontabBtn')?.addEventListener('click', async ev => {

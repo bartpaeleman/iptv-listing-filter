@@ -149,7 +149,9 @@ switch ($route) {
         $router->addApiRoute('crontab_status', SettingsController::class, 'crontabStatus');
         $router->addApiRoute('crontab_save', SettingsController::class, 'crontabSave');
         $router->addApiRoute('crontab_delete', SettingsController::class, 'crontabDelete');
+        $router->addApiRoute('get_crontab', SettingsController::class, 'getCrontab');
         $router->addApiRoute('test_cron', SettingsController::class, 'testCron');
+        $router->addApiRoute('restart_cron', SettingsController::class, 'restartCron');
         $router->addApiRoute('save_epg_source', SettingsController::class, 'saveEpgSource');
         $router->addApiRoute('toggle_epg_source', SettingsController::class, 'toggleEpgSource');
         $router->addApiRoute('delete_epg_source', SettingsController::class, 'deleteEpgSource');
