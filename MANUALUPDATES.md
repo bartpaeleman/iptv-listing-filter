@@ -20,3 +20,6 @@ Dit document beschrijft handmatige acties die beheerders op de QNAP NAS moeten u
 - **QNAP Apache / Web Station (`mod_rewrite`):** Zorg dat `mod_rewrite` actief is en `AllowOverride All` is ingeschakeld voor de projectmap, zodat `.htaccess` de standaard Xtream client-URL's (`/player_api.php`, `/get.php`, `/xmltv.php`, `/live/{user}/{pass}/{id}.{ts|m3u8}`) correct doorstuurt naar `index.php`.
 - **Inloggegevens:** Configureer onder **Instellingen** de uitgaande Xtream Codes gebruikersnaam en wachtwoord (AES-256-GCM versleuteld opgeslagen) en activeer de server.
 
+## Update naar Gesplitste M3U & EPG Cronjobs (`feature/cronjob-split`)
+- Geen database-migratie of `.env`-wijziging vereist.
+- **Crontab opschonen (optioneel):** Als er nog een oude gecombineerde `bin/sync.php --force` regel in `/etc/config/crontab` staat, verwijder deze eenmalig en stel via **Instellingen → ⏱️ Automatisering & Crontab** de twee aparte jobs (`📺 M3U Kanalen Cronjob` en `📅 EPG Gids Cronjob`) opnieuw in.
