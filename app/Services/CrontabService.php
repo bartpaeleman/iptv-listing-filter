@@ -377,141 +377,79 @@ final class CrontabService
      */
     public function executeAsAdminViaSsh(string $user, string $password, string $remoteCmd, int $port = 22): array
     {
-        $sshBin = $this->findExecutable(['/usr/bin/ssh', '/opt/bin/ssh', 'ssh']) ?? 'ssh';
-        $sshArgs = sprintf(
-            '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive -o ConnectTimeout=8 -p %d %s@127.0.0.1 %s',
-            $port,
-            escapeshellarg($user),
-            escapeshellarg($remoteCmd)
-        );
-
-        // Optie 1: Python3 PTY (standaard aanwezig op QNAP QTS)
-        $pythonBin = $this->findExecutable(['/usr/bin/python3', '/opt/bin/python3', 'python3']);
-        if ($pythonBin !== null && function_exists('proc_open')) {
-            $pyScript = <<<'PY'
-import os, pty, select, sys, time
-cmd = [sys.argv[1], '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null', '-o', 'PubkeyAuthentication=no', '-o', 'PreferredAuthentications=password,keyboard-interactive', '-o', 'ConnectTimeout=8', '-p', sys.argv[2], sys.argv[3] + '@127.0.0.1', sys.argv[4]]
-pid, fd = pty.fork()
-if pid == 0:
-    os.execvp(cmd[0], cmd)
-pw = os.environ.get('IPT_SSH_PASS', '')
-sent = False
-out = bytearray()
-deadline = time.time() + 20
-while time.time() < deadline:
-    r, _, _ = select.select([fd], [], [], 0.5)
-    if fd in r:
-        try:
-            chunk = os.read(fd, 4096)
-        except OSError:
-            break
-        if not chunk:
-            break
-        out.extend(chunk)
-        low = out.lower()
-        if not sent and (b'password:' in low or b'assword:' in low):
-            os.write(fd, (pw + '\n').encode())
-            sent = True
-    else:
-        wpid, status = os.waitpid(pid, os.WNOHANG)
-        if wpid != 0:
-            code = os.waitstatus_to_exitcode(status) if hasattr(os, 'waitstatus_to_exitcode') else (status >> 8)
-            sys.stdout.buffer.write(out)
-            sys.exit(code)
-_, status = os.waitpid(pid, 0)
-code = os.waitstatus_to_exitcode(status) if hasattr(os, 'waitstatus_to_exitcode') else (status >> 8)
-sys.stdout.buffer.write(out)
-sys.exit(code)
-PY;
-            $proc = @proc_open(
-                sprintf(
-                    '%s -c %s %s %d %s %s',
-                    escapeshellarg($pythonBin),
-                    escapeshellarg($pyScript),
-                    escapeshellarg($sshBin),
-                    $port,
-                    escapeshellarg($user),
-                    escapeshellarg($remoteCmd)
-                ),
-                [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
-                $pipes,
-                null,
-                ['IPT_SSH_PASS' => $password, 'PATH' => getenv('PATH') ?: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin']
-            );
-            if (is_resource($proc)) {
-                fclose($pipes[0]);
-                $out = (string) stream_get_contents($pipes[1]);
-                $err = (string) stream_get_contents($pipes[2]);
-                fclose($pipes[1]);
-                fclose($pipes[2]);
-                $code = proc_close($proc);
-                $combined = trim($out . "\n" . $err);
-                return [
-                    'exit_code' => $code,
-                    'output' => $this->sanitizeSshOutput($combined, $password),
-                    'active_lines' => $this->extractSyncLines($combined),
-                ];
-            }
+        if (!function_exists('proc_open')) {
+            throw new \RuntimeException('proc_open is uitgeschakeld op deze server.', 403);
         }
 
-        // Optie 2: `script -q -c` PTY fallback
-        $scriptBin = $this->findExecutable(['/usr/bin/script', 'script']);
-        if ($scriptBin !== null && function_exists('proc_open')) {
-            $sshCmd = 'ssh ' . $sshArgs;
-            $proc = @proc_open(
-                sprintf('%s -q -c %s /dev/null', escapeshellarg($scriptBin), escapeshellarg($sshCmd)),
-                [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
-                $pipes
-            );
-            if (is_resource($proc)) {
-                usleep(400000);
-                fwrite($pipes[0], $password . "\n");
-                fclose($pipes[0]);
-                $out = (string) stream_get_contents($pipes[1]);
-                $err = (string) stream_get_contents($pipes[2]);
-                fclose($pipes[1]);
-                fclose($pipes[2]);
-                $code = proc_close($proc);
-                $combined = trim($out . "\n" . $err);
-                return [
-                    'exit_code' => $code,
-                    'output' => $this->sanitizeSshOutput($combined, $password),
-                    'active_lines' => $this->extractSyncLines($combined),
-                ];
-            }
+        $sshBin = $this->findExecutable(['/usr/bin/ssh', '/opt/bin/ssh', 'ssh']);
+        if ($sshBin === null) {
+            throw new \RuntimeException('OpenSSH client (/usr/bin/ssh) niet gevonden op deze server.', 403);
         }
 
-        // Optie 3: PHP ssh2_connect
-        if (function_exists('ssh2_connect')) {
-            $conn = @ssh2_connect('127.0.0.1', 22);
-            if ($conn === false) {
-                throw new \RuntimeException('Kon geen SSH-verbinding maken met 127.0.0.1:22.', 403);
+        $askpassFile = @tempnam(sys_get_temp_dir(), 'iptv_askpass_');
+        if ($askpassFile === false) {
+            throw new \RuntimeException('Kon tijdelijk SSH_ASKPASS-script niet aanmaken.', 403);
+        }
+
+        try {
+            $scriptContent = "#!/bin/sh\nprintf '%s\\n' " . escapeshellarg($password) . "\n";
+            if (@file_put_contents($askpassFile, $scriptContent) === false) {
+                throw new \RuntimeException('Kon tijdelijk SSH_ASKPASS-script niet schrijven.', 403);
             }
-            if (!@ssh2_auth_password($conn, $user, $password)) {
-                throw new \RuntimeException('SSH-authenticatie mislukt voor gebruiker ' . $user . '.', 403);
-            }
-            $stream = @ssh2_exec($conn, $remoteCmd);
-            if ($stream === false) {
-                throw new \RuntimeException('Kon SSH-commando niet uitvoeren.', 403);
-            }
-            stream_set_blocking($stream, true);
-            $errStream = @ssh2_fetch_stream($stream, SSH2_STREAM_STDERR);
-            $out = (string) stream_get_contents($stream);
-            $err = $errStream ? (string) stream_get_contents($errStream) : '';
-            fclose($stream);
-            if ($errStream) {
-                fclose($errStream);
-            }
-            $combined = trim($out . "\n" . $err);
-            $failed = str_contains(strtolower($combined), 'permission denied') || str_contains(strtolower($combined), 'error');
-            return [
-                'exit_code' => $failed ? 1 : 0,
-                'output' => $this->sanitizeSshOutput($combined, $password),
-                'active_lines' => $this->extractSyncLines($combined),
+            @chmod($askpassFile, 0700);
+
+            $sshCmd = sprintf(
+                '%s -T -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive -o ConnectTimeout=8 -p %d %s@127.0.0.1 %s',
+                escapeshellarg($sshBin),
+                $port,
+                escapeshellarg($user),
+                escapeshellarg($remoteCmd)
+            );
+
+            $env = [
+                'SSH_ASKPASS' => $askpassFile,
+                'SSH_ASKPASS_REQUIRE' => 'force',
+                'DISPLAY' => ':0',
+                'PATH' => '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/bin',
             ];
-        }
 
-        throw new \RuntimeException('Geen geschikte SSH PTY-runner beschikbaar (python3, script of php-ssh2 ontbreekt).', 403);
+            $runSsh = static function (string $cmd) use ($env): array {
+                $proc = @proc_open(
+                    $cmd,
+                    [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                    $pipes,
+                    null,
+                    $env
+                );
+                if (!is_resource($proc)) {
+                    return ['exit_code' => 1, 'combined' => 'Kon SSH-proces niet starten.'];
+                }
+                $out = (string) stream_get_contents($pipes[1]);
+                $err = (string) stream_get_contents($pipes[2]);
+                fclose($pipes[1]);
+                fclose($pipes[2]);
+                $code = proc_close($proc);
+                return ['exit_code' => $code, 'combined' => trim($out . "\n" . $err)];
+            };
+
+            $result = $runSsh($sshCmd);
+
+            // Secundaire fallback voor oudere OpenSSH (< 8.4) zonder SSH_ASKPASS_REQUIRE: gebruik setsid
+            if ($result['exit_code'] !== 0) {
+                $setsidBin = $this->findExecutable(['/usr/bin/setsid', '/opt/bin/setsid', 'setsid']);
+                if ($setsidBin !== null) {
+                    $result = $runSsh(escapeshellarg($setsidBin) . ' ' . $sshCmd);
+                }
+            }
+
+            return [
+                'exit_code' => $result['exit_code'],
+                'output' => $this->sanitizeSshOutput($result['combined'], $password),
+                'active_lines' => $this->extractSyncLines($result['combined']),
+            ];
+        } finally {
+            @unlink($askpassFile);
+        }
     }
 
     /**
