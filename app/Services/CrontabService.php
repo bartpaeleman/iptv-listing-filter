@@ -45,14 +45,7 @@ final class CrontabService
             }
         }
 
-        $permissionHint = $writable
-            ? ''
-            : sprintf(
-                'Geen schrijfrechten op %s. Voer eenmalig via SSH als admin/root uit: chmod 664 %s && chgrp httpdusr %s (of gebruik sudo crontab -e).',
-                $backend === 'qnap' ? self::QNAP_CRONTAB_PATH : 'crontab',
-                self::QNAP_CRONTAB_PATH,
-                self::QNAP_CRONTAB_PATH
-            );
+        $permissionHint = '';
 
         return [
             'supported' => $backend !== 'none',
@@ -293,7 +286,8 @@ final class CrontabService
 
     private function trySudoNoPassQnap(string $payload): bool
     {
-        if (!function_exists('proc_open')) {
+        $sudoBin = $this->findExecutable(['/usr/bin/sudo', '/opt/bin/sudo', 'sudo']);
+        if ($sudoBin === null || !function_exists('proc_open')) {
             return false;
         }
         $tmpFile = @tempnam(sys_get_temp_dir(), 'iptv_cron_');
@@ -305,10 +299,11 @@ final class CrontabService
                 return false;
             }
             $cmd = sprintf(
-                'sudo -n sh -c %s',
+                '%s -n sh -c %s',
+                escapeshellarg($sudoBin),
                 escapeshellarg(
                     'cp ' . escapeshellarg($tmpFile) . ' ' . self::QNAP_CRONTAB_PATH
-                    . ' && crontab ' . self::QNAP_CRONTAB_PATH
+                    . ' && /usr/bin/crontab ' . self::QNAP_CRONTAB_PATH
                     . ' && /etc/init.d/crond.sh restart'
                 )
             );
@@ -326,8 +321,9 @@ final class CrontabService
 
     private function writeQnapWithSudo(string $payload, string $password): void
     {
-        if (!function_exists('proc_open')) {
-            throw new \RuntimeException('proc_open is uitgeschakeld op deze server.');
+        $sudoBin = $this->findExecutable(['/usr/bin/sudo', '/opt/bin/sudo', 'sudo']);
+        if ($sudoBin === null || !function_exists('proc_open')) {
+            throw new \RuntimeException('sudo of proc_open is niet beschikbaar op deze server.', 403);
         }
         $tmpFile = @tempnam(sys_get_temp_dir(), 'iptv_cron_');
         if ($tmpFile === false || @file_put_contents($tmpFile, $payload) === false) {
@@ -335,10 +331,10 @@ final class CrontabService
         }
         try {
             $shellCmd = 'cp ' . escapeshellarg($tmpFile) . ' ' . self::QNAP_CRONTAB_PATH
-                . ' && crontab ' . self::QNAP_CRONTAB_PATH
+                . ' && /usr/bin/crontab ' . self::QNAP_CRONTAB_PATH
                 . ' && /etc/init.d/crond.sh restart';
             $proc = @proc_open(
-                'sudo -S -p "" sh -c ' . escapeshellarg($shellCmd),
+                escapeshellarg($sudoBin) . ' -S -p "" sh -c ' . escapeshellarg($shellCmd),
                 [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
                 $pipes
             );
@@ -379,10 +375,12 @@ final class CrontabService
     /**
      * @return array{exit_code: int, output: string, active_lines: array<int, string>}
      */
-    public function executeAsAdminViaSsh(string $user, string $password, string $remoteCmd): array
+    public function executeAsAdminViaSsh(string $user, string $password, string $remoteCmd, int $port = 22): array
     {
+        $sshBin = $this->findExecutable(['/usr/bin/ssh', '/opt/bin/ssh', 'ssh']) ?? 'ssh';
         $sshArgs = sprintf(
-            '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=8 -p 22 %s@127.0.0.1 %s',
+            '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive -o ConnectTimeout=8 -p %d %s@127.0.0.1 %s',
+            $port,
             escapeshellarg($user),
             escapeshellarg($remoteCmd)
         );
@@ -392,9 +390,7 @@ final class CrontabService
         if ($pythonBin !== null && function_exists('proc_open')) {
             $pyScript = <<<'PY'
 import os, pty, select, sys, time
-cmd = ['/usr/bin/ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null', '-o', 'ConnectTimeout=8', '-p', '22', sys.argv[1] + '@127.0.0.1', sys.argv[2]]
-if not os.path.exists(cmd[0]):
-    cmd[0] = 'ssh'
+cmd = [sys.argv[1], '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null', '-o', 'PubkeyAuthentication=no', '-o', 'PreferredAuthentications=password,keyboard-interactive', '-o', 'ConnectTimeout=8', '-p', sys.argv[2], sys.argv[3] + '@127.0.0.1', sys.argv[4]]
 pid, fd = pty.fork()
 if pid == 0:
     os.execvp(cmd[0], cmd)
@@ -428,7 +424,15 @@ sys.stdout.buffer.write(out)
 sys.exit(code)
 PY;
             $proc = @proc_open(
-                sprintf('%s -c %s %s %s', escapeshellarg($pythonBin), escapeshellarg($pyScript), escapeshellarg($user), escapeshellarg($remoteCmd)),
+                sprintf(
+                    '%s -c %s %s %d %s %s',
+                    escapeshellarg($pythonBin),
+                    escapeshellarg($pyScript),
+                    escapeshellarg($sshBin),
+                    $port,
+                    escapeshellarg($user),
+                    escapeshellarg($remoteCmd)
+                ),
                 [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
                 $pipes,
                 null,

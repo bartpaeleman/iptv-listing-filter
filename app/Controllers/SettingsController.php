@@ -257,6 +257,10 @@ final class SettingsController extends BaseController
                 'interval_hours' => $status['interval_hours'],
                 'preferred_hour' => $status['preferred_hour'],
             ]);
+            $status['ok'] = true;
+            $status['message'] = '✅ Cronjob opgeslagen in /etc/config/crontab en crond herstart.';
+            $status['ok'] = true;
+            $status['message'] = '✅ Cronjob verwijderd uit /etc/config/crontab en crond herstart.';
             $this->jsonSuccess($status);
         } catch (\Throwable $e) {
             $elevation['ssh_password'] = '';
@@ -304,6 +308,10 @@ final class SettingsController extends BaseController
             $elevation['ssh_password'] = '';
             unset($elevation);
             \App\Services\AppLogger::log('CRON', 'INFO', 'Cronjob gewist.', ['type' => $type]);
+            $status['ok'] = true;
+            $status['message'] = '✅ Cronjob opgeslagen in /etc/config/crontab en crond herstart.';
+            $status['ok'] = true;
+            $status['message'] = '✅ Cronjob verwijderd uit /etc/config/crontab en crond herstart.';
             $this->jsonSuccess($status);
         } catch (\Throwable $e) {
             $elevation['ssh_password'] = '';

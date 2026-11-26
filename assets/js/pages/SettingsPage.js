@@ -446,6 +446,7 @@ export class SettingsPage extends BaseComponent {
                     <button type="button" class="btn" id="viewCrontabBtn" style="min-height:44px;">📋 Bekijk Crontab</button>
                     ${job.raw_line ? `<button type="button" class="btn btn-danger" id="deleteCrontabBtn" style="min-height:44px;font-size:16px;">🗑️ Verwijderen uit crontab</button>` : ''}
                 </div>
+                <div id="crontabResultBanner" class="hidden" style="padding:0.65rem 0.85rem;border-radius:6px;font-size:0.9rem;"></div>
                 <div id="crontabViewerBox" class="hidden" style="margin-top:0.5rem;"></div>
             `;
 
@@ -568,6 +569,26 @@ export class SettingsPage extends BaseComponent {
                 }
             };
 
+            const setCrontabBanner = (type, text) => {
+                const banner = document.getElementById('crontabResultBanner');
+                if (!banner) return;
+                banner.classList.remove('hidden');
+                if (type === 'loading') {
+                    banner.style.background = 'rgba(59,130,246,0.12)';
+                    banner.style.border = '1px solid rgba(59,130,246,0.4)';
+                    banner.style.color = '#93c5fd';
+                } else if (type === 'success') {
+                    banner.style.background = 'rgba(16,185,129,0.15)';
+                    banner.style.border = '1px solid rgba(16,185,129,0.45)';
+                    banner.style.color = '#6ee7b7';
+                } else {
+                    banner.style.background = 'rgba(239,68,68,0.15)';
+                    banner.style.border = '1px solid rgba(239,68,68,0.45)';
+                    banner.style.color = '#fca5a5';
+                }
+                banner.textContent = text;
+            };
+
             document.getElementById('saveCrontabBtn')?.addEventListener('click', async () => {
                 const schedule = document.getElementById('cronExprInput')?.value?.trim() || '';
                 const phpPath = document.getElementById('cronPhpPathInput')?.value?.trim() || '';
@@ -576,6 +597,7 @@ export class SettingsPage extends BaseComponent {
                 const intervalHours = Math.max(1, parseInt(intEl?.value || (activeType === 'epg' ? '12' : '72'), 10) || 1);
                 const preferredHour = Math.max(0, Math.min(23, parseInt(hrEl?.value || (activeType === 'epg' ? '4' : '3'), 10) || 0));
 
+                setCrontabBanner('loading', '⏳ Bezig met bijwerken van /etc/config/crontab...');
                 try {
                     const res = await this.props.api.post('crontab_save', {
                         job_type: activeType,
@@ -591,7 +613,9 @@ export class SettingsPage extends BaseComponent {
 
                     if (res?.needs_elevation || res?.ok === false) {
                         handleElevationNeeded(res);
-                        this.props.toast.show(res?.message || 'Geen directe schrijfrechten. Vul QNAP SSH/Sudo in.', 'error');
+                        const msg = res?.message || 'Geen directe schrijfrechten. Vul QNAP SSH/Sudo in.';
+                        setCrontabBanner('error', msg.startsWith('❌') ? msg : `❌ ${msg}`);
+                        this.props.toast.show(msg, 'error');
                         return;
                     }
 
@@ -605,13 +629,17 @@ export class SettingsPage extends BaseComponent {
 
                     const passInput = document.getElementById('cronSshPassInput');
                     if (passInput) passInput.value = '';
-                    this.props.toast.show(`${typeLabel} cronjob opgeslagen!`);
-                    this.loadCrontabStatus();
+                    const okMsg = res?.message || `${typeLabel} cronjob opgeslagen!`;
+                    this.props.toast.show(okMsg);
+                    await this.loadCrontabStatus();
+                    setCrontabBanner('success', okMsg.startsWith('✅') ? okMsg : `✅ ${okMsg}`);
                 } catch (err) {
-                    if (err?.data?.needs_elevation || String(err?.message || '').includes('schrijfrechten')) {
+                    if (err?.data?.needs_elevation || String(err?.message || '').includes('schrijfrechten') || String(err?.message || '').includes('SSH')) {
                         handleElevationNeeded(err);
                     }
-                    this.props.toast.show(err?.message || 'Opslaan van cronjob mislukt.', 'error');
+                    const errMsg = err?.message || 'Opslaan van cronjob mislukt.';
+                    setCrontabBanner('error', errMsg.startsWith('❌') ? errMsg : `❌ ${errMsg}`);
+                    this.props.toast.show(errMsg, 'error');
                 }
             });
 
@@ -654,22 +682,29 @@ export class SettingsPage extends BaseComponent {
             document.getElementById('viewCrontabBtn')?.addEventListener('click', renderCrontabViewer);
 
             document.getElementById('deleteCrontabBtn')?.addEventListener('click', async () => {
+                setCrontabBanner('loading', '⏳ Bezig met bijwerken van /etc/config/crontab...');
                 try {
                     const res = await this.props.api.post('crontab_delete', { type: activeType, ...getElevationPayload() });
                     if (res?.needs_elevation || res?.ok === false) {
                         handleElevationNeeded(res);
-                        this.props.toast.show(res?.message || 'Geen directe schrijfrechten. Vul QNAP SSH/Sudo in.', 'error');
+                        const msg = res?.message || 'Geen directe schrijfrechten. Vul QNAP SSH/Sudo in.';
+                        setCrontabBanner('error', msg.startsWith('❌') ? msg : `❌ ${msg}`);
+                        this.props.toast.show(msg, 'error');
                         return;
                     }
                     const passInput = document.getElementById('cronSshPassInput');
                     if (passInput) passInput.value = '';
-                    this.props.toast.show(`${typeLabel} cronjob gewist!`);
-                    this.loadCrontabStatus();
+                    const okMsg = res?.message || `${typeLabel} cronjob gewist!`;
+                    this.props.toast.show(okMsg);
+                    await this.loadCrontabStatus();
+                    setCrontabBanner('success', okMsg.startsWith('✅') ? okMsg : `✅ ${okMsg}`);
                 } catch (err) {
-                    if (err?.data?.needs_elevation || String(err?.message || '').includes('schrijfrechten')) {
+                    if (err?.data?.needs_elevation || String(err?.message || '').includes('schrijfrechten') || String(err?.message || '').includes('SSH')) {
                         handleElevationNeeded(err);
                     }
-                    this.props.toast.show(err?.message || 'Wissen van cronjob mislukt.', 'error');
+                    const errMsg = err?.message || 'Wissen van cronjob mislukt.';
+                    setCrontabBanner('error', errMsg.startsWith('❌') ? errMsg : `❌ ${errMsg}`);
+                    this.props.toast.show(errMsg, 'error');
                 }
             });
 
