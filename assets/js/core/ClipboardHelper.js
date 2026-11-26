@@ -65,3 +65,7 @@ export class ClipboardHelper {
         return false;
     }
 }
+
+if (typeof window !== 'undefined') {
+    window.ClipboardHelper = ClipboardHelper;
+}

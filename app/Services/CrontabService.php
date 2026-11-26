@@ -68,7 +68,7 @@ final class CrontabService
         ];
     }
 
-    public function saveJob(string $schedule, string $phpPath, string $type = 'm3u'): array
+    public function saveJob(string $schedule, string $phpPath, string $type = 'm3u', array $elevation = []): array
     {
         if (!in_array($type, ['m3u', 'epg'], true)) {
             throw new \InvalidArgumentException('Ongeldig cronjob-type. Gebruik m3u of epg.');
@@ -85,62 +85,47 @@ final class CrontabService
         }
 
         $status = $this->getStatus();
-        if (!$status['writable']) {
-            throw new \RuntimeException($status['permission_hint'] ?: 'Geen schrijfrechten voor crontab.');
-        }
-
         $scriptPath = $status['script_path'];
         $typeFlag = '--' . $type;
         $newLine = sprintf('%s %s %s %s --force >/dev/null 2>&1', $schedule, $phpPath, $scriptPath, $typeFlag);
 
         $backend = $status['backend'];
         $lines = $this->readCrontabLines($backend);
-        $updated = [];
-        $replaced = false;
-
-        foreach ($lines as $line) {
+        $updated = array_values(array_filter($lines, static function (string $line) use ($typeFlag): bool {
             $trimmed = trim($line);
-            $isTarget = str_contains($line, self::SYNC_MARKER)
-                && str_contains($line, $typeFlag)
-                && !str_starts_with($trimmed, '#');
-
-            if ($isTarget) {
-                if (!$replaced) {
-                    $updated[] = $newLine;
-                    $replaced = true;
-                }
-                continue;
+            if ($trimmed === '' || str_starts_with($trimmed, '#')) {
+                return $trimmed !== '';
             }
-            $updated[] = $line;
-        }
+            return !(str_contains($trimmed, self::SYNC_MARKER) && str_contains($trimmed, $typeFlag));
+        }));
+        $updated[] = $newLine;
 
-        if (!$replaced) {
-            $updated[] = $newLine;
-        }
-
-        $this->writeCrontabLines($backend, $updated);
+        $this->writeCrontabLines($backend, $updated, $elevation);
         return $this->getStatus();
     }
 
-    public function deleteJob(string $type = 'm3u'): array
+    public function deleteJob(string $type = 'm3u', array $elevation = []): array
     {
         if (!in_array($type, ['m3u', 'epg'], true)) {
             throw new \InvalidArgumentException('Ongeldig cronjob-type. Gebruik m3u of epg.');
         }
 
         $status = $this->getStatus();
-        if (!$status['writable']) {
-            throw new \RuntimeException($status['permission_hint'] ?: 'Geen schrijfrechten voor crontab.');
-        }
-
         $typeFlag = '--' . $type;
         $backend = $status['backend'];
         $lines = $this->readCrontabLines($backend);
         $filtered = array_values(array_filter($lines, static function (string $line) use ($typeFlag): bool {
-            return !(str_contains($line, self::SYNC_MARKER) && str_contains($line, $typeFlag) && !str_starts_with(trim($line), '#'));
+            $trimmed = trim($line);
+            if ($trimmed === '') {
+                return false;
+            }
+            if (str_starts_with($trimmed, '#')) {
+                return true;
+            }
+            return !(str_contains($trimmed, self::SYNC_MARKER) && str_contains($trimmed, $typeFlag));
         }));
 
-        $this->writeCrontabLines($backend, $filtered);
+        $this->writeCrontabLines($backend, $filtered, $elevation);
         return $this->getStatus();
     }
 
@@ -209,43 +194,231 @@ final class CrontabService
 
     /**
      * @param array<int, string> $lines
+     * @param array{auth_mode?: string, ssh_user?: string, ssh_password?: string} $elevation
      */
-    private function writeCrontabLines(string $backend, array $lines): void
+    private function writeCrontabLines(string $backend, array $lines, array $elevation = []): void
     {
         $payload = implode("\n", array_filter($lines, static fn(string $l): bool => $l !== '')) . "\n";
+        $authMode = trim((string) ($elevation['auth_mode'] ?? ''));
+        $sshUser = trim((string) ($elevation['ssh_user'] ?? 'admin'));
+        if ($sshUser === '') {
+            $sshUser = 'admin';
+        }
+        $sshPassword = (string) ($elevation['ssh_password'] ?? '');
+        $elevation['ssh_password'] = '';
 
-        if ($backend === 'qnap') {
-            if (@file_put_contents(self::QNAP_CRONTAB_PATH, $payload, LOCK_EX) === false) {
-                throw new \RuntimeException('Kon niet schrijven naar ' . self::QNAP_CRONTAB_PATH);
-            }
-            if (function_exists('exec')) {
-                @exec('crontab ' . escapeshellarg(self::QNAP_CRONTAB_PATH) . ' 2>&1');
-                if (@is_executable('/etc/init.d/crond.sh')) {
-                    @exec('/etc/init.d/crond.sh restart 2>&1');
+        try {
+            if ($backend === 'qnap') {
+                if (@is_writable(self::QNAP_CRONTAB_PATH) && $authMode === '') {
+                    if (@file_put_contents(self::QNAP_CRONTAB_PATH, $payload, LOCK_EX) === false) {
+                        throw new \RuntimeException('Kon niet schrijven naar ' . self::QNAP_CRONTAB_PATH);
+                    }
+                    $this->reloadQnapCrontab();
+                    return;
                 }
+
+                if ($authMode === '') {
+                    if ($this->trySudoNoPassQnap($payload)) {
+                        return;
+                    }
+                    throw new \RuntimeException(
+                        'Geen schrijfrechten op ' . self::QNAP_CRONTAB_PATH . '. Kies Sudo of QNAP SSH Login om op te slaan.',
+                        403
+                    );
+                }
+
+                if ($authMode === 'sudo') {
+                    if ($sshPassword === '') {
+                        if ($this->trySudoNoPassQnap($payload)) {
+                            return;
+                        }
+                        throw new \RuntimeException('Vul het sudo-wachtwoord in.', 403);
+                    }
+                    $this->writeQnapWithSudo($payload, $sshPassword);
+                    return;
+                }
+
+                if ($authMode === 'ssh') {
+                    if ($sshPassword === '') {
+                        throw new \RuntimeException('Vul het SSH-wachtwoord in.', 403);
+                    }
+                    if (!preg_match('/^[a-zA-Z0-9_.\-]+$/', $sshUser)) {
+                        throw new \InvalidArgumentException('Ongeldige SSH-gebruikersnaam.');
+                    }
+                    $this->writeQnapWithSsh($payload, $sshUser, $sshPassword);
+                    return;
+                }
+
+                throw new \InvalidArgumentException('Ongeldige auth_mode. Gebruik sudo of ssh.');
             }
+
+            if ($backend === 'cli' && function_exists('proc_open')) {
+                $proc = @proc_open('crontab -', [
+                    0 => ['pipe', 'r'],
+                    1 => ['pipe', 'w'],
+                    2 => ['pipe', 'w'],
+                ], $pipes);
+                if (!is_resource($proc)) {
+                    throw new \RuntimeException('Kon crontab proces niet starten.');
+                }
+                fwrite($pipes[0], $payload);
+                fclose($pipes[0]);
+                $err = stream_get_contents($pipes[2]);
+                fclose($pipes[1]);
+                fclose($pipes[2]);
+                $code = proc_close($proc);
+                if ($code !== 0) {
+                    throw new \RuntimeException('Crontab opslaan mislukt: ' . trim((string) $err));
+                }
+                return;
+            }
+
+            throw new \RuntimeException('Crontab wordt op deze server niet ondersteund.');
+        } finally {
+            $sshPassword = '';
+        }
+    }
+
+    private function reloadQnapCrontab(): void
+    {
+        if (!function_exists('exec')) {
             return;
         }
+        $cmd = 'crontab ' . escapeshellarg(self::QNAP_CRONTAB_PATH);
+        if (@is_executable('/etc/init.d/crond.sh')) {
+            $cmd .= ' && /etc/init.d/crond.sh restart';
+        }
+        @exec($cmd . ' 2>&1');
+    }
 
-        if ($backend === 'cli' && function_exists('proc_open')) {
-            $proc = @proc_open('crontab -', [
-                0 => ['pipe', 'r'],
-                1 => ['pipe', 'w'],
-                2 => ['pipe', 'w'],
-            ], $pipes);
-            if (!is_resource($proc)) {
-                throw new \RuntimeException('Kon crontab proces niet starten.');
+    private function trySudoNoPassQnap(string $payload): bool
+    {
+        if (!function_exists('proc_open')) {
+            return false;
+        }
+        $tmpFile = @tempnam(sys_get_temp_dir(), 'iptv_cron_');
+        if ($tmpFile === false) {
+            return false;
+        }
+        try {
+            if (@file_put_contents($tmpFile, $payload) === false) {
+                return false;
             }
-            fwrite($pipes[0], $payload);
+            $cmd = sprintf(
+                'sudo -n sh -c %s',
+                escapeshellarg(
+                    'cp ' . escapeshellarg($tmpFile) . ' ' . self::QNAP_CRONTAB_PATH
+                    . ' && crontab ' . self::QNAP_CRONTAB_PATH
+                    . ' && /etc/init.d/crond.sh restart'
+                )
+            );
+            $proc = @proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+            if (!is_resource($proc)) {
+                return false;
+            }
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            return proc_close($proc) === 0;
+        } finally {
+            @unlink($tmpFile);
+        }
+    }
+
+    private function writeQnapWithSudo(string $payload, string $password): void
+    {
+        if (!function_exists('proc_open')) {
+            throw new \RuntimeException('proc_open is uitgeschakeld op deze server.');
+        }
+        $tmpFile = @tempnam(sys_get_temp_dir(), 'iptv_cron_');
+        if ($tmpFile === false || @file_put_contents($tmpFile, $payload) === false) {
+            throw new \RuntimeException('Kon tijdelijk crontab-bestand niet aanmaken.');
+        }
+        try {
+            $shellCmd = 'cp ' . escapeshellarg($tmpFile) . ' ' . self::QNAP_CRONTAB_PATH
+                . ' && crontab ' . self::QNAP_CRONTAB_PATH
+                . ' && /etc/init.d/crond.sh restart';
+            $proc = @proc_open(
+                'sudo -S -p "" sh -c ' . escapeshellarg($shellCmd),
+                [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                $pipes
+            );
+            if (!is_resource($proc)) {
+                throw new \RuntimeException('Kon sudo-proces niet starten.');
+            }
+            fwrite($pipes[0], $password . "\n");
             fclose($pipes[0]);
+            $out = stream_get_contents($pipes[1]);
             $err = stream_get_contents($pipes[2]);
             fclose($pipes[1]);
             fclose($pipes[2]);
             $code = proc_close($proc);
             if ($code !== 0) {
-                throw new \RuntimeException('Crontab opslaan mislukt: ' . trim((string) $err));
+                throw new \RuntimeException('Sudo crontab-update mislukt: ' . trim((string) ($err ?: $out)));
+            }
+        } finally {
+            @unlink($tmpFile);
+        }
+    }
+
+    private function writeQnapWithSsh(string $payload, string $user, string $password): void
+    {
+        $b64 = base64_encode($payload);
+        $remoteCmd = 'echo ' . escapeshellarg($b64) . ' | base64 -d > ' . self::QNAP_CRONTAB_PATH
+            . ' && crontab ' . self::QNAP_CRONTAB_PATH
+            . ' && /etc/init.d/crond.sh restart';
+
+        if (function_exists('ssh2_connect')) {
+            $conn = @ssh2_connect('127.0.0.1', 22);
+            if ($conn === false) {
+                throw new \RuntimeException('Kon geen SSH-verbinding maken met 127.0.0.1:22.');
+            }
+            if (!@ssh2_auth_password($conn, $user, $password)) {
+                throw new \RuntimeException('SSH-authenticatie mislukt voor gebruiker ' . $user . '.', 403);
+            }
+            $stream = @ssh2_exec($conn, $remoteCmd);
+            if ($stream === false) {
+                throw new \RuntimeException('Kon SSH-commando niet uitvoeren.');
+            }
+            stream_set_blocking($stream, true);
+            $errStream = @ssh2_fetch_stream($stream, SSH2_STREAM_STDERR);
+            $out = stream_get_contents($stream);
+            $err = $errStream ? stream_get_contents($errStream) : '';
+            fclose($stream);
+            if ($errStream) {
+                fclose($errStream);
+            }
+            if (trim((string) $err) !== '' && str_contains(strtolower((string) $err), 'permission denied')) {
+                throw new \RuntimeException('SSH-commando geweigerd: ' . trim((string) $err), 403);
+            }
+            return;
+        }
+
+        if (function_exists('proc_open')) {
+            @exec('which sshpass 2>/dev/null', $whichOut, $whichCode);
+            if ($whichCode === 0 && !empty($whichOut)) {
+                $cmd = sprintf(
+                    'sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 %s@127.0.0.1 %s',
+                    escapeshellarg($user),
+                    escapeshellarg($remoteCmd)
+                );
+                $proc = @proc_open($cmd, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, ['SSHPASS' => $password]);
+                if (!is_resource($proc)) {
+                    throw new \RuntimeException('Kon sshpass-proces niet starten.');
+                }
+                fclose($pipes[0]);
+                $out = stream_get_contents($pipes[1]);
+                $err = stream_get_contents($pipes[2]);
+                fclose($pipes[1]);
+                fclose($pipes[2]);
+                $code = proc_close($proc);
+                if ($code !== 0) {
+                    throw new \RuntimeException('SSH crontab-update mislukt: ' . trim((string) ($err ?: $out)));
+                }
+                return;
             }
         }
+
+        throw new \RuntimeException('Geen SSH-client beschikbaar (installeer PHP ssh2-extensie of sshpass, of gebruik Sudo).');
     }
 
     /**

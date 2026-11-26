@@ -216,9 +216,17 @@ final class SettingsController extends BaseController
         $phpPath = trim((string) ($input['php_cli_path'] ?? $input['php_path'] ?? ''));
         $intervalHours = isset($input['interval_hours']) ? max(1, (int) $input['interval_hours']) : null;
         $preferredHour = isset($input['preferred_hour']) ? max(0, min(23, (int) $input['preferred_hour'])) : null;
+        $elevation = [
+            'auth_mode' => trim((string) ($input['auth_mode'] ?? '')),
+            'ssh_user' => trim((string) ($input['ssh_user'] ?? 'admin')),
+            'ssh_password' => (string) ($input['ssh_password'] ?? ''),
+        ];
+        unset($input['ssh_password']);
 
         try {
-            $status = (new \App\Services\CrontabService())->saveJob($schedule, $phpPath, $type);
+            $status = (new \App\Services\CrontabService())->saveJob($schedule, $phpPath, $type, $elevation);
+            $elevation['ssh_password'] = '';
+            unset($elevation);
 
             $settings = new SettingsRepository();
             if ($intervalHours !== null) {
@@ -250,11 +258,24 @@ final class SettingsController extends BaseController
             ]);
             $this->jsonSuccess($status);
         } catch (\Throwable $e) {
+            $elevation['ssh_password'] = '';
+            unset($elevation);
             \App\Services\AppLogger::log('CRON', 'ERROR', 'Opslaan van cronjob mislukt: ' . $e->getMessage(), [
                 'type' => $type,
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
             ]);
+            if ($e->getCode() === 403) {
+                header('Content-Type: application/json; charset=utf-8');
+                http_response_code(403);
+                echo json_encode([
+                    'success' => false,
+                    'error' => $e->getMessage(),
+                    'needs_elevation' => true,
+                    'methods' => ['sudo', 'ssh'],
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
             $this->jsonError($e->getMessage(), 400);
         }
     }
@@ -266,16 +287,37 @@ final class SettingsController extends BaseController
         $this->verifyCsrf($input);
 
         $type = trim((string) ($input['type'] ?? 'm3u'));
+        $elevation = [
+            'auth_mode' => trim((string) ($input['auth_mode'] ?? '')),
+            'ssh_user' => trim((string) ($input['ssh_user'] ?? 'admin')),
+            'ssh_password' => (string) ($input['ssh_password'] ?? ''),
+        ];
+        unset($input['ssh_password']);
 
         try {
-            $status = (new \App\Services\CrontabService())->deleteJob($type);
+            $status = (new \App\Services\CrontabService())->deleteJob($type, $elevation);
+            $elevation['ssh_password'] = '';
+            unset($elevation);
             \App\Services\AppLogger::log('CRON', 'INFO', 'Cronjob gewist.', ['type' => $type]);
             $this->jsonSuccess($status);
         } catch (\Throwable $e) {
+            $elevation['ssh_password'] = '';
+            unset($elevation);
             \App\Services\AppLogger::log('CRON', 'ERROR', 'Wissen van cronjob mislukt: ' . $e->getMessage(), [
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
             ]);
+            if ($e->getCode() === 403) {
+                header('Content-Type: application/json; charset=utf-8');
+                http_response_code(403);
+                echo json_encode([
+                    'success' => false,
+                    'error' => $e->getMessage(),
+                    'needs_elevation' => true,
+                    'methods' => ['sudo', 'ssh'],
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
             $this->jsonError($e->getMessage(), 400);
         }
     }
