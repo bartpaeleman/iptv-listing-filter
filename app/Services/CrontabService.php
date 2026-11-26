@@ -248,6 +248,45 @@ final class CrontabService
         }
     }
 
+    /**
+     * @return array{source: string, content: string, m3u_rule: ?string, epg_rule: ?string}
+     */
+    public function readRawCrontab(): array
+    {
+        $source = 'crontab -l';
+        $content = '';
+
+        if (@is_file(self::QNAP_CRONTAB_PATH) && @is_readable(self::QNAP_CRONTAB_PATH)) {
+            $source = self::QNAP_CRONTAB_PATH;
+            $raw = @file_get_contents(self::QNAP_CRONTAB_PATH);
+            $content = $raw !== false ? $raw : '';
+        } elseif (function_exists('shell_exec')) {
+            $raw = @shell_exec('crontab -l 2>&1');
+            $content = is_string($raw) ? $raw : '';
+        }
+
+        $m3uRule = null;
+        $epgRule = null;
+        foreach (preg_split('/\r\n|\r|\n/', $content) ?: [] as $line) {
+            $trimmed = trim($line);
+            if ($trimmed === '' || str_starts_with($trimmed, '#') || !str_contains($trimmed, self::SYNC_MARKER)) {
+                continue;
+            }
+            if ($m3uRule === null && str_contains($trimmed, '--m3u')) {
+                $m3uRule = $trimmed;
+            } elseif ($epgRule === null && str_contains($trimmed, '--epg')) {
+                $epgRule = $trimmed;
+            }
+        }
+
+        return [
+            'source' => $source,
+            'content' => $content,
+            'm3u_rule' => $m3uRule,
+            'epg_rule' => $epgRule,
+        ];
+    }
+
     private function isValidCronSchedule(string $schedule): bool
     {
         $parts = explode(' ', $schedule);

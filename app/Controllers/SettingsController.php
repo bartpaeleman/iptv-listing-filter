@@ -185,22 +185,54 @@ final class SettingsController extends BaseController
         $this->jsonSuccess((new \App\Services\CrontabService())->getStatus());
     }
 
+    public function getCrontab(): void
+    {
+        $this->requireAuth();
+        $this->jsonSuccess((new \App\Services\CrontabService())->readRawCrontab());
+    }
+
     public function crontabSave(): void
     {
         $this->requireAuth();
         $input = $this->getJsonInput();
         $this->verifyCsrf($input);
 
-        $schedule = trim((string) ($input['schedule'] ?? ''));
-        $phpPath = trim((string) ($input['php_path'] ?? ''));
-        $type = trim((string) ($input['type'] ?? 'm3u'));
+        $type = trim((string) ($input['job_type'] ?? $input['type'] ?? 'm3u'));
+        $schedule = trim((string) ($input['cron_expression'] ?? $input['schedule'] ?? ''));
+        $phpPath = trim((string) ($input['php_cli_path'] ?? $input['php_path'] ?? ''));
+        $intervalHours = isset($input['interval_hours']) ? max(1, (int) $input['interval_hours']) : null;
+        $preferredHour = isset($input['preferred_hour']) ? max(0, min(23, (int) $input['preferred_hour'])) : null;
 
         try {
             $status = (new \App\Services\CrontabService())->saveJob($schedule, $phpPath, $type);
+
+            $settings = new SettingsRepository();
+            if ($intervalHours !== null) {
+                $settings->set("sync_{$type}_interval_hours", (string) $intervalHours, false);
+                if ($type === 'm3u') {
+                    $settings->set('sync_interval_hours', (string) $intervalHours, false);
+                }
+            }
+            if ($preferredHour !== null) {
+                $settings->set("sync_{$type}_preferred_hour", (string) $preferredHour, false);
+                if ($type === 'm3u') {
+                    $settings->set('sync_preferred_hour', (string) $preferredHour, false);
+                }
+            }
+
+            $activeRule = (string) ($status['jobs'][$type]['raw_line'] ?? '');
+            $status['job_type'] = $type;
+            $status['interval_hours'] = $intervalHours ?? (int) $settings->get("sync_{$type}_interval_hours", $type === 'epg' ? '12' : '72');
+            $status['preferred_hour'] = $preferredHour ?? (int) $settings->get("sync_{$type}_preferred_hour", $type === 'epg' ? '4' : '3');
+            $status['cron_expression'] = $schedule;
+            $status['active_rule'] = $activeRule;
+
             \App\Services\AppLogger::log('CRON', 'INFO', 'Cronjob-instellingen opgeslagen/gewijzigd.', [
                 'type' => $type,
                 'schedule' => $schedule,
                 'php_path' => $phpPath,
+                'interval_hours' => $status['interval_hours'],
+                'preferred_hour' => $status['preferred_hour'],
             ]);
             $this->jsonSuccess($status);
         } catch (\Throwable $e) {
