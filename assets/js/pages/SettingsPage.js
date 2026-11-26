@@ -260,6 +260,12 @@ export class SettingsPage extends BaseComponent {
             const isPreset = presets.some(p => p.value === currentExpr);
             const selectedPreset = isPreset ? currentExpr : 'custom';
 
+            const settings = this.state.settings || {};
+            const execMode = settings.cron_exec_mode || 'direct';
+            const hasSudoPass = Boolean(settings.has_cron_sudo_password);
+            const cronStatus = settings.cron_status || { can_write: Boolean(st.writable), mode: execMode, message: st.permission_hint || '', fix_command: 'chmod 664 /etc/config/crontab && chgrp httpdusr /etc/config/crontab' };
+            const canWrite = Boolean(cronStatus.can_write);
+
             box.innerHTML = `
                 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
                     <strong>Interactief Crontab-beheer</strong>
@@ -268,34 +274,82 @@ export class SettingsPage extends BaseComponent {
                     </span>
                 </div>
                 ${st.raw_line ? `<div class="muted" style="font-size:0.85rem;">Huidige regel: <code>${this.escapeHtml(st.raw_line)}</code></div>` : ''}
-                ${!st.writable ? `
-                    <div class="alert alert-warning" style="padding:0.75rem;border-radius:6px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);">
-                        <p style="margin:0 0 0.5rem 0;font-size:0.88rem;">${this.escapeHtml(st.permission_hint)}</p>
+                <div class="cron-exec-box">
+                    <label>Executiemodus voor Crontab-acties
+                        <select id="cronExecModeSelect">
+                            <option value="direct" ${execMode === 'direct' ? 'selected' : ''}>Direct (PHP webserver user httpdusr)</option>
+                            <option value="sudo_nopasswd" ${execMode === 'sudo_nopasswd' ? 'selected' : ''}>Via sudo (wachtwoordloos / sudoers)</option>
+                            <option value="sudo_password" ${execMode === 'sudo_password' ? 'selected' : ''}>Via sudo / root wachtwoord</option>
+                        </select>
+                    </label>
+                    <div id="cronSudoPassGroup" style="display:${execMode === 'sudo_password' ? 'flex' : 'none'};flex-direction:column;gap:0.5rem;margin-top:0.5rem;">
+                        <label>Sudo / Root Wachtwoord
+                            <input type="password" id="cronSudoPassInput" placeholder="${hasSudoPass ? '•••••••• (opgeslagen)' : 'Voer sudo/root wachtwoord in'}" autocomplete="new-password">
+                        </label>
+                        ${hasSudoPass ? `<label style="display:flex;align-items:center;gap:0.4rem;font-size:0.85rem;"><input type="checkbox" id="clearCronSudoPassChk"> Opgeslagen wachtwoord wissen</label>` : ''}
+                    </div>
+                    <div style="margin-top:0.5rem;">
+                        <button type="button" class="btn btn-sm" id="saveCronExecModeBtn" style="min-height:44px;">Executiemodus opslaan</button>
+                    </div>
+                </div>
+                ${!canWrite ? `
+                    <div class="alert alert-warning cron-status-banner">
+                        <p style="margin:0 0 0.5rem 0;font-size:0.88rem;">${this.escapeHtml(cronStatus.message || st.permission_hint || 'Geen schrijfrechten op /etc/config/crontab.')}</p>
+                        ${execMode !== 'direct' ? `<p class="muted" style="margin:0 0 0.5rem 0;font-size:0.82rem;">Tip: voeg eenmalig via <code>visudo</code> of <code>/etc/sudoers</code> rechten toe voor <code>httpdusr</code> als alternatief op <code>chmod 664</code>.</p>` : ''}
                         <div class="copy-group">
-                            <input type="text" id="cronPermCmdInput" value="chmod 664 /etc/config/crontab && chgrp httpdusr /etc/config/crontab" readonly>
-                            <button type="button" class="btn btn-sm" id="copyCronPermBtn">Kopieer SSH-commando</button>
+                            <input type="text" id="cronPermCmdInput" value="${this.escapeHtml(cronStatus.fix_command || 'chmod 664 /etc/config/crontab && chgrp httpdusr /etc/config/crontab')}" readonly>
+                            <button type="button" class="btn btn-sm" id="copyCronPermBtn" style="min-height:44px;">Kopieer SSH-commando</button>
                         </div>
                     </div>
                 ` : ''}
                 <div class="grid-2">
                     <label>Schema Preset
-                        <select id="cronPresetSelect" ${!st.writable ? 'disabled' : ''}>
+                        <select id="cronPresetSelect" ${!canWrite ? 'disabled' : ''}>
                             ${presets.map(p => `<option value="${this.escapeHtml(p.value)}" ${p.value === selectedPreset ? 'selected' : ''}>${this.escapeHtml(p.label)}</option>`).join('')}
                         </select>
                     </label>
                     <label>Cron Expressie (5 velden)
-                        <input type="text" id="cronExprInput" value="${this.escapeHtml(currentExpr)}" ${!st.writable ? 'disabled' : ''}>
+                        <input type="text" id="cronExprInput" value="${this.escapeHtml(currentExpr)}" ${!canWrite ? 'disabled' : ''}>
                     </label>
                 </div>
                 <label>PHP-CLI Pad
-                    <input type="text" id="cronPhpPathInput" value="${this.escapeHtml(st.default_php_path || '/usr/bin/php')}" ${!st.writable ? 'disabled' : ''}>
+                    <input type="text" id="cronPhpPathInput" value="${this.escapeHtml(st.default_php_path || '/usr/bin/php')}" ${!canWrite ? 'disabled' : ''}>
                 </label>
-                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
-                    <button type="button" class="btn btn-primary" id="saveCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>Cronjob opslaan / wijzigen</button>
+                <div class="cron-actions-bar">
+                    <button type="button" class="btn btn-primary" id="saveCrontabBtn" style="min-height:44px;" ${!canWrite ? 'disabled' : ''}>Cronjob opslaan / wijzigen</button>
                     <button type="button" class="btn" id="testCrontabBtn" style="min-height:44px;">▶️ Cronjob nu testen</button>
-                    ${st.raw_line ? `<button type="button" class="btn btn-danger" id="deleteCrontabBtn" style="min-height:44px;" ${!st.writable ? 'disabled' : ''}>Cronjob wissen</button>` : ''}
+                    <button type="button" class="btn" id="restartCrontabBtn" style="min-height:44px;">🔄 Crontab herstarten</button>
+                    ${st.raw_line ? `<button type="button" class="btn btn-danger" id="deleteCrontabBtn" style="min-height:44px;" ${!canWrite ? 'disabled' : ''}>Cronjob wissen</button>` : ''}
                 </div>
             `;
+
+            document.getElementById('cronExecModeSelect')?.addEventListener('change', ev => {
+                const passGroup = document.getElementById('cronSudoPassGroup');
+                if (passGroup) passGroup.style.display = ev.target.value === 'sudo_password' ? 'flex' : 'none';
+            });
+
+            document.getElementById('saveCronExecModeBtn')?.addEventListener('click', async ev => {
+                const btn = ev.currentTarget;
+                const mode = document.getElementById('cronExecModeSelect')?.value || 'direct';
+                const pass = document.getElementById('cronSudoPassInput')?.value || '';
+                const clearPass = Boolean(document.getElementById('clearCronSudoPassChk')?.checked);
+                btn.disabled = true;
+                try {
+                    await this.props.api.post('save_settings', {
+                        cron_exec_mode: mode,
+                        cron_sudo_password: pass,
+                        clear_cron_sudo_password: clearPass,
+                    });
+                    const updated = await this.props.api.get('get_settings');
+                    this.state.settings = updated;
+                    this.props.toast.show('Cron executiemodus opgeslagen!');
+                    await this.loadCrontabStatus();
+                } catch (err) {
+                    this.props.toast.show(err?.message || 'Opslaan mislukt.', 'error');
+                } finally {
+                    btn.disabled = false;
+                }
+            });
 
             document.getElementById('copyCronPermBtn')?.addEventListener('click', ev => {
                 const input = document.getElementById('cronPermCmdInput');
@@ -371,6 +425,22 @@ export class SettingsPage extends BaseComponent {
                 await this.props.api.post('crontab_delete', {});
                 this.props.toast.show('Cronjob gewist!');
                 this.loadCrontabStatus();
+            });
+
+            document.getElementById('restartCrontabBtn')?.addEventListener('click', async ev => {
+                const btn = ev.currentTarget;
+                const origText = btn.textContent;
+                btn.disabled = true;
+                btn.textContent = 'Bezig met herstarten...';
+                try {
+                    const res = await this.props.api.post('restart_cron', {});
+                    this.props.toast.show(res?.message || 'Crontab succesvol herstart!');
+                } catch (err) {
+                    this.props.toast.show(err?.message || 'Crontab herstarten mislukt.', 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = origText;
+                }
             });
 
             document.getElementById('testCrontabBtn')?.addEventListener('click', async ev => {
