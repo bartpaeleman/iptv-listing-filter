@@ -202,3 +202,8 @@ Vóór elke download/sync controleert `SchedulerService`:
 - **403 Forbidden op playlist/epg:** Client zit buiten het toegestane LAN-subnet of `token` komt niet overeen met `settings.output_token`.
 - **401 Unauthorized op Xtream `player_api.php`:** Controleer `xtream_out_username` / `xtream_out_password` in Instellingen.
 - **Kanalen ontbreken in client:** Controleer of zowel de groep (`m3u_groups.is_enabled = 1`) als het kanaal (`channels.is_enabled = 1`) actief zijn, en of `m3u_groups.category` juist staat voor Live vs. VOD vs. Series.
+
+## EPG Groepsfiltering & Close-Match Workflow
+- `m3u_groups.show_in_epg` bepaalt welke actieve groepen zichtbaar zijn in de groepsdropdown van **EPG Zender Koppeling** (beheerd via `POST ?route=api&endpoint=toggle_group_epg_links`).
+- `EpgMatcherService::findMatchWithQuality()` onderscheidt exacte matches (`auto`) van `close_match`-suggesties; gebruikers bevestigen suggesties in `EpgMappingPage.js` met 1 klik (`manual`).
+- QNAP `/etc/config/crontab`-beheer verloopt via OpenSSH `SSH_ASKPASS` + PHP `hex2bin` in `CrontabService::executeAsAdminViaSsh()`.

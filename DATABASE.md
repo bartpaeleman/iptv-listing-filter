@@ -213,3 +213,7 @@ Koppelt bestaande kanalen uit `channels` aan één of meerdere custom groepen in
    - Toevoegen van extra kanalen aan een custom groep dwingt strikte compatibiliteit af tussen `m3u_groups.category` van doel- en brongroep (`Live` <-> `Live`, `Film` <-> `Film`, `TV Series` <-> `TV Series`).
 3. **Uitgaande Feeds (`PlaylistExporterService` & `XtreamServerService`):**
    - Combineert alle actieve standaardgroepen (`is_enabled = 1 AND is_custom = 0` via `channels.group_id`) met alle actieve custom groepen (`is_enabled = 1 AND is_custom = 1` via `custom_group_channels`), past `ChannelNameCleanerService` toe bij export, en levert M3U- en Xtream-streams uit op één uniforme `stream_id` (`channels.id`).
+
+## Recente Schema-uitbreidingen (`schema_integrity_v10`)
+- `m3u_groups.show_in_epg` (`TINYINT(1) NOT NULL DEFAULT 1`): bepaalt of een groep wordt getoond in EPG Zender Koppeling (`0` voor `Film` en `TV Series`).
+- `channels.epg_match_type` (`ENUM('none', 'auto', 'close_match', 'manual')`): ondersteunt onbevestigde `close_match`-suggesties naast `auto` en `manual`.

@@ -191,6 +191,29 @@ final class ChannelController extends BaseController
         $this->jsonSuccess();
     }
 
+    public function toggleGroupEpgLinks(): void
+    {
+        $this->requireAuth();
+        $input = $this->getJsonInput();
+        $this->verifyCsrf($input);
+
+        $id = (int) ($input['group_id'] ?? $input['id'] ?? 0);
+        if ($id <= 0) {
+            $this->jsonError('Ongeldig group_id.', 400);
+        }
+
+        $showInEpg = !empty($input['show_in_epg']) ? 1 : 0;
+        $newStatus = (new GroupRepository())->setShowInEpg($id, $showInEpg);
+        (new ViewCacheService())->invalidateGroupsCache();
+
+        $this->jsonSuccess([
+            'ok' => true,
+            'group_id' => $id,
+            'show_in_epg' => $newStatus,
+            'message' => $newStatus === 1 ? 'EPG ingeschakeld voor groep' : 'EPG uitgeschakeld voor groep',
+        ]);
+    }
+
     public function bulkGroups(): void
     {
         $this->requireAuth();

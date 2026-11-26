@@ -1,8 +1,10 @@
--- Latest-Only Delta: custom_group_channels ON DELETE SET NULL + snapshot columns
-ALTER TABLE `custom_group_channels`
-    MODIFY COLUMN `channel_id` INT UNSIGNED NULL,
-    ADD COLUMN IF NOT EXISTS `channel_tvg_name` VARCHAR(255) NOT NULL DEFAULT '' AFTER `channel_id`,
-    ADD COLUMN IF NOT EXISTS `channel_tvg_id` VARCHAR(255) NULL AFTER `channel_tvg_name`,
-    ADD COLUMN IF NOT EXISTS `source_group_name` VARCHAR(255) NOT NULL DEFAULT '' AFTER `channel_tvg_id`,
-    ADD COLUMN IF NOT EXISTS `saved_epg_channel_id` VARCHAR(255) NULL AFTER `source_group_name`,
-    ADD COLUMN IF NOT EXISTS `saved_custom_name` VARCHAR(255) NULL AFTER `saved_epg_channel_id`;
+-- Latest-Only Delta: show_in_epg on m3u_groups
+ALTER TABLE `m3u_groups`
+    ADD COLUMN IF NOT EXISTS `show_in_epg` TINYINT(1) NOT NULL DEFAULT 1 AFTER `is_enabled`;
+
+UPDATE `m3u_groups`
+SET `show_in_epg` = 0
+WHERE `category` IN ('Film', 'TV Series');
+
+ALTER TABLE `channels`
+    MODIFY COLUMN `epg_match_type` ENUM('none', 'auto', 'close_match', 'manual') NOT NULL DEFAULT 'none';

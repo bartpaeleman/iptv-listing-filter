@@ -23,3 +23,7 @@ Dit document beschrijft handmatige acties die beheerders op de QNAP NAS moeten u
 ## Update naar Gesplitste M3U & EPG Cronjobs (`feature/cronjob-split`)
 - Geen database-migratie of `.env`-wijziging vereist.
 - **Crontab opschonen (optioneel):** Als er nog een oude gecombineerde `bin/sync.php --force` regel in `/etc/config/crontab` staat, verwijder deze eenmalig en stel via **Instellingen → ⏱️ Automatisering & Crontab** de twee aparte jobs (`📺 M3U Kanalen Cronjob` en `📅 EPG Gids Cronjob`) opnieuw in.
+
+## Update naar EPG-LINKS Toggle & Close-Match (`schema_integrity_v10`)
+- `SchemaMigrator::ensureSchemaUpToDate()` (`schema_integrity_v10`) voegt automatisch `m3u_groups.show_in_epg` toe en breidt `channels.epg_match_type` uit met `'close_match'`.
+- Indien de database-gebruiker geen `ALTER TABLE`-rechten heeft, voer dan handmatig `database/update.sql` uit als DB-admin.

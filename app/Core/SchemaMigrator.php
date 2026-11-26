@@ -26,7 +26,7 @@ final class SchemaMigrator
                 "SELECT COUNT(*) FROM information_schema.tables
                  WHERE table_schema = DATABASE() AND table_name IN ('epg_sources', 'country_tags', 'emoji_rules')"
             )->fetchColumn();
-            $flag = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'schema_integrity_v9' LIMIT 1")->fetchColumn();
+            $flag = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'schema_integrity_v10' LIMIT 1")->fetchColumn();
             if ($tblCount === 3 && (string) $flag === '1') {
                 return;
             }
@@ -259,7 +259,13 @@ final class SchemaMigrator
             );
         }
 
-        $pdo->exec("INSERT INTO settings (setting_key, setting_value, is_encrypted) VALUES ('schema_integrity_v9', '1', 0) ON DUPLICATE KEY UPDATE setting_value = '1'");
+        if (!self::columnExists($pdo, 'm3u_groups', 'show_in_epg')) {
+            $pdo->exec('ALTER TABLE `m3u_groups` ADD COLUMN `show_in_epg` TINYINT(1) NOT NULL DEFAULT 1 AFTER `is_enabled`');
+            $pdo->exec("UPDATE `m3u_groups` SET `show_in_epg` = 0 WHERE `category` IN ('Film', 'TV Series')");
+        }
+        $pdo->exec("ALTER TABLE `channels` MODIFY COLUMN `epg_match_type` ENUM('none', 'auto', 'close_match', 'manual') NOT NULL DEFAULT 'none'");
+
+        $pdo->exec("INSERT INTO settings (setting_key, setting_value, is_encrypted) VALUES ('schema_integrity_v10', '1', 0) ON DUPLICATE KEY UPDATE setting_value = '1'");
     }
 
     private static function columnExists(PDO $pdo, string $table, string $column): bool
